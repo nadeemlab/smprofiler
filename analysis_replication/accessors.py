@@ -9,6 +9,7 @@ from time import sleep
 from time import time
 from datetime import datetime
 from sqlite3 import connect
+from sqlite3 import Connection as SQLiteConnection
 import pickle
 
 from pandas import DataFrame
@@ -54,13 +55,14 @@ def sleep_poll():
 class DataAccessor:
     """Convenience caller of HTTP methods for data access."""
     caching: bool
+    connection: SQLiteConnection
 
     def __init__(self, study, host=None, caching: bool=True):
         self.caching = caching
         if self.caching:
-            with connect('cache.sqlite3') as connection:
-                cursor = connection.cursor()
-                cursor.execute('CREATE TABLE IF NOT EXISTS cache(url TEXT, contents BLOB);')
+            self.connection = connect('cache.sqlite3')
+            cursor = self.connection.cursor()
+            cursor.execute('CREATE TABLE IF NOT EXISTS cache(url TEXT, contents BLOB);')
         _host = get_default_host(host)
         if _host is None:
             raise RuntimeError('Expected host name in api_host.txt .')
@@ -75,6 +77,10 @@ class DataAccessor:
         print('\n' + Colors.bold_magenta + study + Colors.reset + '\n')
         self.cohorts = self._retrieve_cohorts()
         self.all_cells = self._retrieve_all_cells_counts()
+
+    def cleanup(self) -> None:
+        if self.caching:
+            self.connection.close()
 
     def feature_matrix(self, sample: str) -> DataFrame:
         parts = [
@@ -267,28 +273,25 @@ class DataAccessor:
         if not self.caching:
             return
         self._drop_from_cache(url)
-        with connect('cache.sqlite3') as connection:
-            cursor = connection.cursor()
-            cursor.execute('INSERT INTO cache(url, contents) VALUES (?, ?);', (url, pickle.dumps(contents)))
+        cursor = self.connection.cursor()
+        cursor.execute('INSERT INTO cache(url, contents) VALUES (?, ?);', (url, pickle.dumps(contents)))
 
     def _drop_from_cache(self, url: str) -> None:
-        with connect('cache.sqlite3') as connection:
-            cursor = connection.cursor()
-            cursor.execute('DELETE FROM cache WHERE url=?;', (url,))
+        cursor = self.connection.cursor()
+        cursor.execute('DELETE FROM cache WHERE url=?;', (url,))
 
     def _lookup_cache(self, url, binary: bool=False):
         if not self.caching:
             return None
-        with connect('cache.sqlite3') as connection:
-            cursor = connection.cursor()
-            cursor.execute('SELECT contents FROM cache WHERE url=?;', (url,))
-            rows = cursor.fetchall()
-            if len(rows) > 0:
-                if binary:
-                    obj = pickle.loads(rows[0][0], encoding='bytes')
-                else:
-                    obj = pickle.loads(rows[0][0], encoding='bytes').json()
-                return obj, url
+        cursor = self.connection.cursor()
+        cursor.execute('SELECT contents FROM cache WHERE url=?;', (url,))
+        rows = cursor.fetchall()
+        if len(rows) > 0:
+            if binary:
+                obj = pickle.loads(rows[0][0], encoding='bytes')
+            else:
+                obj = pickle.loads(rows[0][0], encoding='bytes').json()
+            return obj, url
         return None
 
     def _retrieve(self, endpoint, query, binary: bool=False):
