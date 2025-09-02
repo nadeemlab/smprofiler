@@ -136,6 +136,9 @@ class Assessor:
         self.access = access
         self.limits = limits
 
+    def cleanup(self) -> None:
+        self.access.cleanup()
+
     def assess(self, case: Case) -> Result:
         if case.metric == 'fractions':
             return self._assess_fraction(case)
@@ -294,6 +297,7 @@ def survey(host: str, study: str) -> DataFrame:
             b.add_line(message, sticky_header='Proximity assessment phase')
 
     b.finish()
+    a.cleanup()
 
     print('')
     print('Single channel fractions results:')
