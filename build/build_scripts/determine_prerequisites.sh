@@ -29,7 +29,7 @@ handle_status $?
 if [ $? -gt 0 ]; then
     exit 1
 fi
-uv pip freeze | grep -v spatialprofilingtoolbox > $FILENAME
+uv pip freeze | grep -v smprofiler > $FILENAME
 handle_status $?
 deactivate
 rm -rf .venv_$SPECIFIER

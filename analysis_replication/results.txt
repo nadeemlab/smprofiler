@@ -1,4 +1,4 @@
-Using host: http://oncopathtk.org/api
+Using host: http://smprofiler.io/api
 
 Melanoma intralesional IL2
 

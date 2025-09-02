@@ -7,9 +7,9 @@ from pandas import read_csv
 from pandas import DataFrame
 from numpy import isnan
 
-from spatialprofilingtoolbox.db.squidpy_metrics import create_and_transcribe_squidpy_features
-from spatialprofilingtoolbox.db.database_connection import DBConnection
-from spatialprofilingtoolbox.db.describe_features import get_feature_description
+from smprofiler.db.squidpy_metrics import create_and_transcribe_squidpy_features
+from smprofiler.db.database_connection import DBConnection
+from smprofiler.db.describe_features import get_feature_description
 
 FeatureVector = tuple[tuple[str, float], ...]
 
@@ -82,7 +82,7 @@ def retrieve_feature_values(connection):
 
 
 def test_autocomputed_squidpy_features():
-    database_config_file='.spt_db.config.container'
+    database_config_file='.smprofiler_db.config.container'
     study = 'Melanoma intralesional IL2'
     create_and_transcribe_squidpy_features(database_config_file, study)
     with DBConnection(database_config_file=database_config_file, study=study) as connection:

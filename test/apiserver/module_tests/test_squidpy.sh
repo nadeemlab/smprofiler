@@ -17,7 +17,7 @@ function test_squidpy() {
         p1="$2"
         p2="$3"
         filename="$4"
-        query="http://spt-apiserver-testing-apiserver:8080/request-spatial-metrics-computation/?study=Melanoma%20intralesional%20IL2&phenotype=$p1&phenotype=$p2&feature_class=$feature_class"
+        query="http://smprofiler-apiserver-testing-apiserver:8080/request-spatial-metrics-computation/?study=Melanoma%20intralesional%20IL2&phenotype=$p1&phenotype=$p2&feature_class=$feature_class"
     fi
     if [[ "$feature_class" == "co-occurrence" ]];
     then
@@ -25,19 +25,19 @@ function test_squidpy() {
         p2="$3"
         r="$4"
         filename="$5"
-        query="http://spt-apiserver-testing-apiserver:8080/request-spatial-metrics-computation/?study=Melanoma%20intralesional%20IL2&phenotype=$p1&phenotype=$p2&radius=$r&feature_class=$feature_class"
+        query="http://smprofiler-apiserver-testing-apiserver:8080/request-spatial-metrics-computation/?study=Melanoma%20intralesional%20IL2&phenotype=$p1&phenotype=$p2&radius=$r&feature_class=$feature_class"
     fi
     if [[ "$feature_class" == "ripley" ]];
     then
         p="$2"
         filename="$3"
-        query="http://spt-apiserver-testing-apiserver:8080/request-spatial-metrics-computation/?study=Melanoma%20intralesional%20IL2&phenotype=$p&feature_class=$feature_class"
+        query="http://smprofiler-apiserver-testing-apiserver:8080/request-spatial-metrics-computation/?study=Melanoma%20intralesional%20IL2&phenotype=$p&feature_class=$feature_class"
     fi
     if [[ "$feature_class" == "spatial%20autocorrelation" ]];
     then
         p="$2"
         filename="$3"
-        query="http://spt-apiserver-testing-apiserver:8080/request-spatial-metrics-computation/?study=Melanoma%20intralesional%20IL2&phenotype=$p&feature_class=$feature_class"
+        query="http://smprofiler-apiserver-testing-apiserver:8080/request-spatial-metrics-computation/?study=Melanoma%20intralesional%20IL2&phenotype=$p&feature_class=$feature_class"
     fi
     start=$SECONDS
     while (( SECONDS - start < 300 )); do

@@ -6,8 +6,8 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "spatialprofilingtoolbox"
-version = "1.0.66"
+name = "smprofiler"
+version = "1.0.67"
 authors = [
     { name = "James Mathews", email = "mathewj2@mskcc.org" }
 ]
@@ -34,8 +34,8 @@ dependencies = [
 ]
 
 [project.urls]
-documentation = "https://github.com/nadeemlab/SPT"
-repository = "https://github.com/nadeemlab/SPT"
+documentation = "https://github.com/nadeemlab/smprofiler"
+repository = "https://github.com/nadeemlab/smprofiler"
 
 [project.optional-dependencies]
 all = [
@@ -129,45 +129,45 @@ dev = [
 ]
 
 [project.scripts]
-spt = "spatialprofilingtoolbox.entry_point.cli:main_program"
-spt-enable-completion = "spatialprofilingtoolbox.entry_point.spt_enable_completion:main_program"
+smprofiler = "smprofiler.entry_point.cli:main_program"
+smprofiler-enable-completion = "smprofiler.entry_point.smprofiler_enable_completion:main_program"
 
 [tool.setuptools]
 packages = [
-    "spatialprofilingtoolbox",
-    "spatialprofilingtoolbox.standalone_utilities",
-    "spatialprofilingtoolbox.entry_point",
-    "spatialprofilingtoolbox.apiserver",
-    "spatialprofilingtoolbox.apiserver.app",
-    "spatialprofilingtoolbox.apiserver.request_scheduling",
-    "spatialprofilingtoolbox.apiserver.scripts",
-    "spatialprofilingtoolbox.graphs",
-    "spatialprofilingtoolbox.graphs.scripts",
-    "spatialprofilingtoolbox.ondemand",
-    "spatialprofilingtoolbox.ondemand.providers",
-    "spatialprofilingtoolbox.ondemand.computers",
-    "spatialprofilingtoolbox.ondemand.scripts",
-    "spatialprofilingtoolbox.db",
-    "spatialprofilingtoolbox.db.accessors",
-    "spatialprofilingtoolbox.db.exchange_data_formats",
-    "spatialprofilingtoolbox.db.scripts",
-    "spatialprofilingtoolbox.db.data_model",
-    "spatialprofilingtoolbox.workflow",
-    "spatialprofilingtoolbox.workflow.scripts",
-    "spatialprofilingtoolbox.workflow.component_interfaces",
-    "spatialprofilingtoolbox.workflow.graph_generation",
-    "spatialprofilingtoolbox.workflow.graph_plugin",
-    "spatialprofilingtoolbox.workflow.tabular_import",
-    "spatialprofilingtoolbox.workflow.tabular_import.parsing",
-    "spatialprofilingtoolbox.workflow.common",
-    "spatialprofilingtoolbox.workflow.common.logging",
-    "spatialprofilingtoolbox.workflow.assets",
+    "smprofiler",
+    "smprofiler.standalone_utilities",
+    "smprofiler.entry_point",
+    "smprofiler.apiserver",
+    "smprofiler.apiserver.app",
+    "smprofiler.apiserver.request_scheduling",
+    "smprofiler.apiserver.scripts",
+    "smprofiler.graphs",
+    "smprofiler.graphs.scripts",
+    "smprofiler.ondemand",
+    "smprofiler.ondemand.providers",
+    "smprofiler.ondemand.computers",
+    "smprofiler.ondemand.scripts",
+    "smprofiler.db",
+    "smprofiler.db.accessors",
+    "smprofiler.db.exchange_data_formats",
+    "smprofiler.db.scripts",
+    "smprofiler.db.data_model",
+    "smprofiler.workflow",
+    "smprofiler.workflow.scripts",
+    "smprofiler.workflow.component_interfaces",
+    "smprofiler.workflow.graph_generation",
+    "smprofiler.workflow.graph_plugin",
+    "smprofiler.workflow.tabular_import",
+    "smprofiler.workflow.tabular_import.parsing",
+    "smprofiler.workflow.common",
+    "smprofiler.workflow.common.logging",
+    "smprofiler.workflow.assets",
 ]
 
 [tool.setuptools.package-data]
-"spatialprofilingtoolbox" = ["py.typed"]
-"spatialprofilingtoolbox.entry_point" = ["spt-completion.sh.jinja"]
-"spatialprofilingtoolbox.workflow.scripts" = [
+"smprofiler" = ["py.typed"]
+"smprofiler.entry_point" = ["smprofiler-completion.sh.jinja"]
+"smprofiler.workflow.scripts" = [
     "aggregate_core_results.py",
     "core_job.py",
     "extract_compartments.py",
@@ -179,29 +179,29 @@ packages = [
     "configure.py",
     "tail_logs.py",
 ]
-"spatialprofilingtoolbox.workflow.assets" = [
-    ".spt_db.config.template",
+"smprofiler.workflow.assets" = [
+    ".smprofiler_db.config.template",
     ".workflow.config.template",
     "log_table.tex.jinja",
     "log_table.html.jinja",
     "main_visitor.nf",
     "nextflow.config.jinja",
 ]
-"spatialprofilingtoolbox.workflow.graph_generation" = [
+"smprofiler.workflow.graph_generation" = [
     "graph_generation.nf",
     "main.nf",
 ]
-"spatialprofilingtoolbox.workflow.graph_plugin" = ["main.nf"]
-"spatialprofilingtoolbox.workflow.tabular_import" = ["main.nf"]
-"spatialprofilingtoolbox.apiserver.scripts" = [
+"smprofiler.workflow.graph_plugin" = ["main.nf"]
+"smprofiler.workflow.tabular_import" = ["main.nf"]
+"smprofiler.apiserver.scripts" = [
     "dump_schema.py",
 ]
-"spatialprofilingtoolbox.ondemand.scripts" = [
+"smprofiler.ondemand.scripts" = [
     "read_expression_dump_file.py",
     "assess_recreate_cache.py",
     "start.py",
 ]
-"spatialprofilingtoolbox.db.scripts" = [
+"smprofiler.db.scripts" = [
     "create_schema.py",
     "guess_channels_from_object_files.py",
     "status.py",
@@ -217,7 +217,7 @@ packages = [
     "count_cells.py",
     "cache_subsample.py",
 ]
-"spatialprofilingtoolbox.db.data_model" = [
+"smprofiler.db.data_model" = [
     "metaschema.sql",
     "drop_metaschema.sql",
     "create_roles.sql",
@@ -229,7 +229,7 @@ packages = [
     "refresh_views.sql",
     "feature_descriptions.tsv",
 ]
-"spatialprofilingtoolbox.graphs.scripts" = [
+"smprofiler.graphs.scripts" = [
     "create_specimen_graphs.py",
     "explore_classes.py",
     "extract.py",

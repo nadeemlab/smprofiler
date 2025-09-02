@@ -1,0 +1,5 @@
+[database-credentials]
+endpoint = smprofiler-db---testing-only-graphs
+database = default_study_lookup
+user = postgres
+password = postgres

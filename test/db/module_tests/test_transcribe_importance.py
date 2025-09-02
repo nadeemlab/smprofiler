@@ -1,9 +1,9 @@
 """Test that transcription of importance scores from GNN output into the database succeeds."""
 from pandas import DataFrame
 
-from spatialprofilingtoolbox.db.database_connection import DBConnection
-from spatialprofilingtoolbox.db.importance_score_transcriber import transcribe_importance
-from spatialprofilingtoolbox.db.describe_features import get_feature_description
+from smprofiler.db.database_connection import DBConnection
+from smprofiler.db.importance_score_transcriber import transcribe_importance
+from smprofiler.db.describe_features import get_feature_description
 
 
 def get_test_importance_rows():
@@ -61,7 +61,7 @@ def test_transcribe_importances():
     columns = ['histological_structure', 'importance']
     df = DataFrame(get_test_importance_rows(), columns=columns)
     df = df.set_index('histological_structure')
-    database_config_file = '../db/.spt_db.config.container'
+    database_config_file = '../db/.smprofiler_db.config.container'
     study = 'Melanoma intralesional IL2'
     transcribe_importance(
         df,

@@ -81,7 +81,7 @@ function import_datasets {
         if [[ "$drop_first" == "yes" ]];
         then
             echo "Dropping "$handle"."
-            spt db drop --study-name="$handle" --database-config-file="$dbconfig"
+            smprofiler db drop --study-name="$handle" --database-config-file="$dbconfig"
         fi
         echo "Importing: $dataset ($handle)"
         import_dataset $dataset $basedirectory &
@@ -95,7 +95,7 @@ function import_dataset {
     basedirectory="$2"
     rundirectory=$(get_run_directory $dataset $basedirectory)
     cd $rundirectory
-    echo "Doing configured SPT run (tabular import) in $rundirectory ."
+    echo "Doing configured SMProfiler run (tabular import) in $rundirectory ."
     ./run.sh
     cd $basedirectory
 }

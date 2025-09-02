@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 from os.path import join
 
-from spatialprofilingtoolbox.workflow.dataset_designs.multiplexed_imaging.file_identifier_schema \
+from smprofiler.workflow.dataset_designs.multiplexed_imaging.file_identifier_schema \
     import get_input_filenames_by_data_type
-from spatialprofilingtoolbox.workflow.tabular_import.tabular_dataset_design \
+from smprofiler.workflow.tabular_import.tabular_dataset_design \
     import TabularCellMetadataDesign
-from spatialprofilingtoolbox.workflow.common.extract_compartments import extract_compartments
+from smprofiler.workflow.common.extract_compartments import extract_compartments
 
 
 def test_extract_compartments():

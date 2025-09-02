@@ -21,7 +21,7 @@ from numpy import log
 from scipy.stats import ttest_ind  # type: ignore
 from sklearn.metrics import auc  # type:ignore
 
-from spatialprofilingtoolbox.standalone_utilities.float8 import decode as decode_float8
+from smprofiler.standalone_utilities.float8 import decode as decode_float8
 
 
 def get_default_host(given: str | None) -> str | None:

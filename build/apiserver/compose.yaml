@@ -1,7 +1,7 @@
 services:
   testing-database:
-    image: nadeemlab/spt-db-preloaded-1
-    container_name: spt-db---testing-only-apiserver
+    image: nadeemlab/smprofiler-db-preloaded-1
+    container_name: smprofiler-db---testing-only-apiserver
     ports:
       - target: 5432
         protocol: tcp
@@ -11,12 +11,12 @@ services:
       POSTGRES_PASSWORD: postgres
 
   testing-fast-counts-server:
-    image: nadeemlab/spt-ondemand
-    container_name: spt-ondemand--testing-apiserver
+    image: nadeemlab/smprofiler-ondemand
+    container_name: smprofiler-ondemand--testing-apiserver
     networks:
       - isolated_temporary_test
     environment:
-      SINGLE_CELL_DATABASE_HOST: spt-db---testing-only-apiserver
+      SINGLE_CELL_DATABASE_HOST: smprofiler-db---testing-only-apiserver
       SINGLE_CELL_DATABASE_USER: postgres
       SINGLE_CELL_DATABASE_PASSWORD: postgres
       CELL_NUMBER_LIMIT_PROXIMITY: 750000
@@ -24,16 +24,16 @@ services:
       JOB_COMPUTATION_TIMEOUT_SECONDS: 150
       DATABASE_DOWNLOAD_CACHE_SAMPLE_LIMIT: 1000
       DATABASE_DOWNLOAD_CACHE_LIMIT_MB: 500
-      SPT_TESTING_MODE: 1
+      SMProfiler_TESTING_MODE: 1
     pull_policy: never
 
   testing-fast-counts-server2:
-    image: nadeemlab/spt-ondemand
-    container_name: spt-ondemand-testing2-apiserver
+    image: nadeemlab/smprofiler-ondemand
+    container_name: smprofiler-ondemand-testing2-apiserver
     networks:
       - isolated_temporary_test
     environment:
-      SINGLE_CELL_DATABASE_HOST: spt-db---testing-only-apiserver
+      SINGLE_CELL_DATABASE_HOST: smprofiler-db---testing-only-apiserver
       SINGLE_CELL_DATABASE_USER: postgres
       SINGLE_CELL_DATABASE_PASSWORD: postgres
       CELL_NUMBER_LIMIT_PROXIMITY: 750000
@@ -41,23 +41,23 @@ services:
       JOB_COMPUTATION_TIMEOUT_SECONDS: 150
       DATABASE_DOWNLOAD_CACHE_SAMPLE_LIMIT: 1000
       DATABASE_DOWNLOAD_CACHE_LIMIT_MB: 500
-      SPT_TESTING_MODE: 1
+      SMProfiler_TESTING_MODE: 1
     pull_policy: never
 
   testing-api-server:
-    image: nadeemlab/spt-apiserver
-    container_name: spt-apiserver-testing-apiserver
+    image: nadeemlab/smprofiler-apiserver
+    container_name: smprofiler-apiserver-testing-apiserver
     ports:
       - target: 8080
         protocol: tcp
     networks:
       - isolated_temporary_test
     environment:
-      SINGLE_CELL_DATABASE_HOST: spt-db---testing-only-apiserver
+      SINGLE_CELL_DATABASE_HOST: smprofiler-db---testing-only-apiserver
       SINGLE_CELL_DATABASE_USER: postgres
       SINGLE_CELL_DATABASE_PASSWORD: postgres
       FEATURE_COMPUTATION_TIMEOUT_SECONDS: 600
-      SPT_TESTING_MODE: 1
+      SMProfiler_TESTING_MODE: 1
       ORCID_ENVIRONMENT: sandbox
     pull_policy: never
 

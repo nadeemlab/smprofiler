@@ -42,7 +42,7 @@
         "relevant_to_reproducible_computation": true
     },
     {
-        "component_name": "spatialprofilingtoolbox",
+        "component_name": "smprofiler",
         "format": "Python package",
         "source": "Python package index (PyPI)",
         "version": "1.0.61",

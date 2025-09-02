@@ -1,5 +1,5 @@
 
-from spatialprofilingtoolbox.workflow.tabular_import.parsing.sample_stratification \
+from smprofiler.workflow.tabular_import.parsing.sample_stratification \
     import SampleStratificationCreator as SSC
 
 

@@ -8,7 +8,7 @@ reset_code="\033[0m"
 function test_cell_data_binary_compressed() {
     study="$1"
     sample="$2"
-    query="http://spt-apiserver-testing-apiserver:8080/cell-data-binary/?study=$study&sample=$sample"
+    query="http://smprofiler-apiserver-testing-apiserver:8080/cell-data-binary/?study=$study&sample=$sample"
 
     echo -e "Doing query $blue$query$reset_code ... "
     curl -s "$query"  > _celldata_c.bin;

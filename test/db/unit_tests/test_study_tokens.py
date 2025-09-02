@@ -1,7 +1,7 @@
 """Test study tokens."""
 
-from spatialprofilingtoolbox.db.study_tokens import StudyCollectionNaming
-from spatialprofilingtoolbox.db.exchange_data_formats.study import StudyHandle
+from smprofiler.db.study_tokens import StudyCollectionNaming
+from smprofiler.db.exchange_data_formats.study import StudyHandle
 
 def test_study_tokens():
     initial = 'Study name ABCD collection: abc-def'

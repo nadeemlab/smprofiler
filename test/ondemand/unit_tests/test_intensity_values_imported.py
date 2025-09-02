@@ -1,7 +1,7 @@
 """Test presence of intensity values."""
 import pandas as pd
 
-from spatialprofilingtoolbox.db.database_connection import DBCursor
+from smprofiler.db.database_connection import DBCursor
 
 def test_intensities():
     query = '''
@@ -27,7 +27,7 @@ def test_intensities():
     rows = []
     studies = ['Melanoma intralesional IL2', 'Breast cancer IMC']
     for study in studies:
-        with DBCursor(database_config_file='../ondemand/.spt_db.config.container', study=study) as cursor:
+        with DBCursor(database_config_file='../ondemand/.smprofiler_db.config.container', study=study) as cursor:
             cursor.execute(query, parameters)
             rows.extend(cursor.fetchall())
 

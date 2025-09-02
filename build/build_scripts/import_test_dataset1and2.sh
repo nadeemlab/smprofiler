@@ -17,21 +17,21 @@ function consider_exit() {
 }
 
 cat build/build_scripts/.workflow.config | sed 's/YYY/1/g' > .workflow.config
-spt workflow configure --workflow='tabular import' --config-file=.workflow.config
+smprofiler workflow configure --workflow='tabular import' --config-file=.workflow.config
 nextflow run .
 cat work/*/*/.command.log
 
 nf_clean
 
 cat build/build_scripts/.workflow.config | sed 's/YYY/2/g' > .workflow.config
-spt workflow configure --workflow='tabular import' --config-file=.workflow.config
+smprofiler workflow configure --workflow='tabular import' --config-file=.workflow.config
 nextflow run .
 cat work/*/*/.command.log
 
-spt db count-cells --database-config-file=build/db/.spt_db.config.local
+smprofiler db count-cells --database-config-file=build/db/.smprofiler_db.config.local
 nf_clean
 
-spt db status --database-config-file build/db/.spt_db.config.local > counts.txt
+smprofiler db status --database-config-file build/db/.smprofiler_db.config.local > counts.txt
 cat counts.txt
 diff counts.txt build/build_scripts/expected_counts_1and2.txt
 status=$?

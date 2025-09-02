@@ -44,7 +44,7 @@ help:
 MAKEFLAGS += --warn-undefined-variables
 MAKEFLAGS += --no-builtin-rules
 
-PACKAGE_NAME := spatialprofilingtoolbox
+PACKAGE_NAME := smprofiler
 export PYTHON := python
 export BUILD_SCRIPTS_LOCATION_ABSOLUTE := ${PWD}/build/build_scripts
 SCRIPTS := ${BUILD_SCRIPTS_LOCATION_ABSOLUTE}
@@ -61,7 +61,7 @@ WHEEL := ${WHEEL_FILENAME}
 export MESSAGE := bash ${SCRIPTS}/verbose_command_wrapper.sh
 
 export DOCKER_ORG_NAME := nadeemlab
-export DOCKER_REPO_PREFIX := spt
+export DOCKER_REPO_PREFIX := smprofiler
 REPO_DEV := ${DOCKER_ORG_NAME}-development/${DOCKER_REPO_PREFIX}-development
 REPO := ${DOCKER_ORG_NAME}/${DOCKER_REPO_PREFIX}
 export DOCKER_SCAN_SUGGEST:=false
@@ -89,7 +89,7 @@ SINGLETON_TEST_TARGETS := $(foreach submodule,$(SUBMODULES),singleton-test-$(sub
 COMBINED_TEST_TARGETS := $(foreach submodule,$(SUBMODULES),combined-test-$(submodule))
 DLI := force-rebuild-data-loaded-image
 P := ${BUILD_LOCATION_ABSOLUTE}
-.PHONY: help release-package check-for-pypi-credentials print-source-files build-and-push-docker-images ${DOCKER_PUSH_SUBMODULE_TARGETS} ${DOCKER_PUSH_PLUGIN_TARGETS} ${DOCKER_PUSH_PLUGIN_CUDA_TARGETS} build-docker-images test module-tests ${MODULE_TEST_TARGETS} ${UNIT_TEST_TARGETS} clean clean-files docker-compositions-rm clean-network-environment generic-spt-push-target data-loaded-images-push-target ensure-plugin-submodules-are-populated before_all_tests
+.PHONY: help release-package check-for-pypi-credentials print-source-files build-and-push-docker-images ${DOCKER_PUSH_SUBMODULE_TARGETS} ${DOCKER_PUSH_PLUGIN_TARGETS} ${DOCKER_PUSH_PLUGIN_CUDA_TARGETS} build-docker-images test module-tests ${MODULE_TEST_TARGETS} ${UNIT_TEST_TARGETS} clean clean-files docker-compositions-rm clean-network-environment generic-smprofiler-push-target data-loaded-images-push-target ensure-plugin-submodules-are-populated before_all_tests
 
 export DB_SOURCE_LOCATION_ABSOLUTE := ${PWD}/${SOURCE_LOCATION}/db
 export DB_BUILD_LOCATION_ABSOLUTE := ${PWD}/${BUILD_LOCATION}/db
@@ -126,7 +126,7 @@ endif
 UPDATE_STATUS = printf 'UPDATE times SET status_code=%s WHERE activity="%s";' "$(1)" "$(2)" | sqlite3 buildcache.sqlite3
 
 release-package: development-image check-for-pypi-credentials
->@${MESSAGE} start "$@" "Uploading spatialprofilingtoolbox==${VERSION} to PyPI"
+>@${MESSAGE} start "$@" "Uploading smprofiler==${VERSION} to PyPI"
 >@cp ~/.pypirc .
 >@docker run \
      -u ${LOCAL_USERID} \
@@ -141,7 +141,7 @@ release-package: development-image check-for-pypi-credentials
 >@rm -f .pypirc
 
 check-for-pypi-credentials:
->@${MESSAGE} start "$@" "Checking for PyPI credentials in ~/.pypirc for spatialprofilingtoolbox"
+>@${MESSAGE} start "$@" "Checking for PyPI credentials in ~/.pypirc for smprofiler"
 >@${PYTHON} ${SCRIPTS}/check_for_credentials.py pypi ; \
     status_code=$$?; \
     $(call UPDATE_STATUS,$$status_code,$@) ;
@@ -209,17 +209,17 @@ ${DEPENDENCY_LISTS}: pyproject.toml.unversioned ${SCRIPTS}/determine_prerequisit
 
 build-and-push-application-images: ${DOCKER_PUSH_SUBMODULE_TARGETS}
 
-build-and-push-docker-images: ${DOCKER_PUSH_SUBMODULE_TARGETS} ${DOCKER_PUSH_PLUGIN_TARGETS} ${DOCKER_PUSH_PLUGIN_CUDA_TARGETS} generic-spt-push-target data-loaded-images-push-target
+build-and-push-docker-images: ${DOCKER_PUSH_SUBMODULE_TARGETS} ${DOCKER_PUSH_PLUGIN_TARGETS} ${DOCKER_PUSH_PLUGIN_CUDA_TARGETS} generic-smprofiler-push-target data-loaded-images-push-target
 
 build-and-push-docker-images-dev: ${DOCKER_PUSH_DEV_SUBMODULE_TARGETS} ${DOCKER_PUSH_DEV_PLUGIN_TARGETS} ${DOCKER_PUSH_DEV_PLUGIN_CUDA_TARGETS}
 
 ${DOCKER_PUSH_SUBMODULE_TARGETS}: ${DOCKER_BUILD_SUBMODULE_TARGETS} check-for-docker-credentials
 >@submodule_directory=$$(echo $@ | sed 's/^docker-push-//g') ; \
-    submodule_name=$$(echo $$submodule_directory | sed 's/spatialprofilingtoolbox\///g') ; \
+    submodule_name=$$(echo $$submodule_directory | sed 's/smprofiler\///g') ; \
     repository_name=${REPO}-$$submodule_name ; \
     ${MESSAGE} start "$@" "Pushing Docker container $$repository_name"
 >@submodule_directory=$$(echo $@ | sed 's/^docker-push-//g') ; \
-    submodule_name=$$(echo $$submodule_directory | sed 's/spatialprofilingtoolbox\///g') ; \
+    submodule_name=$$(echo $$submodule_directory | sed 's/smprofiler\///g') ; \
     echo "$$submodule_name"; \
     repository_name=${REPO}-$$submodule_name ; \
     echo "$$repository_name"; \
@@ -233,11 +233,11 @@ ${DOCKER_PUSH_SUBMODULE_TARGETS}: ${DOCKER_BUILD_SUBMODULE_TARGETS} check-for-do
 
 ${DOCKER_PUSH_DEV_SUBMODULE_TARGETS}: build-docker-images check-for-docker-credentials
 >@submodule_directory=$$(echo $@ | sed 's/^docker-push-dev-//g') ; \
-    submodule_name=$$(echo $$submodule_directory | sed 's/spatialprofilingtoolbox\///g') ; \
+    submodule_name=$$(echo $$submodule_directory | sed 's/smprofiler\///g') ; \
     repository_name=${REPO}-$$submodule_name ; \
     ${MESSAGE} start "$@" "Pushing Docker container $$repository_name"
 >@submodule_directory=$$(echo $@ | sed 's/^docker-push-dev-//g') ; \
-    submodule_name=$$(echo $$submodule_directory | sed 's/spatialprofilingtoolbox\///g') ; \
+    submodule_name=$$(echo $$submodule_directory | sed 's/smprofiler\///g') ; \
     echo "$$submodule_name"; \
     repository_name=${REPO}-$$submodule_name ; \
     echo "$$repository_name"; \
@@ -312,7 +312,7 @@ ${DOCKER_PUSH_DEV_PLUGIN_CUDA_TARGETS}: build-docker-images check-for-docker-cre
     $(call UPDATE_STATUS,$$status_code,$@) ;
 >@${MESSAGE} end "$@" "Pushed." "Not pushed."
 
-generic-spt-push-target: build-docker-images check-for-docker-credentials
+generic-smprofiler-push-target: build-docker-images check-for-docker-credentials
 >@repository_name=${REPO} ; \
     ${MESSAGE} start "$@" "Pushing Docker container $$repository_name"
 >@repository_name=${REPO} ; \
@@ -525,28 +525,28 @@ ${COMBINED_TEST_TARGETS}: development-image ${DATA_IMAGES} ${DOCKER_BUILD_SUBMOD
 # If so, not rebuilt. To trigger rebuild, use "make clean-docker-images" first,
 # or directly force-rebuild-data-loaded-images .
 data-loaded-image-%: ${BUILD_LOCATION_ABSOLUTE}/db/docker.built ${SCRIPTS}/import_test_dataset%.sh development-image
->@${MESSAGE} start "$@" "Building test-data-loaded spt-db image ($*)"
+>@${MESSAGE} start "$@" "Building test-data-loaded smprofiler-db image ($*)"
 >@cp ${SCRIPTS}/.dockerignore . 
 >@source ${SCRIPTS}/check_image_exists.sh; \
     exists=$$(check_image_exists ${REPO}-db-preloaded-$*); \
     if [[ "$$exists" == "no" ]]; \
     then \
-        docker container create --name temporary-spt-db-preloading --network host -e POSTGRES_PASSWORD=postgres -e PGDATA=.postgres/pgdata ${REPO}-db:latest ; \
-        docker container start temporary-spt-db-preloading && \
-        bash ${SCRIPTS}/poll_container_readiness_direct.sh temporary-spt-db-preloading && \
+        docker container create --name temporary-smprofiler-db-preloading --network host -e POSTGRES_PASSWORD=postgres -e PGDATA=.postgres/pgdata ${REPO}-db:latest ; \
+        docker container start temporary-smprofiler-db-preloading && \
+        bash ${SCRIPTS}/poll_container_readiness_direct.sh temporary-smprofiler-db-preloading && \
         pipeline_cmd="cd /working_dir; cp -r /mount_sources/build .; cp -r /mount_sources/test .; bash build/build_scripts/import_test_dataset$*.sh "; \
         docker container run \
         -i \
         --rm \
         -e SQLITE_MOCK_DATABASE=1 \
-        --network container:temporary-spt-db-preloading \
+        --network container:temporary-smprofiler-db-preloading \
         --mount type=bind,src=${PWD},dst=/mount_sources \
         --mount type=tmpfs,destination=/working_dir \
         -t ${REPO_DEV}:latest \
         /bin/bash -c \
         "$$pipeline_cmd" ; status_code="$$?" && \
-        docker commit temporary-spt-db-preloading ${REPO}-db-preloaded-$*:latest && \
-        docker container rm --force temporary-spt-db-preloading ; \
+        docker commit temporary-smprofiler-db-preloading ${REPO}-db-preloaded-$*:latest && \
+        docker container rm --force temporary-smprofiler-db-preloading ; \
     fi; \
     if [[ "$$status_code" == "0" ]]; \
     then \
@@ -560,23 +560,23 @@ data-loaded-image-%: ${BUILD_LOCATION_ABSOLUTE}/db/docker.built ${SCRIPTS}/impor
 force-rebuild-data-loaded-images: ${DLI}-1 ${DLI}-1and2 ${DLI}-1small ${DLI}-1smallnointensity
 
 force-rebuild-data-loaded-image-%: ${BUILD_LOCATION_ABSOLUTE}/db/docker.built ${SCRIPTS}/import_test_dataset%.sh
->@${MESSAGE} start "$@" "Rebuilding test-data-loaded spt-db image ($*)"
+>@${MESSAGE} start "$@" "Rebuilding test-data-loaded smprofiler-db image ($*)"
 >@cp ${SCRIPTS}/.dockerignore . 
 >@source ${SCRIPTS}/check_image_exists.sh; \
-    docker container create --name temporary-spt-db-preloading --network host -e POSTGRES_PASSWORD=postgres -e PGDATA=.postgres/pgdata ${REPO}-db:latest ; \
-    docker container start temporary-spt-db-preloading && \
-    bash ${SCRIPTS}/poll_container_readiness_direct.sh temporary-spt-db-preloading && \
+    docker container create --name temporary-smprofiler-db-preloading --network host -e POSTGRES_PASSWORD=postgres -e PGDATA=.postgres/pgdata ${REPO}-db:latest ; \
+    docker container start temporary-smprofiler-db-preloading && \
+    bash ${SCRIPTS}/poll_container_readiness_direct.sh temporary-smprofiler-db-preloading && \
     pipeline_cmd="cd /working_dir; cp -r /mount_sources/build .; cp -r /mount_sources/test .; bash build/build_scripts/import_test_dataset$*.sh "; \
     docker run \
     --rm \
-    --network container:temporary-spt-db-preloading \
+    --network container:temporary-smprofiler-db-preloading \
     --mount type=bind,src=${PWD},dst=/mount_sources \
     --mount type=tmpfs,destination=/working_dir \
     -t ${REPO_DEV}:latest \
     /bin/bash -c \
     "$$pipeline_cmd" ; status_code="$$?" && \
-    docker commit temporary-spt-db-preloading ${REPO}-db-preloaded-$*:latest && \
-    docker container rm --force temporary-spt-db-preloading ; \
+    docker commit temporary-smprofiler-db-preloading ${REPO}-db-preloaded-$*:latest && \
+    docker container rm --force temporary-smprofiler-db-preloading ; \
     if [[ "$$status_code" == "0" ]]; \
     then \
         touch data-loaded-image-$* ; \
@@ -605,7 +605,7 @@ clean-files:
     done
 >@rm -f Dockerfile
 >@rm -f .dockerignore
->@rm -rf spatialprofilingtoolbox.egg-info/
+>@rm -rf smprofiler.egg-info/
 >@rm -rf __pycache__/
 >@rm -f ${DEPENDENCY_LISTS}
 >@rm -f development-image
@@ -625,7 +625,7 @@ docker-compositions-rm: check-docker-daemon-running
     docker compose --project-directory ./build/db/ rm --force --stop ; status_code3="$$?" ; \
     status_code=$$(( status_code1 + status_code2 + status_code3 + status_code4 + status_code5 )) ; \
     printf 'UPDATE times SET status_code=%s WHERE activity="%s";' "$$status_code" "$@" | sqlite3 buildcache.sqlite3 ;
->@docker container rm --force temporary-spt-db-preloading
+>@docker container rm --force temporary-smprofiler-db-preloading
 >@${MESSAGE} end "$@" "Down." "Error."
 
 clean-network-environment: docker-compositions-rm

@@ -6,7 +6,7 @@ dbconfigargument="$1"
 dbconfig=$(handle_dbconfig_argument $dbconfigargument)
 
 check_exists_else_fail "$dbconfig"
-check_for_spt_availability
+check_for_smprofiler_availability
 create_run_directory
 
 one_inclusion="$2"

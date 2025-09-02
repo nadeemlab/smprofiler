@@ -1,6 +1,6 @@
 
 <p align="center">
-<img src="docs/image_assets/SPT_logo_blue_on_transparent.png" width="400"/>
+<img src="docs/image_assets/SMProfiler_logo_blue_on_transparent.png" width="400"/>
 </p>
 <br/>
 <br/>
@@ -25,7 +25,7 @@ The taxonomy of cell types and their functional states is surprisingly diverse, 
 
 Multiple-channel imaging technology, capable of measuring several dozen protein targets, is reaching maturity. Multiplexed immunofluoresence, imaging mass cytometry, and their variants measure data similar to what is measured by flow cytometry or single-cell RNA-seq, since this is also at the single-cell level and involves multiple quantitative features, but with the crucial advantage that cell positions are also observed -- spatial context.
 
-The Spatial Profiling Toolbox (SPT) project is about making the most of this informative data source using quality software. The guiding principles are:
+The Spatial Multiomics Profiler (SMProfiler) project is about making the most of this informative data source using quality software. The guiding principles are:
 
 |       |                      |         |
 |-------|----------------------|---------|
@@ -34,7 +34,7 @@ The Spatial Profiling Toolbox (SPT) project is about making the most of this inf
 | :computer: | **No code** | The tools should be usable by investigators without doing any programming and without the need for specialized knowledge of computer systems. |
 | :white_check_mark: | **Uniform data management** | Datasets should be organized with high semantic integrity, to ensure that analysis can be performed on them in a consistent way and that the conclusions drawn are valid. |
 
-SPT is available to the public at [oncopathtk.org](https://oncopathtk.org).
+SMProfiler is available to the public at [smprofiler.io](https://smprofiler.io).
 
 <p align="center">
 <a href="docs/image_assets/diagram_medium_res.png">
@@ -48,7 +48,7 @@ SPT is available to the public at [oncopathtk.org](https://oncopathtk.org).
 
 On the main page, select **Melanoma CyTOF ICI**. This brings up a dataset that was collected and published by Moldoveanu et al.[^1].
 
-You'll see a summary of this dataset, including the numbers of samples, cells, and channels, links to relevant publications, classification of the samples, and highlighted findings that can be observed by using the SPT application. In this case the study collected samples from patients treated with immune-checkpoint inhibitor therapy, and the patients either responded favorably or poorly to this treatment.
+You'll see a summary of this dataset, including the numbers of samples, cells, and channels, links to relevant publications, classification of the samples, and highlighted findings that can be observed by using the SMProfiler application. In this case the study collected samples from patients treated with immune-checkpoint inhibitor therapy, and the patients either responded favorably or poorly to this treatment.
 
 ![alt](docs/image_assets/f1.png)
 
@@ -136,55 +136,55 @@ In our implementation, we sought to strike an effective balance between the comp
 Similarly, datasets that we have curated for uniform data import are stored in a simple tabular file format which does not generally support all the features of the `scstudies` model. This intermediary format is designed for ease of creation and it is not entirely formalized. For an example, see [data_curation/](data_curation/).
 
 # CLI command reference
-The Python package `spatialprofilingtoolbox` is released on [PyPI](https://pypi.org/project/spatialprofilingtoolbox/), so it can be installed with
+The Python package `smprofiler` is released on [PyPI](https://pypi.org/project/smprofiler/), so it can be installed with
 
 ```sh
-python -m pip install spatialprofilingtoolbox
+python -m pip install smprofiler
 ```
 
-Installation makes several commands available in the shell. List them with `spt`:
+Installation makes several commands available in the shell. List them with `smprofiler`:
 
 ```sh
-$ spt
+$ smprofiler
 ...
 
-spt apiserver dump-schema
+smprofiler apiserver dump-schema
 
-spt graphs create-specimen-graphs
-spt graphs explore-classes
-spt graphs extract
-spt graphs finalize-graphs
-spt graphs generate-graphs
-spt graphs plot-importance-fractions
-spt graphs plot-interactives
-spt graphs prepare-graph-creation
-spt graphs upload-importances
+smprofiler graphs create-specimen-graphs
+smprofiler graphs explore-classes
+smprofiler graphs extract
+smprofiler graphs finalize-graphs
+smprofiler graphs generate-graphs
+smprofiler graphs plot-importance-fractions
+smprofiler graphs plot-interactives
+smprofiler graphs prepare-graph-creation
+smprofiler graphs upload-importances
 
-spt db collection
-spt db delete-feature
-spt db do-fractions-tests
-spt db drop
-spt db drop-ondemand-computations
-spt db guess-channels-from-object-files
-spt db interactive-uploader
-spt db list-studies
-spt db load-query
-spt db retrieve-feature-matrices
-spt db status
-spt db upload-sync-small
+smprofiler db collection
+smprofiler db delete-feature
+smprofiler db do-fractions-tests
+smprofiler db drop
+smprofiler db drop-ondemand-computations
+smprofiler db guess-channels-from-object-files
+smprofiler db interactive-uploader
+smprofiler db list-studies
+smprofiler db load-query
+smprofiler db retrieve-feature-matrices
+smprofiler db status
+smprofiler db upload-sync-small
 
-spt ondemand cache-expressions-data-array
-spt ondemand start
+smprofiler ondemand cache-expressions-data-array
+smprofiler ondemand start
 
-spt workflow aggregate-core-results
-spt workflow configure
-spt workflow core-job
-spt workflow generate-run-information
-spt workflow initialize
-spt workflow merge-performance-reports
-spt workflow report-on-logs
-spt workflow report-run-configuration
-spt workflow tail-logs
+smprofiler workflow aggregate-core-results
+smprofiler workflow configure
+smprofiler workflow core-job
+smprofiler workflow generate-run-information
+smprofiler workflow initialize
+smprofiler workflow merge-performance-reports
+smprofiler workflow report-on-logs
+smprofiler workflow report-run-configuration
+smprofiler workflow tail-logs
 ```
 
 Each command will print documentation by providing the `--help` option.
@@ -194,7 +194,7 @@ Several commands are mainly for use internal to the application components.
 Some others are TUIs (Terminal User Interfaces) meant to make common tasks, like uploading datasets or inspecting cache or metadata, more reliable.
 
 ## Dataset uploader
-`spt db interactive-uploader` is a TUI that automatically determines available data sources and targets after you have created or located source datasets (format: [data_curation/](data_curation/)). It looks for [database configuration files](spatialprofilingtoolbox//workflow/assets/.spt_db.config.template) named `~/.spt_db.config.*`, checks the environment variable `SPT_S3_BUCKET`, and searches recursively for datasets in the current working directory named `generated_artifacts`. It presents available options and initiates the upload process.
+`smprofiler db interactive-uploader` is a TUI that automatically determines available data sources and targets after you have created or located source datasets (format: [data_curation/](data_curation/)). It looks for [database configuration files](smprofiler//workflow/assets/.smprofiler_db.config.template) named `~/.smprofiler_db.config.*`, checks the environment variable `SMProfiler_S3_BUCKET`, and searches recursively for datasets in the current working directory named `generated_artifacts`. It presents available options and initiates the upload process.
 
 Example usage is shown below.
 
@@ -203,13 +203,13 @@ Example usage is shown below.
 The ETL (Extract/Transform/Load) process includes a number of data integrity checks and the creation of several intermediate data artifacts.
 
 # API reference
-The SPT application is supported by a web API, which provides fine-grained access to specific components of a given dataset. The API is documented [here](https://oncopathtk.org/api/redoc).
+The SMProfiler application is supported by a web API, which provides fine-grained access to specific components of a given dataset. The API is documented [here](https://smprofiler.io/api/redoc).
 
 # Development and maintenance
 See [docs/maintenance.md](docs/maintenance.md).
 
 # Deployment options
-For assistance setting up a deployment of the SPT application for your institution or lab, write to us at [nadeems@mskcc.org](nadeems@mskcc.org).
+For assistance setting up a deployment of the SMProfiler application for your institution or lab, write to us at [nadeems@mskcc.org](nadeems@mskcc.org).
 
 The application can be deployed in several ways:
 
@@ -221,7 +221,7 @@ The application can be deployed in several ways:
 [^1]: Moldoveanu et al. [*Spatially mapping the immune landscape of melanoma using imaging mass cytometry*](https://doi.org/10.1126/sciimmunol.abi5072)
 
 ## License
-© [Nadeem Lab](https://nadeemlab.org/) - SPT code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes. 
+© [Nadeem Lab](https://nadeemlab.org/) - SMProfiler code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes. 
 
 ## Funding
 This work is funded by the 7-year NIH/NCI R37 MERIT Award ([R37CA295658](https://reporter.nih.gov/search/5dgSOlHosEKepkZEAS5_kQ/project-details/11018883#description)).

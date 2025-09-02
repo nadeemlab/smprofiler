@@ -1,6 +1,6 @@
 
 declare -A expectedmessages
-expectedmessages[temporary-spt-db-preloading]="database system is ready to accept connections"
+expectedmessages[temporary-smprofiler-db-preloading]="database system is ready to accept connections"
 
 container_name=$1
 

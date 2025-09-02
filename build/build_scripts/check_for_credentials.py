@@ -50,10 +50,10 @@ class CredentialChecker:
         if not exists(pypirc):
             return False
         config.read(pypirc)
-        if 'spatialprofilingtoolbox' not in config.sections():
+        if 'smprofiler' not in config.sections():
             return False
         fields = ['repository', 'username', 'password']
-        if not all([x in config['spatialprofilingtoolbox'] for x in fields]):
+        if not all([x in config['smprofiler'] for x in fields]):
             return False
         return True
 

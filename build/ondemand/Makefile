@@ -31,8 +31,8 @@ setup-testing:
     fi ; \
     sleep 0.2 ; \
     bash ${P}/poll_container_readiness.sh \
-     spt-ondemand--testing-ondemand \
-     spt-db---testing-only-ondemand ; \
+     smprofiler-ondemand--testing-ondemand \
+     smprofiler-db---testing-only-ondemand ; \
     status_code=$$? ; \
     $(call UPDATE_STATUS,$$status_code,$@) ;
 >@${MESSAGE} end "$@" "Setup env." "Env not setup."
@@ -74,7 +74,7 @@ ${TESTS}: setup-testing
     executor=none-cmd ; \
     if [[ "$$extension" == ".py" ]]; then executor=${PYTHON}; fi ; \
     if [[ "$$extension" == ".sh" ]]; then executor=bash; fi ; \
-    test_cmd="cd /mount_sources/ondemand/ && SINGLE_CELL_DATABASE_HOST=spt-db---testing-only-ondemand SINGLE_CELL_DATABASE_USER=postgres SINGLE_CELL_DATABASE_PASSWORD=postgres USE_ALTERNATIVE_TESTING_DATABASE=1 $$executor $$test_script" ; \
+    test_cmd="cd /mount_sources/ondemand/ && SINGLE_CELL_DATABASE_HOST=smprofiler-db---testing-only-ondemand SINGLE_CELL_DATABASE_USER=postgres SINGLE_CELL_DATABASE_PASSWORD=postgres USE_ALTERNATIVE_TESTING_DATABASE=1 $$executor $$test_script" ; \
     docker run \
      --rm \
      --network ${MODULE_NAME}_isolated_temporary_test \

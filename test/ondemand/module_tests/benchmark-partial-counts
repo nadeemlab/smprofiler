@@ -5,12 +5,12 @@ import subprocess
 import configparser
 import argparse
 
-import spatialprofilingtoolbox
-from spatialprofilingtoolbox.ondemand.counts_service_client import CountRequester
+import smprofiler
+from smprofiler.ondemand.counts_service_client import CountRequester
 
 
 def get_default_counts_server_port():
-    with importlib.resources.path('spatialprofilingtoolbox.standalone_utilities', 'port_assignments.config') as path:
+    with importlib.resources.path('smprofiler.standalone_utilities', 'port_assignments.config') as path:
         parser = configparser.ConfigParser()
         parser.read(path)
         port = int(parser['defaults']['COUNTSSERVER'])
@@ -25,7 +25,7 @@ if __name__=='__main__':
         '--ondemand-host',
         dest='ondemand_host',
         type=str,
-        default='spt-service-ondemand.local',
+        default='smprofiler-service-ondemand.local',
     )
     parser.add_argument(
         '--ondemand-port',

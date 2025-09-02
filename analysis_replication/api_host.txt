@@ -1,1 +1,1 @@
-http://oncopathtk.org/api
+http://smprofiler.io/api

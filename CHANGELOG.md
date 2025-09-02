@@ -1,3 +1,6 @@
+# v1.0.67
+- First release of renamed package **smprofiler**.
+
 # v1.0.66
 - Adds a statistical subsample of all cells from a given dataset, for feasibility of low-resource downstream whole-study analysis. The new command is `spt db cache-subsample`, and the API exposes:
   - `cell-data-binary-intensity-whole-study-subsample`, a concatenation of metadata about the subsample (including default per-sample thresholds for each channel) and the intensities per-cell in a binary format.

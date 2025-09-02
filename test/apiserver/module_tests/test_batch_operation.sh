@@ -1,5 +1,5 @@
 
-query="http://spt-apiserver-testing-apiserver:8080/phenotype-counts-batch/"
+query="http://smprofiler-apiserver-testing-apiserver:8080/phenotype-counts-batch/"
 data="$(cat module_tests/criteria_specs.json | python -m json.tool --compact)"
 curl -H "Content-Type: application/json" --data "$data" -s $query ;
 if [ "$?" -gt 0 ];

@@ -1148,7 +1148,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id44">
         <rect class="BoundingBox" stroke="none" fill="none" x="4997" y="2917" width="2822" height="1016"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="282px" font-weight="400"><tspan class="TextPosition" x="5067" y="3199"><tspan fill="rgb(0,0,0)" stroke="none">spt-data</tspan><tspan font-family="Arial, sans-serif" fill="rgb(0,0,0)" stroke="none"> repository</tspan></tspan><tspan class="TextPosition" x="5956" y="3537"><tspan font-family="Arial, sans-serif" fill="rgb(0,0,0)" stroke="none">git LFS</tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="282px" font-weight="400"><tspan class="TextPosition" x="5067" y="3199"><tspan fill="rgb(0,0,0)" stroke="none">smprofiler-data</tspan><tspan font-family="Arial, sans-serif" fill="rgb(0,0,0)" stroke="none"> repository</tspan></tspan><tspan class="TextPosition" x="5956" y="3537"><tspan font-family="Arial, sans-serif" fill="rgb(0,0,0)" stroke="none">git LFS</tspan></tspan></tspan></text>
        </g>
       </g>
       <g class="com.sun.star.drawing.TextShape">
@@ -1492,7 +1492,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id50">
         <rect class="BoundingBox" stroke="none" fill="none" x="17894" y="4244" width="2822" height="678"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Arial, sans-serif" font-size="282px" font-weight="400"><tspan class="TextPosition" x="18299" y="4526"><tspan fill="rgb(0,0,0)" stroke="none">SPT Dashboard</tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Arial, sans-serif" font-size="282px" font-weight="400"><tspan class="TextPosition" x="18299" y="4526"><tspan fill="rgb(0,0,0)" stroke="none">SMProfiler Dashboard</tspan></tspan></tspan></text>
        </g>
       </g>
       <g class="com.sun.star.drawing.TextShape">
@@ -2352,7 +2352,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id65">
         <rect class="BoundingBox" stroke="none" fill="none" x="8985" y="11467" width="3033" height="300"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400" text-decoration="underline"><tspan class="TextPosition" x="9019" y="11714"><tspan id="id113" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://github.com/nadeemlab/spt-cg-gnn">nadeemlab/spt-cg-gnn</a></tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400" text-decoration="underline"><tspan class="TextPosition" x="9019" y="11714"><tspan id="id113" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://github.com/nadeemlab/smprofiler-cg-gnn">nadeemlab/smprofiler-cg-gnn</a></tspan></tspan></tspan></text>
         <desc class="HyperlinkIdList">id113</desc>
        </g>
       </g>
@@ -2525,7 +2525,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id68">
         <rect class="BoundingBox" stroke="none" fill="none" x="9009" y="14072" width="3068" height="300"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400" text-decoration="underline"><tspan class="TextPosition" x="9061" y="14319"><tspan id="id114" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://github.com/nadeemlab/spt-plugin">nadeemlab/spt-plugin</a></tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400" text-decoration="underline"><tspan class="TextPosition" x="9061" y="14319"><tspan id="id114" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://github.com/nadeemlab/smprofiler-plugin">nadeemlab/smprofiler-plugin</a></tspan></tspan></tspan></text>
         <desc class="HyperlinkIdList">id114</desc>
        </g>
       </g>
@@ -3044,7 +3044,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id77">
         <rect class="BoundingBox" stroke="none" fill="none" x="13915" y="14974" width="3307" height="1018"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, monospace" font-size="212px" font-weight="400"><tspan class="TextPosition" x="13915" y="15186"><tspan fill="rgb(0,0,0)" stroke="none">nadeemlab/spt-ondemand</tspan></tspan><tspan class="TextPosition" x="13915" y="15440"><tspan fill="rgb(0,0,0)" stroke="none">nadeemlab/spt-apiserver</tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, monospace" font-size="212px" font-weight="400"><tspan class="TextPosition" x="13915" y="15186"><tspan fill="rgb(0,0,0)" stroke="none">nadeemlab/smprofiler-ondemand</tspan></tspan><tspan class="TextPosition" x="13915" y="15440"><tspan fill="rgb(0,0,0)" stroke="none">nadeemlab/smprofiler-apiserver</tspan></tspan></tspan></text>
        </g>
       </g>
       <g class="com.sun.star.drawing.CustomShape">
@@ -3210,7 +3210,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id79">
         <rect class="BoundingBox" stroke="none" fill="none" x="13662" y="10507" width="3309" height="300"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400" text-decoration="underline"><tspan class="TextPosition" x="13686" y="10754"><tspan id="id117" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://hub.docker.com/r/nadeemlab/spt-ondemand">nadeemlab/spt-ondemand</a></tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400" text-decoration="underline"><tspan class="TextPosition" x="13686" y="10754"><tspan id="id117" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://hub.docker.com/r/nadeemlab/smprofiler-ondemand">nadeemlab/smprofiler-ondemand</a></tspan></tspan></tspan></text>
         <desc class="HyperlinkIdList">id117</desc>
        </g>
       </g>
@@ -3383,7 +3383,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id82">
         <rect class="BoundingBox" stroke="none" fill="none" x="17486" y="7537" width="3606" height="300"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400" text-decoration="underline"><tspan class="TextPosition" x="17584" y="7784"><tspan id="id118" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://github.com/nadeemlab">nadeemlab/spt-dashboard</a></tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400" text-decoration="underline"><tspan class="TextPosition" x="17584" y="7784"><tspan id="id118" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://github.com/nadeemlab">nadeemlab/smprofiler-dashboard</a></tspan></tspan></tspan></text>
         <desc class="HyperlinkIdList">id118</desc>
        </g>
       </g>
@@ -3730,7 +3730,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id88">
         <rect class="BoundingBox" stroke="none" fill="none" x="17886" y="16046" width="2822" height="343"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Arial, sans-serif" font-size="282px" font-weight="400"><tspan class="TextPosition" x="18473" y="16328"><tspan id="id121" fill="rgb(52,101,164)" stroke="none" class="UrlField" text-decoration="underline"><a target="_blank" xlink:href="https://github.com/nadeemlab/spt">GitHub</a></tspan><tspan text-decoration="none" fill="rgb(52,101,164)" stroke="none">  </tspan><tspan id="id122" fill="rgb(52,101,164)" stroke="none" class="UrlField" text-decoration="underline"><a target="_blank" xlink:href="https://pypi.org/project/spatialprofilingtoolbox/">PyPI</a></tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Arial, sans-serif" font-size="282px" font-weight="400"><tspan class="TextPosition" x="18473" y="16328"><tspan id="id121" fill="rgb(52,101,164)" stroke="none" class="UrlField" text-decoration="underline"><a target="_blank" xlink:href="https://github.com/nadeemlab/smprofiler">GitHub</a></tspan><tspan text-decoration="none" fill="rgb(52,101,164)" stroke="none">  </tspan><tspan id="id122" fill="rgb(52,101,164)" stroke="none" class="UrlField" text-decoration="underline"><a target="_blank" xlink:href="https://pypi.org/project/smprofiler/">PyPI</a></tspan></tspan></tspan></text>
         <desc class="HyperlinkIdList">id121 id122</desc>
        </g>
       </g>
@@ -3903,7 +3903,7 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id91">
         <rect class="BoundingBox" stroke="none" fill="none" x="5089" y="14066" width="2822" height="678"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400"><tspan class="TextPosition" x="5333" y="14348"><tspan fill="rgb(0,0,0)" stroke="none">*/spt-plugin</tspan><tspan font-family="Arial, sans-serif" font-size="282px" fill="rgb(0,0,0)" stroke="none"> fork</tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400"><tspan class="TextPosition" x="5333" y="14348"><tspan fill="rgb(0,0,0)" stroke="none">*/smprofiler-plugin</tspan><tspan font-family="Arial, sans-serif" font-size="282px" fill="rgb(0,0,0)" stroke="none"> fork</tspan></tspan></tspan></text>
        </g>
       </g>
       <g class="com.sun.star.drawing.TextShape">
@@ -4089,14 +4089,14 @@
       <g class="com.sun.star.drawing.TextShape">
        <g id="id96">
         <rect class="BoundingBox" stroke="none" fill="none" x="17541" y="14726" width="3521" height="300"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400"><tspan class="TextPosition" x="17597" y="14973"><tspan id="id126" fill="rgb(0,0,0)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://github.com/nadeemlab/spt">spatialprofilingtoolbox</a></tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Consolas, sans-serif" font-size="247px" font-weight="400"><tspan class="TextPosition" x="17597" y="14973"><tspan id="id126" fill="rgb(0,0,0)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://github.com/nadeemlab/smprofiler">smprofiler</a></tspan></tspan></tspan></text>
         <desc class="HyperlinkIdList">id126</desc>
        </g>
       </g>
       <g class="com.sun.star.drawing.TextShape">
        <g id="id97">
         <rect class="BoundingBox" stroke="none" fill="none" x="13849" y="4118" width="2823" height="1016"/>
-        <text class="TextShape"><tspan class="TextParagraph" font-family="Arial, sans-serif" font-size="282px" font-weight="400"><tspan class="TextPosition" x="14254" y="4400"><tspan fill="rgb(0,0,0)" stroke="none">SPT Dashboard</tspan></tspan><tspan class="TextPosition" x="14322" y="4738"><tspan id="id127" text-decoration="underline" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://oncopathtk.org/">oncopathtk.org</a></tspan></tspan></tspan></text>
+        <text class="TextShape"><tspan class="TextParagraph" font-family="Arial, sans-serif" font-size="282px" font-weight="400"><tspan class="TextPosition" x="14254" y="4400"><tspan fill="rgb(0,0,0)" stroke="none">SMProfiler Dashboard</tspan></tspan><tspan class="TextPosition" x="14322" y="4738"><tspan id="id127" text-decoration="underline" fill="rgb(52,101,164)" stroke="none" class="UrlField"><a target="_blank" xlink:href="https://smprofiler.io/">smprofiler.io</a></tspan></tspan></tspan></text>
         <desc class="HyperlinkIdList">id127</desc>
        </g>
       </g>

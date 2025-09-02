@@ -21,4 +21,4 @@ ENV service_name=$service_name
 COPY $WHEEL_FILENAME ./
 RUN python -m pip install --no-deps "$WHEEL_FILENAME"
 ENV API_SERVER_PORT=8016
-ENTRYPOINT ["spt", "ondemand", "start"]
+ENTRYPOINT ["smprofiler", "ondemand", "start"]

@@ -8,7 +8,7 @@ cp $STUDY_JSON study.json.bak
 cp $STUDY_SMALL_JSON $STUDY_JSON
 
 cat build/build_scripts/.workflow.small.config | sed 's/YYY/1/g' > .workflow.config
-spt workflow configure --workflow='tabular import' --config-file=.workflow.config
+smprofiler workflow configure --workflow='tabular import' --config-file=.workflow.config
 nextflow run .
 
 cp file_manifest.tsv.bak $FM
@@ -16,11 +16,11 @@ rm file_manifest.tsv.bak
 cp study.json.bak $STUDY_JSON
 rm study.json.bak
 
-spt graphs upload-importances --config_path=build/build_scripts/.graph.small.config --importances_csv_path test/test_data/gnn_importances/3.csv
-spt db count-cells --database-config-file=build/db/.spt_db.config.local
+smprofiler graphs upload-importances --config_path=build/build_scripts/.graph.small.config --importances_csv_path test/test_data/gnn_importances/3.csv
+smprofiler db count-cells --database-config-file=build/db/.smprofiler_db.config.local
 
 cat work/*/*/.command.log
-spt db status --database-config-file build/db/.spt_db.config.local > table_counts.txt
+smprofiler db status --database-config-file build/db/.smprofiler_db.config.local > table_counts.txt
 diff build/build_scripts/expected_table_counts_1small.txt table_counts.txt
 status=$?
 [ $status -eq 0 ] && echo "Import created correct number of records." || echo "Import failed."

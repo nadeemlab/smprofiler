@@ -9,7 +9,7 @@ function test_cell_data_binary() {
     study="$1"
     sample="$2"
     filename="$3"
-    query="http://spt-apiserver-testing-apiserver:8080/cell-data-binary/?study=$study&sample=$sample"
+    query="http://smprofiler-apiserver-testing-apiserver:8080/cell-data-binary/?study=$study&sample=$sample"
 
     echo -e "Doing query $blue$query$reset_code ... "
     curl -s "$query"  > _celldata.bin;
@@ -41,7 +41,7 @@ function test_cell_data_binary() {
 
 function test_feature_names_retrieval() {
     study="$1"
-    query="http://spt-apiserver-testing-apiserver:8080/cell-data-binary-feature-names/?study=$study"
+    query="http://smprofiler-apiserver-testing-apiserver:8080/cell-data-binary-feature-names/?study=$study"
 
     echo -e "Doing query $blue$query$reset_code ... "
     curl -s "$query" | python -m json.tool > _names.json;

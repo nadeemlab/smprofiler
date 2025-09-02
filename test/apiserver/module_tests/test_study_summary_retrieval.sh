@@ -1,5 +1,5 @@
 
-query=http://spt-apiserver-testing-apiserver:8080/study-summary/?study=Melanoma%20intralesional%20IL2
+query=http://smprofiler-apiserver-testing-apiserver:8080/study-summary/?study=Melanoma%20intralesional%20IL2
 
 echo "Querying first time."
 curl -s $query ;

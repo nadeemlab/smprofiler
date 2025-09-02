@@ -1,5 +1,5 @@
 
-query='http://spt-apiserver-testing-apiserver:8080/sqlite/?study=Melanoma+intralesional+IL2'
+query='http://smprofiler-apiserver-testing-apiserver:8080/sqlite/?study=Melanoma+intralesional+IL2'
 
 curl -s --verbose "$query" 2>&1 | head -n24 | grep '^< ' | grep -v 'date: ' | tr -d '\b\r' > response.txt
 

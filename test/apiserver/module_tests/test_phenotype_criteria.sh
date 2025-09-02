@@ -1,5 +1,5 @@
 
-query="http://spt-apiserver-testing-apiserver:8080/phenotype-criteria/?study=Melanoma%20intralesional%20IL2&phenotype_symbol=Tumor"
+query="http://smprofiler-apiserver-testing-apiserver:8080/phenotype-criteria/?study=Melanoma%20intralesional%20IL2&phenotype_symbol=Tumor"
 echo ""
 echo "Query: $query"
 

@@ -1,12 +1,12 @@
 """Basic testing that expression vectors are in the database."""
 import os
 
-from spatialprofilingtoolbox.db.database_connection import DBCursor
+from smprofiler.db.database_connection import DBCursor
 
 
 def test_one_expression_vector():
     environment = {
-        'SINGLE_CELL_DATABASE_HOST': 'spt-db---testing-only-apiserver',
+        'SINGLE_CELL_DATABASE_HOST': 'smprofiler-db---testing-only-apiserver',
         'SINGLE_CELL_DATABASE_USER': 'postgres',
         'SINGLE_CELL_DATABASE_PASSWORD': 'postgres',
         'USE_ALTERNATIVE_TESTING_DATABASE': '1',

@@ -60,7 +60,7 @@ function test_squidpy_custom_phenotypes() {
     then
         endpoint="${endpoint}s"
     fi
-    query="http://spt-apiserver-testing-apiserver:8080/$endpoint/?study=Melanoma%20intralesional%20IL2&$phenotype_query&feature_class=$feature_class"
+    query="http://smprofiler-apiserver-testing-apiserver:8080/$endpoint/?study=Melanoma%20intralesional%20IL2&$phenotype_query&feature_class=$feature_class"
 
     if [[ "$feature_class" == "co-occurrence" ]];
     then
