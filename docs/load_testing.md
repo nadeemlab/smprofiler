@@ -3,16 +3,16 @@
 Load testing helps to ensure that the whole application is functioning as expected and with adequate performance.
 
 > [!NOTE]
-> Recall that you can install the Python package `spatialprofilingtoolbox` in several ways and in different environments:
+> Recall that you can install the Python package `smprofiler` in several ways and in different environments:
 > - In a virtual environment created with `python -m venv venv`.
 > - In debug mode with the `-e` option: `python -m pip install -e .[all]`
-> - From PyPI: `python -m pip install spatialprofilingtoolbox[all]`
-> - From a local build. Similar to: `python -m pip install dist/spatialprofilingtoolbox-1.0.8-py3-none-any.whl[all]`
+> - From PyPI: `python -m pip install smprofiler[all]`
+> - From a local build. Similar to: `python -m pip install dist/smprofiler-1.0.8-py3-none-any.whl[all]`
 
-A load test procedure is provided as the SPT command:
+A load test procedure is provided as the SMProfiler command:
 
 ```sh
-spt db load-testing
+smprofiler db load-testing
 ```
 
 To use it, you'll need access to your backend database from the terminal. The script prompts for database details and the API server you want to test. Typically these are either (i) both on a remote deployment, or (2) both in a local deployment.
@@ -30,16 +30,16 @@ The report for an example run is shown below. The real report is colorized in th
     Target database                                                             
 
 Found database config files with correct format and validated credentials:
-*0  /Users/username/.spt_db.config
- 1  /Users/username/.spt_db.config.2
+*0  /Users/username/.smprofiler_db.config
+ 1  /Users/username/.smprofiler_db.config.2
 
 The previously-used credentials file is marked with *.
 
 Select database config file [default selection 0]: 
-Using /Users/username/.spt_db.config
+Using /Users/username/.smprofiler_db.config
 
-Select API server [default selection oncopathtk.org/api]: 
-Selected server: oncopathtk.org/api
+Select API server [default selection smprofiler.io/api]: 
+Selected server: smprofiler.io/api
 API version:     1.0.0
 Number of pending jobs, including failed (abandoned, reached maximum retries):
 orion_crc                          43
@@ -68,9 +68,9 @@ brain_met_imc                       0
 bone_marrow_aging                   0
 
     Basic testing, simple queries                                               
- Retrieving http://oncopathtk.org/api/study-summary/?study=Breast+cancer+IMC ... Done. 
- Retrieving http://oncopathtk.org/api/channels/?study=Breast+cancer+IMC ... Done. 
- Retrieving http://oncopathtk.org/api/phenotype-symbols/?study=Breast+cancer+IMC ... Done. 
+ Retrieving http://smprofiler.io/api/study-summary/?study=Breast+cancer+IMC ... Done. 
+ Retrieving http://smprofiler.io/api/channels/?study=Breast+cancer+IMC ... Done. 
+ Retrieving http://smprofiler.io/api/phenotype-symbols/?study=Breast+cancer+IMC ... Done. 
 
 3 basic requests:              121ms, 90ms, 234ms
 Average response time:          148ms
@@ -83,7 +83,7 @@ Total response time:            36.7s
     Intermediate non-trivial metrics computation, speed test                    
 Test example is a phenotype fractions metric.
 Dropping test example computed feature, if it exists.
- Retrieving http://oncopathtk.org/api/phenotype-counts/?study=Breast+cancer+IMC&positive_marker=TWIST1&negative_marker=VWF ... Done. 
+ Retrieving http://smprofiler.io/api/phenotype-counts/?study=Breast+cancer+IMC&positive_marker=TWIST1&negative_marker=VWF ... Done. 
  polling job queue size... (time=29.8, size=0))
 
                                       Jobs cleared on average at 340.3 jobs / minute
@@ -115,10 +115,10 @@ Cleaning up test example computed feature... Done.
     Large job-set metrics computation, speed test                               
 Test examples are phenotype fractions metrics.
 Dropping test example computed features, if they exists.
- Retrieving http://oncopathtk.org/api/phenotype-counts/?study=LUAD+progression&positive_marker=MPO&negative_marker=KIT ... Done. 
- Retrieving http://oncopathtk.org/api/phenotype-counts/?study=LUAD+progression&positive_marker=ITGAX&negative_marker=MPO ... Done. 
- Retrieving http://oncopathtk.org/api/phenotype-counts/?study=LUAD+progression&positive_marker=KLRD1&negative_marker=CD14 ... Done. 
- Retrieving http://oncopathtk.org/api/phenotype-counts/?study=LUAD+progression&positive_marker=KIT&negative_marker=MPO ... Done. 
+ Retrieving http://smprofiler.io/api/phenotype-counts/?study=LUAD+progression&positive_marker=MPO&negative_marker=KIT ... Done. 
+ Retrieving http://smprofiler.io/api/phenotype-counts/?study=LUAD+progression&positive_marker=ITGAX&negative_marker=MPO ... Done. 
+ Retrieving http://smprofiler.io/api/phenotype-counts/?study=LUAD+progression&positive_marker=KLRD1&negative_marker=CD14 ... Done. 
+ Retrieving http://smprofiler.io/api/phenotype-counts/?study=LUAD+progression&positive_marker=KIT&negative_marker=MPO ... Done. 
  polling job queue size... (time=213.8, size=0)
 
                                       Jobs cleared on average at 573.1 jobs / minute
@@ -150,7 +150,7 @@ Cleaning up test example computed feature... Done.
     Intensive job-set metrics computation, speed test                           
 Test example is a proximity metric.
 Dropping test example computed features, if they exists.
- Retrieving http://oncopathtk.org/api/request-spatial-metrics-computation-custom-phenotypes/?study=Orion+CRC&positive_marker=PDL1&negative_marker=SMA&positive_marker2=MKI67&negative_marker2=SMA&feature_class=proximity&radius=30.0 ... Done. 
+ Retrieving http://smprofiler.io/api/request-spatial-metrics-computation-custom-phenotypes/?study=Orion+CRC&positive_marker=PDL1&negative_marker=SMA&positive_marker2=MKI67&negative_marker2=SMA&feature_class=proximity&radius=30.0 ... Done. 
  polling job queue size... (time=67.6, size=0)
 
                                       Jobs cleared on average at 36.4 jobs / minute

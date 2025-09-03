@@ -1,5 +1,5 @@
 
-query=http://spt-apiserver-testing-apiserver:8080/study-names/
+query=http://smprofiler-apiserver-testing-apiserver:8080/study-names/
 
 curl -s $query ;
 if [ "$?" -gt 0 ];

@@ -10,4 +10,4 @@ function do_query() {
     fi
 }
 
-do_query "http://spt-apiserver-testing-apiserver:8080/study-findings/?study=Melanoma+intralesional+IL2"
+do_query "http://smprofiler-apiserver-testing-apiserver:8080/study-findings/?study=Melanoma+intralesional+IL2"

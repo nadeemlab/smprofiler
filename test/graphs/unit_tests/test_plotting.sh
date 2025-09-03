@@ -1,4 +1,4 @@
-spt graphs plot-interactives \
+smprofiler graphs plot-interactives \
     --cg_path unit_tests/graphs/ \
     --output_directory . \
     --merge_rois

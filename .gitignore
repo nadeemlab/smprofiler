@@ -43,7 +43,7 @@ data-loaded-image-1smallnointensity
 development-image-prerequisites-installed
 log_of_build.log
 pyproject.toml
-spatialprofilingtoolbox.egg-info/
+smprofiler.egg-info/
 test/workflow/.nextflow/
 test/workflow/results/
 test/workflow/work/
@@ -64,5 +64,5 @@ test/apiserver/response_decompressed.bin
 venv/
 .venv/
 **/buildcache.sqlite3
-analysis_replication/.spt_db.config
+analysis_replication/.smprofiler_db.config
 analysis_replication/dbconfig_location.txt

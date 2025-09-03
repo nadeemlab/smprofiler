@@ -21,7 +21,7 @@ The memory map is as follows:
 
 The ellipsis represents repetition of the per-cell section once for each cell. This is 4 + 4 + 4 + 8 = 20 bytes per cell. The "header" preceding the per-cell sections is 20 bytes.
 
-A representation of an example of the cell sections can be found [here](https://github.com/nadeemlab/SPT/blob/main/test/apiserver/module_tests/celldata.dump).
+A representation of an example of the cell sections can be found [here](https://github.com/nadeemlab/SMProfiler/blob/main/test/apiserver/module_tests/celldata.dump).
 
 There is a convenient way to preview the contents at the command line using `xxd`:
 
@@ -40,7 +40,7 @@ separator character (decimal 28):
 - JSON metadata section
 - binary section with intensity data for subsampled cells
 
-The JSON metadata section is structured as in the following example (exact model is [here](../spatialprofilingtoolbox/db/representative_subsample.py)):
+The JSON metadata section is structured as in the following example (exact model is [here](../smprofiler/db/representative_subsample.py)):
 
 ```json
 {
@@ -64,12 +64,12 @@ The JSON metadata section is structured as in the following example (exact model
   ]
 }
 ```
-The integers above use the custom 8-bit [float format](https://github.com/nadeemlab/SPT/blob/main/spatialprofilingtoolbox/standalone_utilities/float8.py).
+The integers above use the custom 8-bit [float format](https://github.com/nadeemlab/SMProfiler/blob/main/smprofiler/standalone_utilities/float8.py).
 
 The binary section is as follows:
 
 | Byte range start | Byte range end | Number of bytes | Description                                                       | Data types                  |
 |------------------|----------------|-----------------|-------------------------------------------------------------------|-----------------------------|
-| 1                | N              | N               | The intensity values for each of the N channels, for first cell.  | Custom 8-bit [float format](https://github.com/nadeemlab/SPT/blob/main/spatialprofilingtoolbox/standalone_utilities/float8.py) |
+| 1                | N              | N               | The intensity values for each of the N channels, for first cell.  | Custom 8-bit [float format](https://github.com/nadeemlab/SMProfiler/blob/main/smprofiler/standalone_utilities/float8.py) |
 | N+1              | 2N             | N               | The intensity values for each of the N channels, for second cell. | Custom 8-bit float format   |
 | ... | ... | ... | ... | ... |

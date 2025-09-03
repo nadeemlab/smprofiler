@@ -1,5 +1,5 @@
 
-from spatialprofilingtoolbox.ondemand.cache_assessment import CacheAssessment
+from smprofiler.ondemand.cache_assessment import CacheAssessment
 
 def test_assessor():
     assessor = CacheAssessment(database_config_file=None, study='Melanoma intralesional IL2')

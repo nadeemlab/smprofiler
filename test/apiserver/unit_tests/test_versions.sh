@@ -1,5 +1,5 @@
 
-query=http://spt-apiserver-testing-apiserver:8080/software-component-versions/
+query=http://smprofiler-apiserver-testing-apiserver:8080/software-component-versions/
 
 curl -s $query ;
 if [ "$?" -gt 0 ];

@@ -15,7 +15,7 @@ from PIL import Image
 from numpy import power
 from numpy import array
 
-from spatialprofilingtoolbox.db.feature_matrix_extractor import FeatureMatrixExtractor
+from smprofiler.db.feature_matrix_extractor import FeatureMatrixExtractor
 
 PICKLED_FILENAME = 'dfs.pickle'
 samples = ('Mold_sample_14RD', 'Mold_sample_22RD', 'Mold_sample_39RD', 'Mold_sample_41BL', 'Mold_sample_42RD')

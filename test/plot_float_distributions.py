@@ -3,8 +3,8 @@
 from matplotlib import pyplot as plt
 import matplotlib.pyplot as plt
 
-from spatialprofilingtoolbox.standalone_utilities.float8 import float_format
-from spatialprofilingtoolbox.standalone_utilities.float8 import generate_metadata_table
+from smprofiler.standalone_utilities.float8 import float_format
+from smprofiler.standalone_utilities.float8 import generate_metadata_table
 
 
 def create_comparison_plot():

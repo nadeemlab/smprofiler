@@ -1,15 +1,15 @@
 
 import re
-from spatialprofilingtoolbox.db.database_connection import DBConnection
-from spatialprofilingtoolbox.db.database_connection import DBCursor
-from spatialprofilingtoolbox.db.sqlite_builder import SQLiteBuilder
+from smprofiler.db.database_connection import DBConnection
+from smprofiler.db.database_connection import DBCursor
+from smprofiler.db.sqlite_builder import SQLiteBuilder
 
 def _normalize(name):
     name = re.sub(' collection: .*$', '', name)
     return re.sub(r'[ \-]', '_', name).lower()
 
 def test_sqlite_dump():
-    database_config_file = '../db/.spt_db.config.container'
+    database_config_file = '../db/.smprofiler_db.config.container'
     connection = DBConnection(database_config_file=database_config_file)
     connection.__enter__()
     with DBCursor(connection=connection, study=None) as cursor:

@@ -1,5 +1,5 @@
-spt graphs extract \
-    --config_path unit_tests/spt-test.config \
+smprofiler graphs extract \
+    --config_path unit_tests/smprofiler-test.config \
     --output_directory .
 $([ $? -eq 0 ] && [ -e "label_to_result.json" ] && [ -e "cells.h5" ] && [ -e "labels.h5" ])
 status="$?"

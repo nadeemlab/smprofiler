@@ -1,11 +1,11 @@
 """Test pulling out of stratification for cohorts from database."""
 import pandas as pd
 
-from spatialprofilingtoolbox.db.stratification_puller import StratificationPuller
+from smprofiler.db.stratification_puller import StratificationPuller
 
 
 def test_stratification_puller(measured_only: bool):
-    database_config_file='../workflow/.spt_db.config.container'
+    database_config_file='../workflow/.smprofiler_db.config.container'
     puller = StratificationPuller(database_config_file)
     puller.pull(measured_only=measured_only)
     stratification = puller.get_stratification()

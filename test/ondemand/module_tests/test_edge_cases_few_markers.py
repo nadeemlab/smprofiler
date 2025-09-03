@@ -1,7 +1,7 @@
 """Test a few cases of using the counts service."""
 
-from spatialprofilingtoolbox.db.database_connection import DBConnection
-from spatialprofilingtoolbox.apiserver.request_scheduling.ondemand_requester import OnDemandRequester
+from smprofiler.db.database_connection import DBConnection
+from smprofiler.apiserver.request_scheduling.ondemand_requester import OnDemandRequester
 
 
 def retrieve_case(case):

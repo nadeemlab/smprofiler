@@ -1,3 +1,3 @@
 # Template
 
-Template for SPT plugin development.
+Template for SMProfiler plugin development.

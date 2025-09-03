@@ -5,7 +5,7 @@ from pandas import read_csv
 from pandas import DataFrame
 from scipy.stats import pearsonr
 
-from spatialprofilingtoolbox.workflow.common.optimize_thresholds import ThresholdOptimizer
+from smprofiler.workflow.common.optimize_thresholds import ThresholdOptimizer
 
 def test_threshold_optimization():
     cell_data = read_csv(join('module_tests', 'bm_subsample.tsv'), sep='\t')

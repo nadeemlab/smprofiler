@@ -27,8 +27,8 @@ RUN pip install cg-gnn==0.3.2
 # Make the files you need in this directory available everywhere in the container
 ADD . /app
 RUN chmod +x train.py
-RUN mv train.py /usr/local/bin/spt-plugin-train-on-graphs
+RUN mv train.py /usr/local/bin/smprofiler-plugin-train-on-graphs
 RUN chmod +x /app/print_graph_config.sh
-RUN mv /app/print_graph_config.sh /usr/local/bin/spt-plugin-print-graph-request-configuration
+RUN mv /app/print_graph_config.sh /usr/local/bin/smprofiler-plugin-print-graph-request-configuration
 RUN chmod +x /app/print_training_config.sh
-RUN mv /app/print_training_config.sh /usr/local/bin/spt-plugin-print-training-configuration
+RUN mv /app/print_training_config.sh /usr/local/bin/smprofiler-plugin-print-training-configuration

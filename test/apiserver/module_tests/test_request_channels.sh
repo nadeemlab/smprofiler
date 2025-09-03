@@ -1,4 +1,4 @@
-query="http://spt-apiserver-testing-apiserver:8080/channels/?study=Melanoma%20intralesional%20IL2"
+query="http://smprofiler-apiserver-testing-apiserver:8080/channels/?study=Melanoma%20intralesional%20IL2"
 
 curl -s $query | python -m json.tool | tee summary_rc.json | tr '\n' ' ' | sed 's/ \+//g'
 if [ "$?" -gt 0 ];

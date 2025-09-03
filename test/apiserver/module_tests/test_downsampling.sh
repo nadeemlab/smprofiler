@@ -6,11 +6,11 @@ function consider_exit() {
     fi
 }
 
-spt db cache-subsample 106 --database-config-file .spt_db.config.container --only-uncreated;
+smprofiler db cache-subsample 106 --database-config-file .smprofiler_db.config.container --only-uncreated;
 source module_tests/downsampled_retrieval.sh
 
 study='Melanoma+intralesional+IL2'
-server=spt-apiserver-testing-apiserver:8080
+server=smprofiler-apiserver-testing-apiserver:8080
 
 get_downsampled "$study" "$server"
 

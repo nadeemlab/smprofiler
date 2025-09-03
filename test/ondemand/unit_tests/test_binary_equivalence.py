@@ -3,8 +3,8 @@
 from numpy import asarray
 from numpy.typing import NDArray
 
-from spatialprofilingtoolbox.workflow.common.sparse_matrix_puller import SparseMatrixPuller
-from spatialprofilingtoolbox.ondemand.computers.squidpy_computer import extract_binary
+from smprofiler.workflow.common.sparse_matrix_puller import SparseMatrixPuller
+from smprofiler.ondemand.computers.squidpy_computer import extract_binary
 
 def primitive_compress(vector: tuple[int, ...]) -> int:
     return sum(map(lambda pair: pair[1]*int(pow(2, pair[0])), enumerate(vector)))

@@ -8,7 +8,7 @@ from subprocess import run
 
 STUDY_NAME = quote('Melanoma intralesional IL2')
 ENDPOINT = 'importance-composition'
-HOST = 'spt-apiserver-testing-apiserver'
+HOST = 'smprofiler-apiserver-testing-apiserver'
 PORT = 8080
 
 POSITIVE_MARKERS = ['CD3', 'CD4', 'CD8']

@@ -26,15 +26,15 @@ from util import GraphData, load_hs_graphs, save_hs_graphs
 TMP_DIRECTORY = 'tmp'
 
 
-def _translate_spt_graphs(spt_graphs: list[GraphData], output_directory: str,
+def _translate_smprofiler_graphs(smprofiler_graphs: list[GraphData], output_directory: str,
                           ) -> tuple[int, int, str, str, str, str]:
-    """Translate the SPT graphs into tmi2022 graphs."""
+    """Translate the SMProfiler graphs into tmi2022 graphs."""
     makedirs(output_directory, exist_ok=True)
     ids_train: list[str] = []
     ids_val: list[str] = []
     ids_test: list[str] = []
     ids_unlabeled: list[str] = []
-    for graph_data in spt_graphs:
+    for graph_data in smprofiler_graphs:
         graph_id = _convert_graph_to_tmi2022(graph_data, output_directory)
         match graph_data.set:
             case 'train':
@@ -62,20 +62,20 @@ def _translate_spt_graphs(spt_graphs: list[GraphData], output_directory: str,
 
     # Find the number of classes
     unique_labels: set[int] = set()
-    for graph_data in spt_graphs:
+    for graph_data in smprofiler_graphs:
         if graph_data.label is not None:
             unique_labels.add(graph_data.label)
     n_classes = len(unique_labels)
     assert unique_labels == set(range(len(unique_labels))), \
         "Labels are not zero-indexed and non-missing"
-    n_features = spt_graphs[0].graph.node_features.shape[1]
+    n_features = smprofiler_graphs[0].graph.node_features.shape[1]
 
     return n_classes, n_features, \
         path_to_train_ids, path_to_val_ids, path_to_test_ids, path_to_unlabeled_ids
 
 
 def _convert_graph_to_tmi2022(graph_data: GraphData, data_directory: str) -> str:
-    """Convert an SPT graph to a tmi2022 graph."""
+    """Convert an SMProfiler graph to a tmi2022 graph."""
     # Extract data from the GraphData instance
     adj = graph_data.graph.adj
     node_features = graph_data.graph.node_features
@@ -184,7 +184,7 @@ def write_one_id_to_file(val_set: str) -> str:
 # def _convert_from_graphdataset_format(id: str,
 #                                       data_directory: str,
 #                                       importances: NDArray[float_],) -> GraphData:
-#     """Convert a tmi2022 graph of id to an SPT graph."""
+#     """Convert a tmi2022 graph of id to an SMProfiler graph."""
 #     specimen, name = id.split('/')
 
 #     # Load the tensors from disk
@@ -228,13 +228,13 @@ if __name__ == '__main__':
     batch_size = config.getint('batch_size', 8)
     log_interval_local = config.getint('log_interval_local', 6)
 
-    spt_graphs, _ = load_hs_graphs(args.input_directory)
+    smprofiler_graphs, _ = load_hs_graphs(args.input_directory)
 
     # Call the function with the current args.input_directory and graph_directory
     graph_directory = join(TMP_DIRECTORY, 'graphs')
     n_classes, n_features, path_to_train_ids, path_to_val_ids, path_to_test_ids, \
-        path_to_unlabeled_ids = _translate_spt_graphs(spt_graphs, graph_directory)
-    # Consider deleting spt_graphs and reloading later to save memory
+        path_to_unlabeled_ids = _translate_smprofiler_graphs(smprofiler_graphs, graph_directory)
+    # Consider deleting smprofiler_graphs and reloading later to save memory
 
     # Train tmi2022
     run_tmi2022(n_classes,
@@ -295,7 +295,7 @@ if __name__ == '__main__':
         node_importance = node_importance.flatten().numpy()
 
         # Save the importance vector back to the graph in GraphData format
-        for graph_data in spt_graphs:
+        for graph_data in smprofiler_graphs:
             if graph_data.name == single_id.split('\t')[0].split('/')[1]:
                 assert graph_data.graph.node_features.shape[0] == node_importance.shape[0]
                 graph_data.graph.importances = node_importance
@@ -306,7 +306,7 @@ if __name__ == '__main__':
         else:
             raise RuntimeError(f'Couldn\'t find graph associated with {single_id}')
 
-    save_hs_graphs(spt_graphs, args.output_directory)
+    save_hs_graphs(smprofiler_graphs, args.output_directory)
     hs_id_to_importance: dict[int, float] = {k: mean(v) for k, v in importance_scores.items()}
     s = Series(hs_id_to_importance).sort_index()
     s.name = 'importance'

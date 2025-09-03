@@ -1,5 +1,5 @@
 
-query="http://spt-apiserver-testing-apiserver:8080/importance-fraction-plot/?study=Melanoma%20intralesional%20IL2"
+query="http://smprofiler-apiserver-testing-apiserver:8080/importance-fraction-plot/?study=Melanoma%20intralesional%20IL2"
 
 curl -sf "$query" > _gnn.svg ;
 curl -sf "$query" > _gnn.svg ;

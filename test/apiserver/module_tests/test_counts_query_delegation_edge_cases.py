@@ -7,7 +7,7 @@ STUDY_NAME = quote('Melanoma intralesional IL2')
 POSITIVE_MARKERS = ['CD3', 'CD4', 'CD8']
 NEGATIVE_MARKERS: list[str] = ['']
 ENDPOINTS = ('anonymous-phenotype-counts-fast', 'phenotype-counts')
-HOST = 'spt-apiserver-testing-apiserver'
+HOST = 'smprofiler-apiserver-testing-apiserver'
 PORT = 8080
 
 def main():

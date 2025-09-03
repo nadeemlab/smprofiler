@@ -2,7 +2,7 @@ import sys
 
 from pandas import read_csv, DataFrame
 
-from spatialprofilingtoolbox.db.feature_matrix_extractor import (
+from smprofiler.db.feature_matrix_extractor import (
     FeatureMatrixExtractor,
     MatrixBundle,
 )
@@ -114,7 +114,7 @@ def test_stratification(study: dict[str, DataFrame]):
 
 
 if __name__ == '__main__':
-    extractor = FeatureMatrixExtractor(database_config_file='../workflow/.spt_db.config.container')
+    extractor = FeatureMatrixExtractor(database_config_file='../workflow/.smprofiler_db.config.container')
     study_name = 'Melanoma intralesional IL2 collection: abc-123'
     test_study = extractor.extract(study=study_name)
     test_sample_set(test_study)

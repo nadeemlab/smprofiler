@@ -1,4 +1,4 @@
-name: spt
+name: smprofiler
 channels:
   - conda-forge
 dependencies:

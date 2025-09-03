@@ -1,6 +1,6 @@
-# How to train graph transformation models using SPT
+# How to train graph transformation models using SMProfiler
 
-The intended procedure for using `spt graphs` and graph workflows is:
+The intended procedure for using `smprofiler graphs` and graph workflows is:
 
 1. [Prerequisites](#install-prerequisites)
 2. [Explore the data available for a study and train the model](#explore-the-data-available-for-a-study-and-train-the-model)
@@ -9,43 +9,43 @@ The intended procedure for using `spt graphs` and graph workflows is:
 
 ## Install prerequisites
 
-Our graph transformation workflows are powered by [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html) and [Docker](https://docs.docker.com/engine/install/) or [Singularity](https://docs.sylabs.io/guides/3.0/user-guide/installation.html), in addition to the SPT Python package. Please ensure all three are installed before proceeding.
+Our graph transformation workflows are powered by [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html) and [Docker](https://docs.docker.com/engine/install/) or [Singularity](https://docs.sylabs.io/guides/3.0/user-guide/installation.html), in addition to the SMProfiler Python package. Please ensure all three are installed before proceeding.
 ```sh
 # Install Docker or Singularity per the links above
 curl -s https://get.nextflow.io | bash
-pip install spatialprofilingtoolbox[workflow]
+pip install smprofiler[workflow]
 ```
 
 ## Explore the data available for a study and train the model
 
-- Evaluate the specimen cohorts at your disposal with `spt graphs explore-classes`.
-- Select sample strata to use and fetch graph data artifacts from the database using `spt graphs extract`.
-- Use an [SPT plugin](https://github.com/nadeemlab/spt-plugin) to transform your graph data into results, including cell-level importance scores.
+- Evaluate the specimen cohorts at your disposal with `smprofiler graphs explore-classes`.
+- Select sample strata to use and fetch graph data artifacts from the database using `smprofiler graphs extract`.
+- Use an [SMProfiler plugin](https://github.com/nadeemlab/smprofiler-plugin) to transform your graph data into results, including cell-level importance scores.
 
 ## Configure a reproducible graph transformation workflow
 
-To create artifacts that will reproducibly run through the entire process of gathering the data, transforming it, and reporting results in one line using Nextflow, we provide the `spt workflow configure` utility. It uses the parameters obtained from the last step to create this reproducible workflow.
+To create artifacts that will reproducibly run through the entire process of gathering the data, transforming it, and reporting results in one line using Nextflow, we provide the `smprofiler workflow configure` utility. It uses the parameters obtained from the last step to create this reproducible workflow.
 
-Currently, we a `graph plugin` workflow available in SPT that makes available two first-class plugins supported by us SPT developers, [`cg-gnn`](https://github.com/nadeemlab/spt-cg-gnn) and [`graph-transformer`](https://github.com/nadeemlab/spt-graph-transformer), with plans to add more in the future. Both train a deep learning model and return importance scores for cells used to train and test the model. If you'd like to develop your own, please refer to the [spt-plugin repository](https://github.com/nadeemlab/spt-plugin) for more information.
+Currently, we a `graph plugin` workflow available in SMProfiler that makes available two first-class plugins supported by us SMProfiler developers, [`cg-gnn`](https://github.com/nadeemlab/smprofiler-cg-gnn) and [`graph-transformer`](https://github.com/nadeemlab/smprofiler-graph-transformer), with plans to add more in the future. Both train a deep learning model and return importance scores for cells used to train and test the model. If you'd like to develop your own, please refer to the [smprofiler-plugin repository](https://github.com/nadeemlab/smprofiler-plugin) for more information.
 
 (Note that because most deep learning models like cg-gnn use non-deterministic algorithms, workflows may not be exactly reproducible.)
 
 To set up a workflow, use the following command:
 ```
-spt workflow configure --workflow=<YOUR WORKFLOW> --config-file=<YOUR CONFIG FILE LOCATION>
+smprofiler workflow configure --workflow=<YOUR WORKFLOW> --config-file=<YOUR CONFIG FILE LOCATION>
 ```
-For more information about how `spt workflow configure` works, see
-* [`spt workflow configure -h`](spatialprofilingtoolbox/workflow/scripts/configure.py)
-* the template of the workflow configuration file, see [`.workflow.config.template`](spatialprofilingtoolbox/workflow/assets/.workflow.config.template)
+For more information about how `smprofiler workflow configure` works, see
+* [`smprofiler workflow configure -h`](smprofiler/workflow/scripts/configure.py)
+* the template of the workflow configuration file, see [`.workflow.config.template`](smprofiler/workflow/assets/.workflow.config.template)
 
 ### The graph configuration file
 
-[The template from the graphs submodule](spatialprofilingtoolbox/graphs/template.config) is reproduced here for quick reference, but again please refer to the source code for the most up to date information. The values supplied here generally correspond to the default arguments (`study_name` and `strata` excepted) so you can omit them if you want to use the defaults.
+[The template from the graphs submodule](smprofiler/graphs/template.config) is reproduced here for quick reference, but again please refer to the source code for the most up to date information. The values supplied here generally correspond to the default arguments (`study_name` and `strata` excepted) so you can omit them if you want to use the defaults.
 
 ```ini
 [general]
-db_config_file_path = spt_db.config
-study_name = Study name in SPT database
+db_config_file_path = smprofiler_db.config
+study_name = Study name in SMProfiler database
 random_seed = None
 
 [extract]
@@ -130,7 +130,7 @@ Upload importances
 
 # Run the workflow
 
-The workflow spins up a Docker container with the necessary dependencies to run the workflow, so we recommend installing it before trying to run it. Once `spt workflow configure` finishes setting up, run the workflow with:
+The workflow spins up a Docker container with the necessary dependencies to run the workflow, so we recommend installing it before trying to run it. Once `smprofiler workflow configure` finishes setting up, run the workflow with:
 
 ```sh
 nextflow run .

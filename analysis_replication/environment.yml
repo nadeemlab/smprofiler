@@ -1,4 +1,4 @@
-name: spt-repl
+name: smprofiler-repl
 channels:
   - conda-forge
   - defaults

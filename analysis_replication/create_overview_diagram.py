@@ -28,8 +28,8 @@ from pystache import parse as pystache_parse
 
 from matplotlib import colormaps
 
-from spatialprofilingtoolbox.db.database_connection import DBConnection
-from spatialprofilingtoolbox.db.database_connection import DBCursor
+from smprofiler.db.database_connection import DBConnection
+from smprofiler.db.database_connection import DBCursor
 
 from accessors import DataAccessor
 
@@ -37,7 +37,7 @@ from accessors import DataAccessor
 class GatherSampleSummaryData:
     database_config_file: str
 
-    def __init__(self, database_config_file = '.spt_db.config'):
+    def __init__(self, database_config_file = '.smprofiler_db.config'):
         self.database_config_file = database_config_file
         self.studies = self.get_studies()
 
@@ -330,7 +330,7 @@ class BoxDiagramBuilder:
                     td.set('data-tooltip', sample_name)
                     td.set('class', f'sample-marker-clickable')
                     sample_name_for_url = quote_plus(sample_name)
-                    td.set('onclick', f"window.location.href='https://oncopathtk.org/study/{study_for_url}/slide-viewer/{sample_name_for_url}';")
+                    td.set('onclick', f"window.location.href='https://smprofiler.io/study/{study_for_url}/slide-viewer/{sample_name_for_url}';")
                 td.set('class', f'sample-group-color-{o} sample-marker')
         return ET.tostring(e, encoding='unicode')
 

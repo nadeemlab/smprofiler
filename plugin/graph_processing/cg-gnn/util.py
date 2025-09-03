@@ -1,6 +1,6 @@
 """Histological structure graph dataset utility functions.
 
-This is a copy of spatialprofilingtoolbox.graphs.util.
+This is a copy of smprofiler.graphs.util.
 """
 
 from os import listdir, makedirs

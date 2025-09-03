@@ -12,7 +12,7 @@ function normalize_floats() {
 }
 
 function test_proximity_batch() {
-    query="http://spt-apiserver-testing-apiserver:8080/batch-request-spatial-metrics-computation-custom-phenotypes/"
+    query="http://smprofiler-apiserver-testing-apiserver:8080/batch-request-spatial-metrics-computation-custom-phenotypes/"
     curl -X POST -d @batch_specifications.json "$query" --header "Content-Type:application/json" | python -m json.tool > batch_result.json
     start=$SECONDS
     while (( SECONDS - start < 120 )); do

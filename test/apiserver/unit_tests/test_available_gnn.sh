@@ -1,5 +1,5 @@
 
-query="http://spt-apiserver-testing-apiserver:8080/available-gnn-metrics/?study=Melanoma+intralesional+IL2"
+query="http://smprofiler-apiserver-testing-apiserver:8080/available-gnn-metrics/?study=Melanoma+intralesional+IL2"
 
 curl -s "$query" ;
 if [ "$?" -gt 0 ];

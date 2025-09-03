@@ -1,14 +1,45 @@
 # Development, maintenance, administration
 
-1. <a href="#building-and-testing-modules">Building and testing modules</a>
+1. <a href="#development-environment">Development environment</a>
 2. <a href="#python-package">Python package</a>
+2. <a href="#integration-tests">Integration tests</a>
 3. <a href="#modules">Modules</a>
 4. <a href="#test-managed-development">Test-managed development</a>
-5. <a href="#spt-tab-completion">`spt` tab-completion</a>
+5. <a href="#smprofiler-tab-completion">`smprofiler` tab-completion</a>
 6. <a href="#throwaway-testing">Throwaway testing</a>
 7. <a href="#new-workflows">Add a new workflow</a>
 
-## <a id="building-and-testing-modules"></a> 1. Building and testing modules
+## <a id="development-environment"></a> 1. Development environment
+
+For SMProfiler development tasks, we use:
+
+|                                                            | Version required or tested under |
+| ---------------------------------------------------------- | -------------------------------  |
+| [bash](https://www.gnu.org/software/bash/)                 | 5.2.21                           |
+| [Docker Engine](https://docs.docker.com/engine/install/)   | 27.5.1                           |
+| [Docker Compose](https://docs.docker.com/compose/install/) | 2.32.4                           |
+| [GNU Make](https://www.gnu.org/software/make/)             | 4.4.1                            |
+| [uv](https://docs.astral.sh/uv/)                           | 0.5.29                           |
+| [python](https://www.python.org/downloads/)                | 3.13                             |
+
+These tasks include:
+- Determining up-to-date dependency requirements
+- Releasing `smprofiler` to PyPI
+- Building application container images
+- Running integration/functional tests
+
+## <a id="python-package"></a> 2. Python package
+
+To release to PyPI use:
+
+```sh
+make release-package
+```
+
+`pyproject.toml` contains the package metadata, with only a few version constraints on dependencies.
+Pinned versions for each dependency are listed separately in `requirements.txt`.
+
+## <a id="integration-tests"></a> 2. Integration tests
 
 The modules in this repository are built, tested, and deployed using `make` and Docker.
 
@@ -44,14 +75,14 @@ Building ondemand Dockerfile ...................................................
 Building db Dockerfile ......................................................... Built.         (0s)
 Building workflow Dockerfile ................................................... Built.         (0s)
 Checking for Docker credentials in ~/.docker/config.json ....................... Found.         (0s)
-Building Docker image nadeemlab/spt-db ......................................... Built.         (6s)
-Building test-data-loaded spt-db image (1small) ................................ Built.         (0s)
-Building test-data-loaded spt-db image (1) ..................................... Built.         (0s)
-Building test-data-loaded spt-db image (1and2) ................................. Built.         (1s)
-Building Docker image nadeemlab/spt-apiserver .................................. Built.         (5s)
-Building Docker image nadeemlab/spt-graphs ..................................... Built.         (6s)
-Building Docker image nadeemlab/spt-ondemand ................................... Built.         (6s)
-Building Docker image nadeemlab/spt-workflow ................................... Built.         (6s)
+Building Docker image nadeemlab/smprofiler-db ......................................... Built.         (6s)
+Building test-data-loaded smprofiler-db image (1small) ................................ Built.         (0s)
+Building test-data-loaded smprofiler-db image (1) ..................................... Built.         (0s)
+Building test-data-loaded smprofiler-db image (1and2) ................................. Built.         (1s)
+Building Docker image nadeemlab/smprofiler-apiserver .................................. Built.         (5s)
+Building Docker image nadeemlab/smprofiler-graphs ..................................... Built.         (6s)
+Building Docker image nadeemlab/smprofiler-ondemand ................................... Built.         (6s)
+Building Docker image nadeemlab/smprofiler-workflow ................................... Built.         (6s)
 Running docker compose rm (remove) ............................................. Down.          (1s)
 apiserver (setup testing environment) .......................................... Setup.         (4s)
   study names .................................................................. Passed.        (1s)
@@ -78,7 +109,7 @@ workflow (setup testing environment) ...........................................
   signature cell set subsetting ................................................ Passed.        (1s)
   sample stratification ........................................................ Passed.        (1s)
 workflow (teardown testing environment) ........................................ Down.          (1s)
-Building test-data-loaded spt-db image (1smallnointensity) ..................... Built.         (0s)
+Building test-data-loaded smprofiler-db image (1smallnointensity) ..................... Built.         (0s)
 apiserver (setup testing environment) .......................................... Setup.         (5s)
   phenotype criteria ........................................................... Passed.        (0s)
   proximity .................................................................... Passed.        (4s)
@@ -113,10 +144,10 @@ Optionally, if the images are ready to be released:
 
 <pre>
 Checking for Docker credentials in ~/.docker/config.json <span style="color:olive;">...</span><span style="color:olive;">....................</span> <span style="font-weight:bold;color:green;">Found.</span>         <span style="color:purple;">(0s)</span>
-Pushing Docker container nadeemlab/spt-apiserver <span style="color:olive;">...</span><span style="color:olive;">............................</span> <span style="font-weight:bold;color:green;">Pushed.</span>        <span style="color:purple;">(16s)</span>
-Pushing Docker container nadeemlab/spt-ondemand <span style="color:olive;">...</span><span style="color:olive;">.............................</span> <span style="font-weight:bold;color:green;">Pushed.</span>        <span style="color:purple;">(15s)</span>
-Pushing Docker container nadeemlab/spt-db <span style="color:olive;">...</span><span style="color:olive;">...................................</span> <span style="font-weight:bold;color:green;">Pushed.</span>        <span style="color:purple;">(23s)</span>
-Pushing Docker container nadeemlab/spt-workflow <span style="color:olive;">...</span><span style="color:olive;">.............................</span> <span style="font-weight:bold;color:green;">Pushed.</span>        <span style="color:purple;">(27s)</span>
+Pushing Docker container nadeemlab/smprofiler-apiserver <span style="color:olive;">...</span><span style="color:olive;">............................</span> <span style="font-weight:bold;color:green;">Pushed.</span>        <span style="color:purple;">(16s)</span>
+Pushing Docker container nadeemlab/smprofiler-ondemand <span style="color:olive;">...</span><span style="color:olive;">.............................</span> <span style="font-weight:bold;color:green;">Pushed.</span>        <span style="color:purple;">(15s)</span>
+Pushing Docker container nadeemlab/smprofiler-db <span style="color:olive;">...</span><span style="color:olive;">...................................</span> <span style="font-weight:bold;color:green;">Pushed.</span>        <span style="color:purple;">(23s)</span>
+Pushing Docker container nadeemlab/smprofiler-workflow <span style="color:olive;">...</span><span style="color:olive;">.............................</span> <span style="font-weight:bold;color:green;">Pushed.</span>        <span style="color:purple;">(27s)</span>
 </pre>
 
 If the package source code is ready to be released to PyPI:
@@ -124,12 +155,12 @@ If the package source code is ready to be released to PyPI:
 - `$ make release-package`
 
 <pre>
-Checking for PyPI credentials in ~/.pypirc for spatialprofilingtoolbox <span style="color:olive;">...</span><span style="color:olive;">......</span> <span style="font-weight:bold;color:green;">Found.</span>         <span style="color:purple;">(0s)</span>
-Uploading spatialprofilingtoolbox==0.11.0 to PyPI <span style="color:olive;">...</span><span style="color:olive;">...........................</span> <span style="font-weight:bold;color:green;">Uploaded.</span>      <span style="color:purple;">(3s)</span>
+Checking for PyPI credentials in ~/.pypirc for smprofiler <span style="color:olive;">...</span><span style="color:olive;">......</span> <span style="font-weight:bold;color:green;">Found.</span>         <span style="color:purple;">(0s)</span>
+Uploading smprofiler==0.11.0 to PyPI <span style="color:olive;">...</span><span style="color:olive;">...........................</span> <span style="font-weight:bold;color:green;">Uploaded.</span>      <span style="color:purple;">(3s)</span>
 </pre>
 
 ## <a id="python-package"></a> 2. Python package
-The source code is contained in one Python package, `spatialprofilingtoolbox`. The package metadata uses the declarative `pyproject.toml` format.
+The source code is contained in one Python package, `smprofiler`. The package metadata uses the declarative `pyproject.toml` format.
 
 ## <a id="modules"></a> 3. Modules
 The main functionality is provided by 4 modules designed to operate as services. Each module's source is wrapped in a Docker image.
@@ -137,7 +168,7 @@ The main functionality is provided by 4 modules designed to operate as services.
 | Module name     | Description |
 | --------------- | ----------- |
 | `apiserver`     | FastAPI application supporting queries over cell data. |
-| `graphs`        | Command line tool to apply cell graph neural network models to data stored in an SPT framework. |
+| `graphs`        | Command line tool to apply cell graph neural network models to data stored in an SMProfiler framework. |
 | `ondemand`      | An optimized class-counting and other metrics-calculation program served by a custom TCP server. |
 | `db`            | Data model/interface and PostgresQL database management SQL fragments. |
 | `workflow`      | [Nextflow](https://www.nextflow.io)-orchestrated computation workflows. |
@@ -151,17 +182,17 @@ These tests serve multiple purposes for us:
 1. To verify preserved functionality during source code modification.
 2. To exemplify typical usage of classes and functions, including how they are wrapped in a container and how that container is setup.
 
-Each test is performed inside an isolated for-development-only `spatialprofilingtoolbox`-loaded Docker container, in the presence of a running module-specific Docker composition that provides the given module's service as well as other modules' services (if needed).
+Each test is performed inside an isolated for-development-only `smprofiler`-loaded Docker container, in the presence of a running module-specific Docker composition that provides the given module's service as well as other modules' services (if needed).
 
-## <a id="spt-tab-completion"></a> 5. `spt` tab completion
-You might want to install `spatialprofilingtoolbox` to your local machine in order to initiate database control actions, ETL, etc.
+## <a id="smprofiler-tab-completion"></a> 5. `smprofiler` tab completion
+You might want to install `smprofiler` to your local machine in order to initiate database control actions, ETL, etc.
 
 In this case bash completion is available that allows you to readily assess and find functionality provided at the command line. This reduces the need for some kinds of documentation, since such documentation is already folded in to the executables in such a way that it can be readily accessed.
 
-After installation of the Python package, an entry point `spt` is created. (Use `spt-enable-completion` to manually install the completion to a shell profile file).
-- `spt [TAB]` yields the submodules which can be typed next.
-- `spt <module name> [TAB]` yields the commands provided by the given module.
-- `spt <module name> <command name> [TAB]` yields the `--help` text for the command.
+After installation of the Python package, an entry point `smprofiler` is created. (Use `smprofiler-enable-completion` to manually install the completion to a shell profile file).
+- `smprofiler [TAB]` yields the submodules which can be typed next.
+- `smprofiler <module name> [TAB]` yields the commands provided by the given module.
+- `smprofiler <module name> <command name> [TAB]` yields the `--help` text for the command.
 
 
 ## <a id="throwaway-testing"></a> 6. Throwaway testing
@@ -184,7 +215,7 @@ docker run \
   --rm \
   --network <module name>_isolated_temporary_test \
   --mount type=bind,src=$(realpath ..),dst=/mount_sources \
-  -t nadeemlab-development/spt-development:latest \
+  -t nadeemlab-development/smprofiler-development:latest \
   /bin/bash -c "$test_cmd";
 ```
 6. Tear down the testing environment when you're done:
@@ -197,7 +228,7 @@ You can of course also modify the testing environment, involving more or fewer m
 
 ## <a id="new-workflows"></a> 7. Add a new workflow
 
-The computation workflows are orchestrated with Nextflow, using the process definition script [`main_visitor.nf`](https://github.com/nadeemlab/SPT/blob/main/spatialprofilingtoolbox/workflow/assets/main_visitor.nf). "Visitor" refers to the visitor pattern, whereby the process steps access the database, do some reads, do some computations, and return some results by sending them to the database.
+The computation workflows are orchestrated with Nextflow, using the process definition script [`main_visitor.nf`](https://github.com/nadeemlab/SMProfiler/blob/main/smprofiler/workflow/assets/main_visitor.nf). "Visitor" refers to the visitor pattern, whereby the process steps access the database, do some reads, do some computations, and return some results by sending them to the database.
 
 Each workflow consists of:
 - "job" definition (in case the workflow calls for parallelization)
@@ -205,7 +236,7 @@ Each workflow consists of:
 - core jobs
 - integration/wrap-up
 
-**To make a new workflow**: copy the `phenotype_proximity` subdirectory to a sibling directory with a new name. Update the components accordingly, and update [`workflow/__init__.py`](https://github.com/nadeemlab/SPT/blob/main/spatialprofilingtoolbox/workflow/__init__.py) with a new entry for your workflow, to ensure that it is discovered. You'll also need to update [`pyproject.toml`](https://github.com/nadeemlab/SPT/blob/main/pyproject.toml.unversioned) to declare your new subpackage.
+**To make a new workflow**: copy the `phenotype_proximity` subdirectory to a sibling directory with a new name. Update the components accordingly, and update [`workflow/__init__.py`](https://github.com/nadeemlab/SMProfiler/blob/main/smprofiler/workflow/__init__.py) with a new entry for your workflow, to ensure that it is discovered. You'll also need to update [`pyproject.toml`](https://github.com/nadeemlab/SMProfiler/blob/main/pyproject.toml.unversioned) to declare your new subpackage.
 
 
 ## <a id="one-test"></a> 8. Do one test
@@ -220,7 +251,7 @@ MAKEFLAGS=--no-builtin-rules \
 BUILD_SCRIPTS_LOCATION_ABSOLUTE=$(realpath build/build_scripts) \
 MESSAGE='bash ${BUILD_SCRIPTS_LOCATION_ABSOLUTE}/verbose_command_wrapper.sh' \
 DOCKER_ORG_NAME=nadeemlab \
-DOCKER_REPO_PREFIX=spt \
+DOCKER_REPO_PREFIX=smprofiler \
 TEST_LOCATION_ABSOLUTE=$(realpath test) \
 TEST_LOCATION=test \
   make --no-print-directory -C build/SUBMODULE_NAME test-../../test/SUBMODULE_NAME/module_tests/TEST_FILENAME

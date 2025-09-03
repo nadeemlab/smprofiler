@@ -1,20 +1,20 @@
 
 declare -A expectedmessages
-expectedmessages[spt-db---testing-only-apiserver]="database system is ready to accept connections"
-expectedmessages[spt-ondemand--testing-apiserver]="Initial search"
-expectedmessages[spt-ondemand-testing2-apiserver]="Initial search"
-expectedmessages[spt-apiserver-testing-apiserver]="Application startup complete"
+expectedmessages[smprofiler-db---testing-only-apiserver]="database system is ready to accept connections"
+expectedmessages[smprofiler-ondemand--testing-apiserver]="Initial search"
+expectedmessages[smprofiler-ondemand-testing2-apiserver]="Initial search"
+expectedmessages[smprofiler-apiserver-testing-apiserver]="Application startup complete"
 
-expectedmessages[spt-db---testing-only-db]="database system is ready to accept connections"
+expectedmessages[smprofiler-db---testing-only-db]="database system is ready to accept connections"
 
-expectedmessages[spt-db---testing-only-graphs]="database system is ready to accept connections"
+expectedmessages[smprofiler-db---testing-only-graphs]="database system is ready to accept connections"
 
-expectedmessages[spt-ondemand--testing-ondemand]="Initial search"
-expectedmessages[spt-db---testing-only-ondemand]="database system is ready to accept connections"
+expectedmessages[smprofiler-ondemand--testing-ondemand]="Initial search"
+expectedmessages[smprofiler-db---testing-only-ondemand]="database system is ready to accept connections"
 
-expectedmessages[spt-db---testing-only-workflow]="database system is ready to accept connections"
+expectedmessages[smprofiler-db---testing-only-workflow]="database system is ready to accept connections"
 
-expectedmessages[temporary-spt-db-preloading]="database system is ready to accept connections"
+expectedmessages[temporary-smprofiler-db-preloading]="database system is ready to accept connections"
 
 container_wait_time=60 #seconds
 counter=1

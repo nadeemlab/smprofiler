@@ -9,7 +9,7 @@ function test_cell_data_binary() {
     study="$1"
     sample="$2"
     filename="$3"
-    query="http://spt-apiserver-testing-apiserver:8080/cell-data-binary/?study=$study&sample=$sample"
+    query="http://smprofiler-apiserver-testing-apiserver:8080/cell-data-binary/?study=$study&sample=$sample"
 
     echo -e "Doing query $blue$query$reset_code ... "
     curl -s "$query"  > _celldata_u.bin;

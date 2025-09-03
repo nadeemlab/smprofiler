@@ -1,10 +1,10 @@
 from requests import get as requests_get
 from requests import post as requests_post
 
-from spatialprofilingtoolbox.db.exchange_data_formats.findings import FindingCreate
+from smprofiler.db.exchange_data_formats.findings import FindingCreate
 
 def test_findings():
-    response = requests_get('http://spt-apiserver-testing-apiserver:8080/findings/?study=Melanoma+intralesional+IL2')
+    response = requests_get('http://smprofiler-apiserver-testing-apiserver:8080/findings/?study=Melanoma+intralesional+IL2')
     if response.status_code != 200:
         raise ValueError(f'Get request not OK. HTTP {response.status_code} {response.reason}')
     items = response.json()
@@ -22,12 +22,12 @@ def test_findings():
     )
     finding_dict = finding.model_dump()
     h = {'Content-Type': 'application/json'}
-    response = requests_post('http://spt-apiserver-testing-apiserver:8080/findings/', json=finding_dict, headers=h)
+    response = requests_post('http://smprofiler-apiserver-testing-apiserver:8080/findings/', json=finding_dict, headers=h)
     if response.status_code != 200:
         print(finding_dict)
         print(response.text)
         raise ValueError(f'Post request not OK. HTTP {response.status_code} {response.reason}')
-    response = requests_get('http://spt-apiserver-testing-apiserver:8080/findings/?study=Melanoma+intralesional+IL2')
+    response = requests_get('http://smprofiler-apiserver-testing-apiserver:8080/findings/?study=Melanoma+intralesional+IL2')
     if response.status_code != 200:
         raise ValueError(f'Get request not OK. HTTP {response.status_code} {response.reason}')
     items = response.json()

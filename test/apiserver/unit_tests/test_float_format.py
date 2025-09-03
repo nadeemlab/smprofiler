@@ -3,8 +3,8 @@ from os.path import join
 import re
 from json import dumps as json_dumps
 
-from spatialprofilingtoolbox.standalone_utilities.float8 import SMALL_FLOAT_FORMAT
-from spatialprofilingtoolbox.standalone_utilities.float8 import generate_metadata_table
+from smprofiler.standalone_utilities.float8 import SMALL_FLOAT_FORMAT
+from smprofiler.standalone_utilities.float8 import generate_metadata_table
 
 WRITE_ARTIFACTS = False
 # WRITE_ARTIFACTS = True

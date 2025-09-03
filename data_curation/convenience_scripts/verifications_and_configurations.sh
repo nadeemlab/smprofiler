@@ -27,11 +27,11 @@ function handle_dbconfig_argument {
     echo $dbconfig
 }
 
-function check_for_spt_availability {
-    location=$(command -v spt)
+function check_for_smprofiler_availability {
+    location=$(command -v smprofiler)
     if [[ "$location" == "" ]];
     then
-        echo "spt command is not available."
+        echo "smprofiler command is not available."
         exit 1
     fi
 }
@@ -148,6 +148,6 @@ function configure_run_directory_for_dataset {
     echo "[tabular import]" >> workflow.config
     echo "input_path = $inputpath" >> workflow.config
 
-    spt workflow configure --workflow="tabular import" --config-file=workflow.config
+    smprofiler workflow configure --workflow="tabular import" --config-file=workflow.config
     cd $basedirectory
 }

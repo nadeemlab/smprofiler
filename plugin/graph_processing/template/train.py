@@ -28,4 +28,4 @@ if __name__ == '__main__':
         config_file.read(DEFAULT_CONFIG_FILE)
     config = config_file['plugin']
 
-    spt_graphs, _ = load_hs_graphs(args.input_directory)
+    smprofiler_graphs, _ = load_hs_graphs(args.input_directory)

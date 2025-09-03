@@ -1,11 +1,11 @@
 """Test the promotion/demotion functions for public/private collections."""
 
-from spatialprofilingtoolbox.db.publish_promote import PublisherPromoter
+from smprofiler.db.publish_promote import PublisherPromoter
 
 
 def test_collection_management():
     collection = 'abc-123'
-    database_config_file='.spt_db.config.container'
+    database_config_file='.smprofiler_db.config.container'
     promoter = PublisherPromoter(database_config_file)
     promoter.promote(collection)
     promoter.demote(collection)

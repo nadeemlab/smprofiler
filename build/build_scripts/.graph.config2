@@ -1,5 +1,5 @@
 [general]
-db_config_file_path = build/db/.spt_db.config.local
+db_config_file_path = build/db/.smprofiler_db.config.local
 study_name = Breast cancer IMC
 
 [upload-importances]

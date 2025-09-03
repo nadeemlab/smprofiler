@@ -1,5 +1,5 @@
 
-spt db status --database-config-file .spt_db.config.container > current_counts.txt;
+smprofiler db status --database-config-file .smprofiler_db.config.container > current_counts.txt;
 diff current_counts.txt module_tests/record_counts_1_2.txt
 status="$?"
 rm current_counts.txt
@@ -9,13 +9,13 @@ then
     exit 1
 fi
 
-spt db drop --study-name="Breast cancer IMC"  --database-config-file .spt_db.config.container
+smprofiler db drop --study-name="Breast cancer IMC"  --database-config-file .smprofiler_db.config.container
 if [[ "$?" != "0" ]];
 then
     exit 1
 fi
 
-spt db status --database-config-file .spt_db.config.container > counts_after_drop.txt;
+smprofiler db status --database-config-file .smprofiler_db.config.container > counts_after_drop.txt;
 
 grep -v 'cell_phenotype\|chemical_species\|research_professional' counts_after_drop.txt > _counts_after_drop.txt
 rm counts_after_drop.txt

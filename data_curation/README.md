@@ -1,4 +1,4 @@
-The scripts here are used to import dataset into a PostgreSQL database for the SPT application or analysis, as well as organize or curate these datasets into a form acceptable for import.
+The scripts here are used to import dataset into a PostgreSQL database for the SMProfiler application or analysis, as well as organize or curate these datasets into a form acceptable for import.
 
 1. [Curation or pre-processing](#curation-or-pre-processing)
 2. [Doing import / upload into the database](#doing-import--upload-into-the-database)
@@ -11,14 +11,14 @@ Extraction scripts tend to be dataset-specific, but there are some common tasks 
 
 
 # Doing import / upload into the database
-The recommended import method is to use `spt db interactive-uploader`.
+The recommended import method is to use `smprofiler db interactive-uploader`.
 
 It will take care of creating a run directory for Nextflow, configuring it with a `workflow.config`
 file like:
 
 ```ini
 [general]
-db_config_file = /Users/username/.spt_db.config.local
+db_config_file = /Users/username/.smprofiler_db.config.local
 
 [database visitor]
 study_name = Melanoma CyTOF ICI

@@ -1,3 +1,3 @@
 
-spt workflow configure --local --input-path=./data --workflow='phenotype density'
+smprofiler workflow configure --local --input-path=./data --workflow='phenotype density'
 nextflow run .

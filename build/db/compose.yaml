@@ -1,7 +1,7 @@
 services:
   testing-database:
-    image: nadeemlab/spt-db-preloaded-1and2
-    container_name: spt-db---testing-only-db
+    image: nadeemlab/smprofiler-db-preloaded-1and2
+    container_name: smprofiler-db---testing-only-db
     ports:
       - target: 5432
         protocol: tcp

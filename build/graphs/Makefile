@@ -31,7 +31,7 @@ setup-testing:
     fi ; \
     sleep 0.2 ; \
     bash ${P}/poll_container_readiness.sh \
-     spt-db---testing-only-graphs ; \
+     smprofiler-db---testing-only-graphs ; \
     status_code=$$? ; \
     $(call UPDATE_STATUS,$$status_code,$@) ;
 >@${MESSAGE} end "$@" "Setup env." "Env not setup."

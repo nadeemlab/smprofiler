@@ -1,11 +1,11 @@
 """Test pulling out of centroids of each structure (cell) in the database"""
 import sys
 
-from spatialprofilingtoolbox.workflow.common.structure_centroids_puller import \
+from smprofiler.workflow.common.structure_centroids_puller import \
     StructureCentroidsPuller
 
 if __name__ == '__main__':
-    database_config_file='../workflow/.spt_db.config.container'
+    database_config_file='../workflow/.smprofiler_db.config.container'
     puller = StructureCentroidsPuller(database_config_file)
     puller.pull()
     structure_centroids = puller.get_structure_centroids()

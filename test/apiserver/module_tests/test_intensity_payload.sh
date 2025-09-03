@@ -9,7 +9,7 @@ function test_cell_data_binary_intensity() {
     study="$1"
     sample="$2"
     filename="$3"
-    query="http://spt-apiserver-testing-apiserver:8080/cell-data-binary-intensity/?study=$study&sample=$sample"
+    query="http://smprofiler-apiserver-testing-apiserver:8080/cell-data-binary-intensity/?study=$study&sample=$sample"
 
     echo -e "Doing query $blue$query$reset_code ... "
     curl -s -H "Accept-Encoding: br" "$query"  > _celldata.bin.i;

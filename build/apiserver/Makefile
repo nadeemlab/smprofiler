@@ -30,10 +30,10 @@ setup-testing:
     fi ; \
     sleep 0.2 ; \
     bash ${P}/poll_container_readiness.sh \
-     spt-apiserver-testing-apiserver \
-     spt-db---testing-only-apiserver \
-     spt-ondemand--testing-apiserver \
-     spt-ondemand-testing2-apiserver ; \
+     smprofiler-apiserver-testing-apiserver \
+     smprofiler-db---testing-only-apiserver \
+     smprofiler-ondemand--testing-apiserver \
+     smprofiler-ondemand-testing2-apiserver ; \
     status_code=$$?; printf 'UPDATE times SET status_code=%s WHERE activity="%s";' "$$status_code" "apiserver" | sqlite3 buildcache.sqlite3;
 >@${MESSAGE} end "apiserver" "Setup env." "Env not setup."
 

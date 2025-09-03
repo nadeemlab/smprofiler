@@ -1,5 +1,0 @@
-[database-credentials]
-endpoint = spt-db---testing-only-ondemand
-database = default_study_lookup
-user = postgres
-password = postgres

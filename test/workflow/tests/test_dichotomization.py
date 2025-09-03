@@ -3,12 +3,12 @@ from os.path import join, dirname
 
 import pandas as pd
 
-from spatialprofilingtoolbox.workflow.common.dichotomization import Dichotomizer
-from spatialprofilingtoolbox.workflow.tabular_import.tabular_dataset_design \
+from smprofiler.workflow.common.dichotomization import Dichotomizer
+from smprofiler.workflow.tabular_import.tabular_dataset_design \
     import TabularCellMetadataDesign
-from spatialprofilingtoolbox.workflow.dataset_designs.multiplexed_imaging.file_identifier_schema \
+from smprofiler.workflow.dataset_designs.multiplexed_imaging.file_identifier_schema \
     import ELEMENTARY_PHENOTYPES_FILE_IDENTIFIER
-from spatialprofilingtoolbox.workflow.dataset_designs.multiplexed_imaging.file_identifier_schema \
+from smprofiler.workflow.dataset_designs.multiplexed_imaging.file_identifier_schema \
     import get_input_filename_by_identifier
 
 

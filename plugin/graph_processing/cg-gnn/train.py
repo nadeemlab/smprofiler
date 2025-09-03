@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert SPT graph objects to CG-GNN graph objects and run training and evaluation with them."""
+"""Convert SMProfiler graph objects to CG-GNN graph objects and run training and evaluation with them."""
 
 from sys import path
 from configparser import ConfigParser
@@ -21,37 +21,37 @@ from cggnn.run import train_and_evaluate
 
 path.append('/app')  # noqa
 from train_cli import parse_arguments, DEFAULT_CONFIG_FILE
-from util import HSGraph, GraphData as SPTGraphData, load_hs_graphs, save_hs_graphs
+from util import HSGraph, GraphData as SMProfilerGraphData, load_hs_graphs, save_hs_graphs
 
 
-def _convert_spt_graph(g_spt: HSGraph) -> DGLGraph:
-    """Convert a SPT HSGraph to a CG-GNN cell graph."""
-    num_nodes = g_spt.node_features.shape[0]
+def _convert_smprofiler_graph(g_smprofiler: HSGraph) -> DGLGraph:
+    """Convert a SMProfiler HSGraph to a CG-GNN cell graph."""
+    num_nodes = g_smprofiler.node_features.shape[0]
     g_dgl = graph([])
     g_dgl.add_nodes(num_nodes)
-    g_dgl.ndata[INDICES] = IntTensor(g_spt.histological_structure_ids)
-    g_dgl.ndata[CENTROIDS] = FloatTensor(g_spt.centroids)
-    g_dgl.ndata[FEATURES] = FloatTensor(g_spt.node_features)
+    g_dgl.ndata[INDICES] = IntTensor(g_smprofiler.histological_structure_ids)
+    g_dgl.ndata[CENTROIDS] = FloatTensor(g_smprofiler.centroids)
+    g_dgl.ndata[FEATURES] = FloatTensor(g_smprofiler.node_features)
     # Note: channels and phenotypes are binary variables, but DGL only supports FloatTensors
-    edge_list = nonzero(g_spt.adj.toarray())
+    edge_list = nonzero(g_smprofiler.adj.toarray())
     g_dgl.add_edges(list(edge_list[0]), list(edge_list[1]))
     return g_dgl
 
 
-def _convert_spt_graph_data(g_spt: SPTGraphData) -> GraphData:
-    """Convert a SPT GraphData object to a CG-GNN/DGL GraphData object."""
+def _convert_smprofiler_graph_data(g_smprofiler: SMProfilerGraphData) -> GraphData:
+    """Convert a SMProfiler GraphData object to a CG-GNN/DGL GraphData object."""
     return GraphData(
-        graph=_convert_spt_graph(g_spt.graph),
-        label=g_spt.label,
-        name=g_spt.name,
-        specimen=g_spt.specimen,
-        set=g_spt.set,
+        graph=_convert_smprofiler_graph(g_smprofiler.graph),
+        label=g_smprofiler.label,
+        name=g_smprofiler.name,
+        specimen=g_smprofiler.specimen,
+        set=g_smprofiler.set,
     )
 
 
-def _convert_spt_graphs_data(graphs_data: list[SPTGraphData]) -> list[GraphData]:
-    """Convert a list of SPT HSGraphs to CG-GNN cell graphs."""
-    return [_convert_spt_graph_data(g_spt) for g_spt in graphs_data]
+def _convert_smprofiler_graphs_data(graphs_data: list[SMProfilerGraphData]) -> list[GraphData]:
+    """Convert a list of SMProfiler HSGraphs to CG-GNN cell graphs."""
+    return [_convert_smprofiler_graph_data(g_smprofiler) for g_smprofiler in graphs_data]
 
 
 def _convert_dgl_graph(g_dgl: DGLGraph) -> HSGraph:
@@ -66,8 +66,8 @@ def _convert_dgl_graph(g_dgl: DGLGraph) -> HSGraph:
     )
 
 
-def _convert_dgl_graph_data(g_dgl: GraphData) -> SPTGraphData:
-    return SPTGraphData(
+def _convert_dgl_graph_data(g_dgl: GraphData) -> SMProfilerGraphData:
+    return SMProfilerGraphData(
         graph=_convert_dgl_graph(g_dgl.graph),
         label=g_dgl.label,
         name=g_dgl.name,
@@ -76,7 +76,7 @@ def _convert_dgl_graph_data(g_dgl: GraphData) -> SPTGraphData:
     )
 
 
-def _convert_dgl_graphs_data(graphs_data: list[GraphData]) -> list[SPTGraphData]:
+def _convert_dgl_graphs_data(graphs_data: list[GraphData]) -> list[SMProfilerGraphData]:
     """Convert a list of DGLGraphs to CG-GNN cell graphs."""
     return [_convert_dgl_graph_data(g_dgl) for g_dgl in graphs_data]
 
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     if random_seed is None:
         random_seed = _handle_random_seed_values(config.get('random_seed', None))
 
-    spt_graphs, _ = load_hs_graphs(args.input_directory)
-    save_cell_graphs(_convert_spt_graphs_data(spt_graphs), args.output_directory)
+    smprofiler_graphs, _ = load_hs_graphs(args.input_directory)
+    save_cell_graphs(_convert_smprofiler_graphs_data(smprofiler_graphs), args.output_directory)
 
     model, graphs_data, hs_id_to_importances = train_and_evaluate(args.output_directory,
                                                                   in_ram,

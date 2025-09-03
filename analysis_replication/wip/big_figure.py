@@ -16,8 +16,8 @@ pd.set_option('display.max_rows', 500)
 pd.set_option('display.max_columns', 500)
 pd.set_option('display.width', 1000)
 
-from spatialprofilingtoolbox.db.database_connection import DBCursor
-from spatialprofilingtoolbox.db.database_connection import DBConnection
+from smprofiler.db.database_connection import DBCursor
+from smprofiler.db.database_connection import DBConnection
 from accessors import DataAccessor
 
 def shorten_study(s: str) -> str:
@@ -78,7 +78,7 @@ def retrieve_source_data():
     print('\n'.join(all_channels))
 
     channel_details = None
-    database_config_file = '.spt_db.config'
+    database_config_file = '.smprofiler_db.config'
     for study in studies:
         with DBConnection(database_config_file=database_config_file, study=study) as connection:
             # cursor.execute('SELECT * from chemical_species;')
