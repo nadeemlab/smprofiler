@@ -14,7 +14,7 @@ class ChainableDestructableResource:
     only override `get_subresources` to indicate which objects should be
     considered for release.
     """
-    def get_subresources(self) -> Iterable['ResourceChainable']:
+    def get_subresources(self) -> Iterable['ChainableDestructableResource']:
         return ()
 
     def __enter__(self):

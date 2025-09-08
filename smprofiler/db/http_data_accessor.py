@@ -197,18 +197,10 @@ def univariate_pair_compare(series1: Series[float], series2: Series[float]):
     return result.pvalue, actual
 
 
-def get_fractions(df, column_numerator, column_denominator, cohort1, cohort2, omit_zeros=True):
+def get_fractions(df: DataFrame, column_numerator: str, column_denominator: str, cohort1: str, cohort2: str):
     fractions = df[column_numerator] / df[column_denominator]
-    if omit_zeros:
-        mask = ~ ( (df[column_numerator] == 0) | (df[column_denominator] == 0) )
-        total1 = sum((df['cohort'] == cohort1))
-        omit1 = total1 - sum((df['cohort'] == cohort1) & mask)
-        total2 = sum((df['cohort'] == cohort2))
-        omit2 = total2 - sum((df['cohort'] == cohort2) & mask)
-        # if omit1 !=0 or omit2 !=0:
-        #     print(f'(Omitting {omit1}/{total1} from {cohort1} and {omit2}/{total2} from {cohort2}.)')
-    else:
-        mask = True
+    mask = ~ ( (df[column_numerator] == 0) | (df[column_denominator] == 0) )
     fractions1 = fractions[(df['cohort'] == cohort1) & mask]
     fractions2 = fractions[(df['cohort'] == cohort2) & mask]
     return fractions1, fractions2
+
