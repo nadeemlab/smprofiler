@@ -18,7 +18,7 @@ from numpy.linalg import inv
 from numpy import matmul
 
 from smprofiler.standalone_utilities.terminal_scrolling import TerminalScrollingBuffer
-from smprofiler.standalone_utilities.resource_chainable import ChainableDestructableResource
+from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
 
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.db.http_data_accessor import DataAccessor
@@ -360,3 +360,4 @@ if __name__=='__main__':
     if host is None:
         raise RuntimeError('Could not determine API server hostname.')
     df = survey(host, study)
+
