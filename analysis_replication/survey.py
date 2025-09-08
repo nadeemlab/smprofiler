@@ -203,12 +203,12 @@ class AutoAssessor(ChainableDestructableResource):
         if p1 == p2:
             p2 = 'all cells'
         cohorts = case.cohorts
-        fractions1, fractions2 = get_fractions(df, p1, p2, *cohorts, omit_zeros=True)
+        fractions1, fractions2 = get_fractions(df, p1, p2, *cohorts)
         p, effect = compare(fractions1, fractions2)
         higher_cohort = case.cohorts[1]
         if effect < 1.0:
             cohorts = cast(tuple[str, str], tuple(list(reversed(case.cohorts))))
-            fractions1, fractions2 = get_fractions(df, p1, p2, *cohorts, omit_zeros=True)
+            fractions1, fractions2 = get_fractions(df, p1, p2, *cohorts)
             p, effect = compare(fractions1, fractions2)
             higher_cohort = cohorts[1]
         significance = ResultSignificance(float(p), effect)
