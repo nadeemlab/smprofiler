@@ -3,14 +3,11 @@ from typing import cast
 import re
 from itertools import chain
 from urllib.parse import urlencode
-from requests import get as get_request  # type: ignore
+from requests import get as get_request
 from os.path import exists
 from time import sleep
 from time import time
 from datetime import datetime
-from sqlite3 import connect
-from sqlite3 import Connection as SQLiteConnection
-import pickle
 
 from pandas import DataFrame
 from pandas import concat
@@ -19,10 +16,12 @@ from numpy import nan
 from numpy import isnan
 from numpy import mean
 from numpy import log
-from scipy.stats import ttest_ind  # type: ignore
-from sklearn.metrics import auc  # type:ignore
+from scipy.stats import ttest_ind
+from sklearn.metrics import auc
 
 from smprofiler.standalone_utilities.float8 import decode as decode_float8
+from smprofiler.standalone_utilities.simple_file_cache import SimpleFileCache
+from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource 
 
 
 def get_default_host(given: str | None) -> str | None:
@@ -52,17 +51,12 @@ def sleep_poll():
     sleep(seconds)
 
 
-class DataAccessor:
+class DataAccessor(ChainableDestructableResource):
     """Convenience caller of HTTP methods for data access."""
-    caching: bool
-    connection: SQLiteConnection
+    cache: SimpleFileCache 
 
-    def __init__(self, study, host=None, caching: bool=True):
-        self.caching = caching
-        if self.caching:
-            self.connection = connect('cache.sqlite3')
-            cursor = self.connection.cursor()
-            cursor.execute('CREATE TABLE IF NOT EXISTS cache(url TEXT, contents BLOB);')
+    def __init__(self, study, host=None):
+        self.cache = SimpleFileCache()
         _host = get_default_host(host)
         if _host is None:
             raise RuntimeError('Expected host name in api_host.txt .')
@@ -78,9 +72,8 @@ class DataAccessor:
         self.cohorts = self._retrieve_cohorts()
         self.all_cells = self._retrieve_all_cells_counts()
 
-    def cleanup(self) -> None:
-        if self.caching:
-            self.connection.close()
+    def get_subresources(self) -> tuple[SimpleFileCache]:
+        return (self.cache,)
 
     def feature_matrix(self, sample: str) -> DataFrame:
         parts = [
@@ -269,49 +262,20 @@ class DataAccessor:
             protocol = 'http'
         return '://'.join((protocol, self.host))
 
-    def _add_to_cache(self, url, contents):
-        if not self.caching:
-            return
-        self._drop_from_cache(url)
-        cursor = self.connection.cursor()
-        cursor.execute('INSERT INTO cache(url, contents) VALUES (?, ?);', (url, pickle.dumps(contents)))
-
-    def _drop_from_cache(self, url: str) -> None:
-        cursor = self.connection.cursor()
-        cursor.execute('DELETE FROM cache WHERE url=?;', (url,))
-
-    def _lookup_cache(self, url, binary: bool=False):
-        if not self.caching:
-            return None
-        cursor = self.connection.cursor()
-        cursor.execute('SELECT contents FROM cache WHERE url=?;', (url,))
-        rows = cursor.fetchall()
-        if len(rows) > 0:
-            if binary:
-                obj = pickle.loads(rows[0][0], encoding='bytes')
-            else:
-                obj = pickle.loads(rows[0][0], encoding='bytes').json()
-            return obj, url
-        return None
-
-    def _retrieve(self, endpoint, query, binary: bool=False):
+    def _retrieve(self, endpoint: str, query: str, binary: bool=False):
         base = f'{self._get_base()}'
         url = '/'.join([base, endpoint, '?' + query])
-        c = self._lookup_cache(url, binary=binary)
-        if c:
-            if binary:
-                return c[0].content, c[1]
-            if 'is_pending' in c[0]:
-                if not c[0]['is_pending']:
-                    return c
-            else:
-                return c
+        key = url
+        payload = self.cache.lookup(key)
+        if payload:
+            return self._process_payload(payload, key, binary)
         try:
             start = time()
             headers = {} if not binary else {'Accept-Encoding': 'br'}
-            content = get_request(url, headers=headers)
+            payload = get_request(url, headers=headers)
             end = time()
-            self._add_to_cache(url, content)
+            key = url
+            self.cache.add(key, payload)
             delta = str(end - start)
             now = str(datetime.now())
             with open('requests_timing.txt', 'ta', encoding='utf-8') as file:
@@ -319,9 +283,19 @@ class DataAccessor:
         except Exception as exception:
             print(url)
             raise exception
+        return self._process_payload(payload, key, binary)
+
+    def _process_payload(self, payload, key: str, binary: bool) -> tuple[dict | bytes, str]:
         if binary:
-            return content.content, url
-        return content.json(), url
+            return payload.content, key
+        else:
+            parsed_payload = payload.json()
+            if 'is_pending' in parsed_payload:
+                if not parsed_payload['is_pending']:
+                    return parsed_payload, key
+            else:
+                return parsed_payload, key
+        raise ValueError(f'Processing downloaded payload failed: {key}')
 
     def _phenotype_criteria(self, name):
         if isinstance(name, dict):
