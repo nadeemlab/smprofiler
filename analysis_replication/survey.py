@@ -21,7 +21,7 @@ from smprofiler.standalone_utilities.terminal_scrolling import TerminalScrolling
 from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
 
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
-from smprofiler.db.http_data_accessor import DataAccessor
+from smprofiler.db.http_data_accessor import StudyDataAccessor
 from smprofiler.db.http_data_accessor import univariate_pair_compare as compare
 from smprofiler.db.http_data_accessor import get_fractions
 
@@ -106,14 +106,14 @@ class Confounding:
         """
         r1 = result1
         r2 = result2
-        if cls._incomparable_results(r1, r2):
-            return False
-        if cls._get_common_phenotype(r1, r2) is None:
-            return False
-        return cls._direction_of_association_consistent(r1, r2)
+        return (
+            (not cls._incomparable_due_to_cohort_set(r1, r2)) and
+            (cls._get_common_phenotype(r1, r2) is not None) and
+            cls._direction_of_association_consistent(r1, r2)
+        )
 
     @classmethod
-    def _incomparable_results(cls, r1: Result, r2: Result) -> bool:
+    def _incomparable_due_to_cohort_set(cls, r1: Result, r2: Result) -> bool:
         return set(r1.case.cohorts) != set(r2.case.cohorts)
 
     @classmethod
@@ -135,17 +135,6 @@ class Confounding:
 
 DEFAULT_LIMITS = Limits(1.3, 0.01, 0.2, 2.0)
 
-def get_default_host(given: str | None) -> str | None:
-    if given is not None:
-        return given
-    filename = 'api_host.txt'
-    if exists(filename):
-        with open(filename, 'rt', encoding='utf-8') as file:
-            host = file.read().rstrip()
-    else:
-        host = None
-    return host
-
 
 class AutoAssessor(ChainableDestructableResource):
     """
@@ -155,15 +144,13 @@ class AutoAssessor(ChainableDestructableResource):
     probably confounded by previous ones.
     This uses default limits that trade-off a significance measure and effect size.
     """
-    access: DataAccessor
+    access: StudyDataAccessor
     limits: Limits
 
-    def __init__(self, access: DataAccessor, limits: Limits=DEFAULT_LIMITS):
+    def __init__(self, access: StudyDataAccessor, limits: Limits=DEFAULT_LIMITS):
         self.access = access
         self.limits = limits
-
-    def get_subresources(self) -> tuple[DataAccessor,]:
-        return (self.access,)
+        self.add_subresource(self.access)
 
     def assess(self, case: Case) -> Result:
         if case.metric == 'fractions':
@@ -177,20 +164,27 @@ class AutoAssessor(ChainableDestructableResource):
         m2 = ('',) if len(p.negative_markers) == 0 else p.negative_markers
         return PhenotypeCriteria(positive_markers=m1, negative_markers=m2)
 
+    def _pad_channel_lists_case(self, case: Case) -> tuple[PhenotypeCriteria, ...]:
+        return tuple(map(
+            lambda p: self._pad_channel_lists(cast(PhenotypeCriteria, p)),
+            filter(
+                lambda p0: p0 is not None,
+                [case.phenotype, case.other]
+            )
+        ))
+
     def _assess_fraction(self, case: Case) -> Result:
-        df = self.access.counts(
-            tuple(map(lambda p: self._pad_channel_lists(cast(PhenotypeCriteria, p)), filter(lambda p0: p0 is not None, [case.phenotype, case.other])))
-        )
-        return self._assess_df(df, case)
+        df = self.access.counts(self._pad_channel_lists_case(case))
+        return self._assess_case_df(df, case)
 
     def _assess_proximity(self, case: Case) -> Result:
-        df = self.access._two_phenotype_spatial_metric(
+        df = self.access.two_phenotype_spatial_metric(
             'proximity',
-            tuple(map(lambda p: self._pad_channel_lists(cast(PhenotypeCriteria, p)), filter(lambda p0: p0 is not None, [case.phenotype, case.other]))),
+            self._pad_channel_lists_case(case),
         )
-        return self._assess_df(df, case)
+        return self._assess_case_df(df, case)
 
-    def _assess_df(self, df: DataFrame, case: Case) -> Result:
+    def _assess_case_df(self, df: DataFrame, case: Case) -> Result:
         df = df.loc[:,~df.columns.duplicated()].copy()
         if len(df.columns) == 3:
             p1 = df.columns[2]
@@ -224,7 +218,7 @@ def _format_p(p: float) -> str:
     return '{:>12}'.format('p = ' + '%.5f' % p if p >= 0.0001 else '{:.2E}'.format(Decimal(p)))
 
 def survey(host: str, study: str) -> DataFrame:
-    with AutoAssessor(DataAccessor(study, host=host)) as a:
+    with AutoAssessor(StudyDataAccessor(study, host=host)) as a:
         b = TerminalScrollingBuffer(20)
         channels = a.access._retrieve_feature_names()
         # if study == '...':
@@ -351,6 +345,18 @@ def survey(host: str, study: str) -> DataFrame:
     df3 = DataFrame([_form_record(r) for r in proximity_significants if severe.acceptable(r.significance)])
     df3['metric'] = 'proximity'
     return concat([df1, df2, df3], axis=0)
+
+
+def get_default_host(given: str | None) -> str | None:
+    if given is not None:
+        return given
+    filename = 'api_host.txt'
+    if exists(filename):
+        with open(filename, 'rt', encoding='utf-8') as file:
+            host = file.read().rstrip()
+    else:
+        host = None
+    return host
 
 if __name__=='__main__':
     if len(sys.argv) == 2:

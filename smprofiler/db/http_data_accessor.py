@@ -31,7 +31,7 @@ def sleep_poll():
     sleep(seconds)
 
 
-class DataAccessor(ChainableDestructableResource):
+class StudyDataAccessor(ChainableDestructableResource):
     """
     Convenience caller of HTTP methods for data access (study metadata, computed metrics).
     """
@@ -52,16 +52,6 @@ class DataAccessor(ChainableDestructableResource):
     def get_subresources(self) -> tuple[KeyValueStore]:
         return (self.cache,)
 
-    def _retrieve_cohorts(self):
-        summary_obj, _ = self._retrieve('study-summary', urlencode([('study', self.study)]))
-        summary = StudySummary.model_validate(summary_obj)
-        return DataFrame(summary.cohorts.assignments).set_index('sample')
-
-    def _retrieve_feature_names(self) -> list[str]:
-        names_obj, _ = self._retrieve('cell-data-binary-feature-names', urlencode([('study', self.study)]))
-        names = BitMaskFeatureNames.model_validate(names_obj)
-        return list(map(lambda d: d.symbol, names.names))
-
     def counts(self, phenotypes: tuple[PhenotypeCriteria, ...]):
         individual_counts_series = [
             self._get_counts_series(p, f'p{i+1}')
@@ -74,19 +64,11 @@ class DataAccessor(ChainableDestructableResource):
         df.replace([inf, -inf], nan, inplace=True)
         return df
 
-    def _one_phenotype_spatial_metric(self, feature_class: str, criteria: PhenotypeCriteria):
-        parts1 = self._form_query_parameters_key_values(criteria)
-        parts = parts1 + [('study', self.study), ('feature_class', feature_class)]
-        query = urlencode(parts)
-        endpoint = 'request-spatial-metrics-computation-custom-phenotype'
-        return self._polling_retrieve_values(endpoint, query)
-
-    def _two_phenotype_spatial_metric(self, feature_class: str, criteria: tuple[PhenotypeCriteria, ...]):
+    def two_phenotype_spatial_metric(self, feature_class: str, criteria: tuple[PhenotypeCriteria, ...]):
         p1 = criteria[0]
         p2 = criteria[1]
         parts1 = self._form_query_parameters_key_values(p1)
         parts2 = self._form_query_parameters_key_values(p2)
-
         parts = parts1 + parts2 + [('study', self.study), ('feature_class', feature_class)]
         if feature_class == 'co-occurrence':
             parts.append(('radius', '100'))
@@ -95,6 +77,24 @@ class DataAccessor(ChainableDestructableResource):
         query = urlencode(parts)
         endpoint = 'request-spatial-metrics-computation-custom-phenotypes'
         return self._polling_retrieve_values(endpoint, query)
+
+    def _retrieve_cohorts(self):
+        summary_obj, _ = self._retrieve('study-summary', urlencode([('study', self.study)]))
+        summary = StudySummary.model_validate(summary_obj)
+        return DataFrame(summary.cohorts.assignments).set_index('sample')
+
+    def _retrieve_feature_names(self) -> list[str]:
+        names_obj, _ = self._retrieve('cell-data-binary-feature-names', urlencode([('study', self.study)]))
+        names = BitMaskFeatureNames.model_validate(names_obj)
+        return list(map(lambda d: d.symbol, names.names))
+
+    def _one_phenotype_spatial_metric(self, feature_class: str, criteria: PhenotypeCriteria):
+        parts1 = self._form_query_parameters_key_values(criteria)
+        parts = parts1 + [('study', self.study), ('feature_class', feature_class)]
+        query = urlencode(parts)
+        endpoint = 'request-spatial-metrics-computation-custom-phenotype'
+        return self._polling_retrieve_values(endpoint, query)
+
 
     def _polling_retrieve_values(self, endpoint: str, query: str) -> DataFrame:
         while True:
