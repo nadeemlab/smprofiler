@@ -27,6 +27,7 @@ from smprofiler.db.http_data_accessor import get_fractions
 
 Metric = Literal['fractions', 'proximity']
 
+
 @define
 class Case:
     """
@@ -173,7 +174,7 @@ class AutoAssessor(ChainableDestructableResource):
 
     def _pad_channel_lists(self, p: PhenotypeCriteria) -> PhenotypeCriteria:
         m1 = ('',) if len(p.positive_markers) == 0 else p.positive_markers
-        m2 = ('',) if len(p.negative_markers) == 0 else p.negative_markers       
+        m2 = ('',) if len(p.negative_markers) == 0 else p.negative_markers
         return PhenotypeCriteria(positive_markers=m1, negative_markers=m2)
 
     def _assess_fraction(self, case: Case) -> Result:

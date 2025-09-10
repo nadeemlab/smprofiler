@@ -32,7 +32,9 @@ def sleep_poll():
 
 
 class DataAccessor(ChainableDestructableResource):
-    """Convenience caller of HTTP methods for data access."""
+    """
+    Convenience caller of HTTP methods for data access (study metadata, computed metrics).
+    """
     cache: SimpleFileCache 
 
     def __init__(self, study, host: str):
@@ -114,7 +116,7 @@ class DataAccessor(ChainableDestructableResource):
         parts.append(('study', self.study))
         query = urlencode(parts)
         endpoint = 'phenotype-counts'
-        return endpoint, query 
+        return endpoint, query
 
     def _form_query_parameters_key_values(self, p: PhenotypeCriteria) -> list[tuple[str, str]]:
         positives = p.positive_markers

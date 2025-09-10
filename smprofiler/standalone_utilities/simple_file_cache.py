@@ -4,14 +4,14 @@ from sqlite3 import Cursor as SQLiteCursor
 from sqlite3 import Connection as SQLiteConnection
 import pickle
 
-from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource 
+from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
 
 
 class SQLiteConnectionManager(ChainableDestructableResource):
     connection: SQLiteConnection
 
-    def __init__(self, filename: str):
-        self.connection = connect(filename)
+    def __init__(self, handle: str):
+        self.connection = connect(handle)
 
     def release(self) -> None:
         self.connection.close()
@@ -27,9 +27,7 @@ class SimpleFileCache(ChainableDestructableResource):
     def __init__(self):
         self.connection_manager = SQLiteConnectionManager('cache.sqlite3')
         self.cursor().execute('CREATE TABLE IF NOT EXISTS cache(key TEXT, contents BLOB);')
- 
-    def get_subresources(self) -> tuple[SQLiteConnectionManager]:
-        return (self.connection_manager,)
+        self.add_subresource(self.connection_manager)
 
     def cursor(self) -> SQLiteCursor:
         return self.connection_manager.connection.cursor()
