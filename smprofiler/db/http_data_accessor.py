@@ -16,8 +16,8 @@ from numpy import isnan
 from numpy import mean
 from scipy.stats import ttest_ind
 
-from smprofiler.standalone_utilities.simple_file_cache import SimpleFileCache
-from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource 
+from smprofiler.standalone_utilities.key_value_store import KeyValueStore
+from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCounts
@@ -35,10 +35,10 @@ class DataAccessor(ChainableDestructableResource):
     """
     Convenience caller of HTTP methods for data access (study metadata, computed metrics).
     """
-    cache: SimpleFileCache 
+    cache: KeyValueStore
 
-    def __init__(self, study, host: str):
-        self.cache = SimpleFileCache()
+    def __init__(self, study: str, host: str):
+        self.cache = KeyValueStore()
         use_http = False
         if re.search('^http://', host):
             use_http = True
@@ -49,7 +49,7 @@ class DataAccessor(ChainableDestructableResource):
         self.cohorts = self._retrieve_cohorts()
         self.all_cells = self._retrieve_all_cells_counts()
 
-    def get_subresources(self) -> tuple[SimpleFileCache]:
+    def get_subresources(self) -> tuple[KeyValueStore]:
         return (self.cache,)
 
     def _retrieve_cohorts(self):

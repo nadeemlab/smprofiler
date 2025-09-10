@@ -17,15 +17,16 @@ class SQLiteConnectionManager(ChainableDestructableResource):
         self.connection.close()
 
 
-class SimpleFileCache(ChainableDestructableResource):
+class KeyValueStore(ChainableDestructableResource):
     """
-    A key value store saved on disk using SQLite.
+    A key value store saved on disk or in memory using SQLite.
     The values should be pickle-serializable python objects.
+    Supply ":memory" as the `handle` to use the in-memory version.
     """
     connection_manager: SQLiteConnectionManager
 
-    def __init__(self):
-        self.connection_manager = SQLiteConnectionManager('cache.sqlite3')
+    def __init__(self, handle: str = 'cache.sqlite3'):
+        self.connection_manager = SQLiteConnectionManager(handle)
         self.cursor().execute('CREATE TABLE IF NOT EXISTS cache(key TEXT, contents BLOB);')
         self.add_subresource(self.connection_manager)
 
