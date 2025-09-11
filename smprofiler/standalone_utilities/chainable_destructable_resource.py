@@ -1,6 +1,8 @@
 """
 A resource-release pattern to ensure cleanup without requiring the resource
-user to explicitly call a cleanup function.
+user to explicitly call a cleanup function, which works in the case where
+the primary resource is at a higher level of abstraction, and the resources
+to be released are nested secondary resources.
 """
 
 class ChainableDestructableResource:
@@ -9,9 +11,9 @@ class ChainableDestructableResource:
     For a number of nested resources (the nesting being explicitly declared),
     an item at any level can be used as a context manager in which all
     subresources are cleaned up recursively at the end.
-    The intermediate objects do not need to be extensively modified, but need
-    only use `add_subresource` to indicate which objects should be considered
-    for release.
+    The intermediate objects do not need to be extensively modified in order to
+    implement this pattern, but need only use `add_subresource` to indicate
+    which objects should be considered for release.
 
     Example usage:
     ```py
