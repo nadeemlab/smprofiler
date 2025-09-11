@@ -1,4 +1,4 @@
-"""Data analysis script for one dataset."""
+"""Data analysis script with automated multi-feature assessments."""
 import sys
 import re
 from decimal import Decimal
@@ -23,7 +23,9 @@ from smprofiler.standalone_utilities.chainable_destructable_resource import Chai
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.db.http_data_accessor import StudyDataAccessor
 from smprofiler.db.http_data_accessor import univariate_pair_compare as compare
-from smprofiler.db.http_data_accessor import get_fractions
+from smprofiler.standalone_utilities.log_formats import colorized_logger
+
+logger = colorized_logger(__name__)
 
 Metric = Literal['fractions', 'proximity']
 
@@ -31,8 +33,8 @@ Metric = Literal['fractions', 'proximity']
 @define
 class Case:
     """
-    In this context, that of a single-study survey, a single "case" means
-    comparison of one or two phenotypes (cell sets) along two given sample cohorts,
+    In the context of a single-study survey, a single "case" means comparison
+    of one or two phenotypes (cell sets) along two given sample cohorts,
     using one of the computed metrics.
     """
     phenotype: PhenotypeCriteria
@@ -56,6 +58,7 @@ class Result:
     higher_cohort: str
     significance: ResultSignificance
     significant: bool
+
     def lower_cohort(self) -> str:
         return list(set(self.case.cohorts).difference([self.higher_cohort]))[0]
 
@@ -96,47 +99,78 @@ class Limits:
         linear_term = c[0] * p + c[1] * effect - 1
         return (effect > self.effect_min) and (p < self.p_max) and (linear_term > 0)
 
-class Confounding:
-    @classmethod
-    def probable_confounding(cls, result1: Result, result2: Result) -> bool:
-        """
-        Estimate whether ratios result (result2) may be confounded by singleton result (result1).
-        This can happen when either the numerator or denominator phenotype in result2 is the
-        singleton result of result1, and the direction of association implied by both results is the same.
-        """
-        r1 = result1
-        r2 = result2
-        return (
-            (not cls._incomparable_due_to_cohort_set(r1, r2)) and
-            (cls._get_common_phenotype(r1, r2) is not None) and
-            cls._direction_of_association_consistent(r1, r2)
+class SimpleConfounding:
+    """
+    Estimate whether ratios result (result2) may be confounded by singleton result
+    (result1). This can happen when:
+      - either the numerator or denominator phenotype in result2 is the singleton
+        phenotype of result1
+      - either of the two phenotypes for proximity in result2 is the singleton
+        phenotype of result1,
+    and the direction of association implied by both results is the same.
+    """
+    r1: Result
+    r2: Result
+
+    def __init__(self, result1: Result, result2: Result):
+        self.r1 = result1
+        self.r2 = result2
+
+    def probable_confounding(self) -> bool:
+        return self._check_result_types() and (
+            (not self._incomparable_due_to_cohort_set()) and
+            (self._get_common_phenotype() is not None) and
+            self._direction_of_association_consistent()
         )
 
-    @classmethod
-    def _incomparable_due_to_cohort_set(cls, r1: Result, r2: Result) -> bool:
-        return set(r1.case.cohorts) != set(r2.case.cohorts)
+    def _check_result_types(self) -> bool:
+        c1 = self.r1.case
+        c2 = self.r2.case
+        return (
+            c1.metric == 'fractions' and
+            c2.metric == 'fractions' and
+            c1.other is None and
+            c2.other is not None
+        ) or (
+            c1.metric == 'fractions' and
+            c2.metric == 'proximity' and
+            c1.other is None
+        )
 
-    @classmethod
-    def _get_common_phenotype(cls, r1: Result, r2: Result) -> Literal['phenotype', 'other', None]:
-        if r1.case.phenotype == r2.case.phenotype:
+    def _incomparable_due_to_cohort_set(self) -> bool:
+        c1 = self.r1.case
+        c2 = self.r2.case
+        return set(c1.cohorts) != set(c2.cohorts)
+
+    def _get_common_phenotype(self) -> Literal['phenotype', 'other', None]:
+        c1 = self.r1.case
+        c2 = self.r2.case
+        if c1.phenotype == c2.phenotype:
             return 'phenotype'
-        if r1.case.phenotype == r2.case.other:
+        if c1.phenotype == c2.other:
             return 'other'
         return None
 
-    @classmethod
-    def _direction_of_association_consistent(cls, r1: Result, r2: Result) -> bool:
-        common = cls._get_common_phenotype(r1, r2)
-        if common == 'phenotype':
-            return r1.higher_cohort == r2.higher_cohort
-        if common == 'other':
-            return r1.higher_cohort != r2.higher_cohort
+    def _direction_of_association_consistent(self) -> bool:
+        common = self._get_common_phenotype()
+        if self.r2.case.metric == 'fractions':
+            if common == 'phenotype':
+                return self.r1.higher_cohort == self.r2.higher_cohort
+            if common == 'other':
+                return self.r1.higher_cohort != self.r2.higher_cohort
+        if self.r2.case.metric == 'proximity':
+            return self.r1.higher_cohort == self.r2.higher_cohort
         return False
 
 DEFAULT_LIMITS = Limits(1.3, 0.01, 0.2, 2.0)
 
+@define
+class FilteredResults:
+    single_fractions: tuple[Result, ...]
+    ratios: tuple[Result, ...]
+    proximity: tuple[Result, ...]
 
-class AutoAssessor(ChainableDestructableResource):
+class StudyAutoAssessor(ChainableDestructableResource):
     """
     Automatically search and filter significant results from among, first, elementary
     results involving one phenotype, then incrementally increase the complexity of the
@@ -146,27 +180,93 @@ class AutoAssessor(ChainableDestructableResource):
     """
     access: StudyDataAccessor
     limits: Limits
+    channels: tuple[str, ...]
+    cohorts: tuple[str, ...]
 
-    def __init__(self, access: StudyDataAccessor, limits: Limits=DEFAULT_LIMITS):
+    def __init__(self, access: StudyDataAccessor, interactive: bool, limits: Limits=DEFAULT_LIMITS):
         self.access = access
         self.limits = limits
+        self.logger = AssessmentLogger(interactive=interactive)
         self.add_subresource(self.access)
+        self.add_subresource(self.logger)
 
-    def assess(self, case: Case) -> Result:
-        if case.metric == 'fractions':
-            return self._assess_fraction(case)
-        if case.metric == 'proximity':
-            return self._assess_proximity(case)
+    def get_filtered_results(self) -> FilteredResults:
+        self._initial_fetch()
+        singleton_significants: list[Result] = []
+        for case in self._get_cases(phase=1):
+            result = self._assess_case(case)
+            if result.significant:
+                singleton_significants.append(result)
+                self.logger.log_singleton(result)
+        ratio_significants: list[Result] = []
+        for case in self._get_cases(phase=2):
+            result = self._assess_case(case)
+            if result.significant:
+                confounding = tuple(filter(
+                    lambda r0: SimpleConfounding(r0, result).probable_confounding(),
+                    singleton_significants,
+                ))
+                if len(confounding) == 0:
+                    ratio_significants.append(result)
+                self.logger.log_ratios(result, confounding = confounding)
+        proximity_significants: list[Result] = []
+        for case in self._get_cases(phase=3):
+            result = self._assess_case(case)
+            if result.significant:
+                confounding = tuple(filter(
+                    lambda r0: SimpleConfounding(r0, result).probable_confounding(),
+                    singleton_significants,
+                ))
+                if len(confounding) == 0:
+                    proximity_significants.append(result)
+                self.logger.log_proximity(result, confounding = confounding)
+        return FilteredResults(tuple(singleton_significants), tuple(ratio_significants), tuple(proximity_significants)) 
+
+    def _get_cases(self, phase: int) -> tuple[Case, ...]:
+        if phase == 1:
+            return tuple(map(
+                lambda c: Case(self._form_single_phenotype(c[0]), None, c[1], 'fractions'),
+                product(self.channels, combinations(self.cohorts, 2))
+            ))
+        if phase == 2:
+            return tuple(map(
+                lambda c: Case(self._form_single_phenotype(c[0]), self._form_single_phenotype(c[1]), c[2], 'fractions'),
+                filter(
+                    lambda c: c[0] != c[1],
+                    product(self.channels, self.channels, combinations(self.cohorts, 2))
+                )
+            ))
+        if phase == 3:
+            return tuple(map(
+                lambda c: Case(self._form_single_phenotype(c[0]), self._form_single_phenotype(c[1]), c[2], 'proximity'),
+                product(self.channels, self.channels, combinations(self.cohorts, 2)),
+            ))
+        raise ValueError(f'Phase requested: {phase}')
+
+    def _initial_fetch(self) -> None:
+        self.channels = tuple(self.access._retrieve_feature_names())
+        self.cohorts = tuple(sorted(list(set(self.access._retrieve_cohorts()['cohort'])), key=lambda x: int(x)))
+        self.logger.set_name_width(max(map(len, self.channels)))
+        self._log(f'Using channels: {self.channels}')
+        self._log(f'Using cohorts: {self.cohorts}')
+
+    def _form_single_phenotype(self, channel: str) -> PhenotypeCriteria:
+        if re.search('distance', channel):
+            return PhenotypeCriteria(positive_markers=(), negative_markers=(channel,))
+        return PhenotypeCriteria(positive_markers=(channel,), negative_markers=())
+
+    def _assess_case(self, case: Case) -> Result:
+        handlers = (
+            ('fractions', self._assess_fraction),
+            ('proximity', self._assess_proximity),
+        )
+        for metric, handler in handlers:
+            if case.metric == metric:
+                return handler(case)
         raise ValueError
 
-    def _pad_channel_lists(self, p: PhenotypeCriteria) -> PhenotypeCriteria:
-        m1 = ('',) if len(p.positive_markers) == 0 else p.positive_markers
-        m2 = ('',) if len(p.negative_markers) == 0 else p.negative_markers
-        return PhenotypeCriteria(positive_markers=m1, negative_markers=m2)
-
-    def _pad_channel_lists_case(self, case: Case) -> tuple[PhenotypeCriteria, ...]:
-        return tuple(map(
-            lambda p: self._pad_channel_lists(cast(PhenotypeCriteria, p)),
+    def _get_phenotypes(self, case: Case) -> tuple[PhenotypeCriteria, ...]:
+        return cast(tuple[PhenotypeCriteria, ...], tuple(
             filter(
                 lambda p0: p0 is not None,
                 [case.phenotype, case.other]
@@ -174,158 +274,138 @@ class AutoAssessor(ChainableDestructableResource):
         ))
 
     def _assess_fraction(self, case: Case) -> Result:
-        df = self.access.counts(self._pad_channel_lists_case(case))
-        return self._assess_case_df(df, case)
+        df = self.access.fractions(self._get_phenotypes(case))
+        return self._assess_case_df(df, case, 'fraction')
 
     def _assess_proximity(self, case: Case) -> Result:
         df = self.access.two_phenotype_spatial_metric(
             'proximity',
-            self._pad_channel_lists_case(case),
+            self._get_phenotypes(case),
+            'proximity',
         )
-        return self._assess_case_df(df, case)
+        return self._assess_case_df(df, case, 'proximity')
 
-    def _assess_case_df(self, df: DataFrame, case: Case) -> Result:
-        df = df.loc[:,~df.columns.duplicated()].copy()
-        if len(df.columns) == 3:
-            p1 = df.columns[2]
-            p2 = df.columns[2]
-        elif re.search(' and ', df.columns[2]):
-            p1 = df.columns[3]
-            p2 = df.columns[4]
-        else:
-            p1 = df.columns[2]
-            p2 = df.columns[3]
-        if p1 == p2:
-            p2 = 'all cells'
+    def _assess_case_df(self, df: DataFrame, case: Case, feature_name: str) -> Result:
         cohorts = case.cohorts
-        fractions1, fractions2 = get_fractions(df, p1, p2, *cohorts)
-        p, effect = compare(fractions1, fractions2)
-        higher_cohort = case.cohorts[1]
+        values1 = df[df['cohort'] == cohorts[0]][feature_name]
+        values2 = df[df['cohort'] == cohorts[1]][feature_name]
+        p, effect = compare(values1, values2)
+        higher_cohort = cohorts[1]
         if effect < 1.0:
-            cohorts = cast(tuple[str, str], tuple(list(reversed(case.cohorts))))
-            fractions1, fractions2 = get_fractions(df, p1, p2, *cohorts)
-            p, effect = compare(fractions1, fractions2)
-            higher_cohort = cohorts[1]
+            higher_cohort = cohorts[0]
+            effect = 1.0 / effect
         significance = ResultSignificance(float(p), effect)
-        if effect < 1.0:
-            return Result(case, None, significance, False)
         return Result(case, higher_cohort, significance, self.limits.acceptable(significance))
 
-def _format_effect(e: float) -> str:
-    return '{:>12}'.format('%.4f' % e) + ' x'
+    def _log(self, *args, **kwargs) -> None:
+        self.logger.log(*args, **kwargs)
 
-def _format_p(p: float) -> str:
-    return '{:>12}'.format('p = ' + '%.5f' % p if p >= 0.0001 else '{:.2E}'.format(Decimal(p)))
+class AssessmentLogger(ChainableDestructableResource):
+    interactive: bool
+    buffer: TerminalScrollingBuffer
+    name_width: int
 
-def survey(host: str, study: str) -> DataFrame:
-    with AutoAssessor(StudyDataAccessor(study, host=host)) as a:
-        b = TerminalScrollingBuffer(20)
-        channels = a.access._retrieve_feature_names()
-        # if study == '...':
-        #     channels = list(filter(lambda s: len(s) < 6, channels))
-        #     # channels = list(filter(lambda s: len(s) >= 6, channels))
-        cohorts = sorted(list(set(a.access._retrieve_cohorts()['cohort'])), key=lambda x: int(x))
-        m = max(map(len, channels))
-        b.add_line(f'Using channels: {channels}')
-        b.add_line(f'Using cohorts: {cohorts}')
+    def __init__(self, interactive: bool=True, scrolling_buffer_lines: int=20):
+        self.interactive = interactive
+        if interactive:
+            self.buffer = TerminalScrollingBuffer(scrolling_buffer_lines)
+            self.add_subresource(self.buffer)
 
-        def _format_phenotype(p: Phenotype) -> str:
-            return ' '.join([m + '+' for m in p.positive_markers]) + ' '.join([m + '-' for m in p.negative_markers])
+    def set_name_width(self, w: int) -> None:
+        self.name_width = w
 
-        def _format_singleton(result: Result) -> str:
-            s = result.significance
-            w = m + 22
-            pre = ('{:>' + str(w) + '}').format(f'{_format_phenotype(result.case.phenotype)} fractions in cohort {result.higher_cohort} (vs {result.lower_cohort()})')
-            message = f'{pre} {_format_effect(s.effect)}   {_format_p(s.p)}'
-            return message
+    def log(self, message: str, **kwargs) -> None:
+        if self.interactive:
+            self.buffer.add_line(message, **kwargs)
+        else:
+            logger.info(message)
 
-        def _form_single_phenotype(channel: str) -> Phenotype:
-            if re.search('distance', channel):
-                return Phenotype([], [channel])
-            return Phenotype([channel], [])
+    def log_singleton(self, result: Result) -> None:
+        message = self._format_singleton(result)
+        self.log(f'Hit: {message}', sticky_header='Single channel assessment phase')
 
-        singleton_significants: list[Result] = []
-        for channel, (c1, c2) in product(channels, combinations(cohorts, 2)):
-            p1 = _form_single_phenotype(channel)
-            p2 = None
-            case = Case(p1, p2, (c1, c2), 'fractions')
-            result = a.assess(case)
-            if result.significant:
-                message = _format_singleton(result)
-                b.add_line(f'Hit: {message}', sticky_header='Single channel assessment phase')
-                if result.significant:
-                    singleton_significants.append(result)
+    def log_ratios(self, result: Result, confounding: tuple[Result, ...]):
+        qualification = self._form_qualification(confounding)
+        message = self._format_ratio(result)
+        message = f'Hit: {message}   {qualification}'
+        self.log(message, sticky_header='Channel ratios assessment phase')
 
-        def _format_ratio(r: Result) -> str:
-            s = result.significance
-            p1 = ('{:>' + str(m + 1) + '}').format(_format_phenotype(result.case.phenotype))
-            p2 = ('{:>' + str(m + 1) + '}').format(_format_phenotype(result.case.other))
-            pre = f'{p1} / {p2}   ratios in cohort {result.higher_cohort} (vs {result.lower_cohort()})'
-            return f'{pre} {_format_effect(s.effect)}   {_format_p(s.p)}'
+    def log_proximity(self, result: Result, confounding: tuple[Result, ...]):
+        qualification = self._form_qualification(confounding)
+        message = self._format_proximity(result)
+        message = f'Hit: {message}   {qualification}'
+        self.log(message, sticky_header='Proximity assessment phase')
 
-        ratio_significants: list[Result] = []
-        for channel1, channel2, (c1, c2) in product(channels, channels, combinations(cohorts, 2)):
-            if channel1 == channel2:
-                continue
-            p1 = _form_single_phenotype(channel1)
-            p2 = _form_single_phenotype(channel2)
-            case = Case(p1, p2, (c1, c2), 'fractions')
-            result = a.assess(case)
-            if result.significant:
-                confounding = tuple(_format_phenotype(r0.case.phenotype) for r0 in singleton_significants if Confounding.probable_confounding(r0, result))
-                if len(confounding) > 0:
-                    l = ', '.join(confounding)
-                    qualification = f'(Probable confounding with {l} results)'
-                else:
-                    qualification = ''
-                    ratio_significants.append(result)
-                message = _format_ratio(result)
-                message = f'Hit: {message}   {qualification}'
-                b.add_line(message, sticky_header='Channel ratios assessment phase')
+    def _form_qualification(self, confounding: tuple[Result, ...]) -> str:
+        if len(confounding) > 0:
+            strings = map(lambda r0: self._format_phenotype(r0.case.phenotype), confounding)
+            reference = ', '.join(strings)
+            qualification = f'(Probable confounding with {reference} results)'
+        else:
+            qualification = ''
+        return qualification
 
-        def _format_proximity(r: Result) -> str:
-            s = result.significance
-            p1 = ('{:>' + str(m + 1) + '}').format(_format_phenotype(result.case.phenotype))
-            p2 = ('{:>' + str(m + 1) + '}').format(_format_phenotype(result.case.other))
-            pre = f'{p1} have a number of nearby {p2}   cells in cohort {result.higher_cohort} (vs {result.lower_cohort()})'
-            return f'{pre} {_format_effect(s.effect)}   {_format_p(s.p)}'
+    def _format_singleton(self, result: Result) -> str:
+        s = result.significance
+        w = self.name_width + 22
+        p = self._format_phenotype((result.case.phenotype))
+        pre = ('{:>' + str(w) + '}').format(f'{p} fractions in cohort {result.higher_cohort} (vs {result.lower_cohort()})')
+        message = f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}'
+        return message
 
-        proximity_significants: list[Result] = []
-        for channel1, channel2, (c1, c2) in product(channels, channels, combinations(cohorts, 2)):
-            p1 = _form_single_phenotype(channel1)
-            p2 = _form_single_phenotype(channel2)
-            case = Case(p1, p2, (c1, c2), 'proximity')
-            result = a.assess(case)
-            if result.significant:
-                confounding = tuple(_format_phenotype(r0.case.phenotype) for r0 in singleton_significants if Confounding.probable_confounding(r0, result))
-                if len(confounding) > 0:
-                    number = ', '.join(confounding)
-                    qualification = f'(Probable confounding with {number} results)'
-                else:
-                    qualification = ''
-                    proximity_significants.append(result)
-                message = _format_proximity(result)
-                message = f'Hit: {message}   {qualification}'
-                b.add_line(message, sticky_header='Proximity assessment phase')
+    def _format_effect(self, e: float) -> str:
+        return '{:>12}'.format('%.4f' % e) + ' x'
 
-        b.finish()
+    def _format_p(self, p: float) -> str:
+        return '{:>12}'.format('p = ' + '%.5f' % p if p >= 0.0001 else '{:.2E}'.format(Decimal(p)))
+
+    def _format_phenotype(self, p: PhenotypeCriteria) -> str:
+        return ' '.join([x + '+' for x in p.positive_markers]) + ' '.join([x + '-' for x in p.negative_markers])
+
+    def _format_ratio(self, result: Result) -> str:
+        if result.case.other is None:
+            raise ValueError('Only use this function for ratio features.')
+        s = result.significance
+        p1 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.phenotype))
+        p2 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.other))
+        pre = f'{p1} / {p2}   ratios in cohort {result.higher_cohort} (vs {result.lower_cohort()})'
+        return f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}'
+
+    def _format_proximity(self, result: Result) -> str:
+        if result.case.other is None:
+            raise ValueError('Proximity requires two phenotypes.')
+        s = result.significance
+        p1 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.phenotype))
+        p2 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.other))
+        pre = f'{p1} have a number of nearby {p2}   cells in cohort {result.higher_cohort} (vs {result.lower_cohort()})'
+        return f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}'
+
+
+def survey(host: str, study: str, interactive: bool) -> DataFrame:
+    with StudyAutoAssessor(StudyDataAccessor(study, host=host), interactive=interactive) as a:
+        results = a.get_filtered_results()
+        singleton_significants = results.single_fractions
+        ratio_significants = results.ratios
+        proximity_significants = results.proximity
 
     print('')
     print('Single channel fractions results:')
     for result in sorted(singleton_significants, key=lambda r: int(r.higher_cohort)):
-        print(_format_singleton(result))
+        print(a.logger._format_singleton(result))
     print('')
     print('Ratio of channels fractions results:')
-    for result in sorted(ratio_significants, key=lambda r: (int(r.higher_cohort), _format_phenotype(r.case.other), _format_phenotype(r.case.phenotype))):
-        print(_format_ratio(result))
+    def c(p: PhenotypeCriteria | None) -> PhenotypeCriteria:
+        return cast(PhenotypeCriteria, p)
+    for result in sorted(ratio_significants, key=lambda r: (int(r.higher_cohort), a.logger._format_phenotype(c(r.case.other)), a.logger._format_phenotype(r.case.phenotype))):
+        print(a.logger._format_ratio(result))
     print('')
 
     severe = Limits(1.5, 0.005, 0.2, 3.0)
 
     print('Proximity results:')
-    for result in sorted(proximity_significants, key=lambda r: (int(r.higher_cohort), _format_phenotype(r.case.other), _format_phenotype(r.case.phenotype))):
+    for result in sorted(proximity_significants, key=lambda r: (int(r.higher_cohort), a.logger._format_phenotype(c(r.case.other)), a.logger._format_phenotype(r.case.phenotype))):
         if severe.acceptable(result.significance):
-            print(_format_proximity(result))
+            print(a.logger._format_proximity(result))
 
     def _form_record(r: Result) -> dict[str, str | float | int]:
         return {
@@ -334,8 +414,8 @@ def survey(host: str, study: str) -> DataFrame:
             'higher_cohort': r.higher_cohort,
             'c1': r.case.cohorts[0],
             'c2': r.case.cohorts[1],
-            'p1': _format_phenotype(r.case.phenotype),
-            'p2': _format_phenotype(r.case.other) if r.case.other else '',
+            'p1': a.logger._format_phenotype(r.case.phenotype),
+            'p2': a.logger._format_phenotype(r.case.other) if r.case.other else '',
         }
 
     df1 = DataFrame([_form_record(r) for r in singleton_significants])
@@ -366,5 +446,5 @@ if __name__=='__main__':
     host = get_default_host(None)
     if host is None:
         raise RuntimeError('Could not determine API server hostname.')
-    df = survey(host, study)
+    df = survey(host, study, True)
 

@@ -4,12 +4,12 @@ from math import log10
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from accessors import get_default_host
+from survey import get_default_host
 from survey import survey
 
 host = get_default_host(None)
 study = open('study.txt', 'rt', encoding='utf-8').read().rstrip()
-df = survey(host, study=study)
+df = survey(host=host, study=study, interactive=True)
 df['qual'] = df['multiplier'] * df['p'].apply(log10)
 
 dfm = df[df['metric'] == 'proximity']

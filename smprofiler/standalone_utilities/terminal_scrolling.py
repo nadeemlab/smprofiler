@@ -4,18 +4,20 @@ import re
 from collections import deque
 from time import time as get_time_seconds
 
-class TerminalScrollingBufferInterface:
-    def add_line(self, line: str, sticky_header: str | None = None) -> None:
+from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
+
+class TerminalScrollingBufferInterface(ChainableDestructableResource):
+    def __init__(self, **kwargs):
         pass
 
-    def finish(self) -> None:
+    def add_line(self, line: str, sticky_header: str | None = None) -> None:
         pass
 
     def reset_header(self) -> None:
         pass
 
 
-class TerminalScrollingBuffer(TerminalScrollingBufferInterface):
+class TerminalScrollingBuffer(TerminalScrollingBufferInterface, ChainableDestructableResource):
     """
     Show a scrolling status window in the terminal with displayed lines incrementally
     added/cycled out over time.
@@ -30,23 +32,24 @@ class TerminalScrollingBuffer(TerminalScrollingBufferInterface):
     If `show_section_count=True`, the sticky header will include the count of the
     number of "sections" that have been displayed so far, including the current one.
 
-    In interactive mode, calling `finish` will dump all log lines (with no formatting)
-    to the terminal. This can be helpful for detailed inspection of logs only after
-    a whole process has completed, with incremental inspection when in progress.
+    This is meant to run in interactive mode, at the end to dumping all log lines
+    (with no formatting) to the terminal. This can be helpful for detailed
+    inspection of logs only after a whole process has completed, with incremental
+    inspection when in progress.
 
-    In non-interactive mode, log lines are plainly echoed to the terminal and no
-    scrolling effect is used.
+    Note that the resource-release pattern is used, so this buffer can be used
+    in a standalone way as a context manager, or as an attribute of another
+    object that registers the buffer as a dependent resources.
 
     Usage:
 
     ```
     from time import sleep
-    b = TerminalScrollingBuffer(number_lines=7)
-    for i in range(1, 31, 1):
-        sleep(0.1)
-        sticky_header = f'Group {int(i/10)}' if i%10 == 0 else None
-        b.add_line(f'Line item #{i}', sticky_header=sticky_header)
-    b.dump_all()
+    with TerminalScrollingBuffer(number_lines=7) as b:
+        for i in range(1, 31, 1):
+            sleep(0.1)
+            sticky_header = f'Group {int(i/10)}' if i%10 == 0 else None
+            b.add_line(f'Line item #{i}', sticky_header=sticky_header)
     ```
     """
     number_lines: int
@@ -55,41 +58,33 @@ class TerminalScrollingBuffer(TerminalScrollingBufferInterface):
     all_lines: list[str]
     section_count: int
     show_section_count: bool
-    interactive: bool
     start_time: float
 
-    def __init__(self, number_lines: int = 4, show_section_count: bool=True, interactive: bool=True):
+    def __init__(self, number_lines: int = 4, show_section_count: bool=True):
         self.number_lines = number_lines
         self.lines = deque(maxlen=number_lines)
         self.sticky_header = ''
         self.section_count = 0
         self.all_lines = []
         self.show_section_count = show_section_count
-        self.interactive = interactive
         self._start()
 
+    def release(self) -> None:
+        self._dump_all()
+
     def add_line(self, line: str, sticky_header: str | None = None) -> None:
-        if not self.interactive:
-            print(line)
-            return
         if sticky_header is not None:
             self.sticky_header = sticky_header
             self.section_count += 1
-        if not isinstance(line, str):
-            line = str(line)
         lines = line.split('\n')
         if len(lines) > 1:
-            for l in lines:
-                self.add_line(l)
+            for _line in lines:
+                self.add_line(_line)
         else:
             self.all_lines.append(line)
             _line = self._sanitize(line)
             self.lines.append(_line)
             self._update_display()
-
-    def finish(self) -> None:
-        if self.interactive:
-            self._dump_all()
 
     def _dump_all(self) -> None:
         for line in self.all_lines:
@@ -120,6 +115,7 @@ class TerminalScrollingBuffer(TerminalScrollingBufferInterface):
         print('\033[A\33[2K\r' * (self.number_lines + 2), end='')
 
     def _show_header(self) -> None:
+        header = ''
         if self.show_section_count:
             if self.sticky_header != '':
                 header = self.sticky_header + f' ({self.section_count})'

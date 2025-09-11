@@ -1,4 +1,6 @@
 
+from typing import cast
+from collections.abc import Iterable
 from typing import Callable
 
 from attrs import define
@@ -49,8 +51,10 @@ class SignatureConcordance:
 
     def evaluate(self, channel_thresholds: ndarray) -> float:
         if isscalar(channel_thresholds):
-            channel_thresholds = [channel_thresholds]
-        return self._evaluate(dict(zip(self.channels, channel_thresholds)))
+            _channel_thresholds = [channel_thresholds]
+        else:
+            _channel_thresholds = channel_thresholds
+        return self._evaluate(dict(zip(self.channels, cast(Iterable[float], _channel_thresholds))))
 
     def _evaluate(self, thresholds: dict[str, float]) -> float:
         objective = 0
@@ -111,9 +115,9 @@ class ThresholdOptimizer:
     The signature definitions should be provided in `signatures` by phenotype name, with value
     a pair consisting of the tuple of positive markers/channels and the tuple of negative markers/channels.
 
-    If `verbose` is set, logs are printed to the console. If in addition `interactive` is set, a
-    scrolling buffer is used to display a fixed number of statements during optimization, then
-    upon completion the whole logs are dumped to the console.
+    If `verbose` is set, logs are printed to the console. A scrolling buffer is used to display a
+    fixed number of statements during optimization, then upon completion the whole logs are
+    dumped to the console.
     """
     cell_data: DataFrame
     channels: tuple[str, ...]
@@ -137,7 +141,6 @@ class ThresholdOptimizer:
         main_phase_iterations: int=20,
         main_phase_step: int=3,
         verbose: bool=True,
-        interactive: bool=True,
     ):
         self.cell_data = cell_data
         self.channels = channels
@@ -148,27 +151,31 @@ class ThresholdOptimizer:
         self.main_phase_iterations = main_phase_iterations
         self.main_phase_step = main_phase_step
         if verbose:
-            self.terminal_scroller = TerminalScrollingBuffer(number_lines=15, interactive=interactive)
+            T = TerminalScrollingBuffer
+            kwargs = {'number_lines': 15, 'show_section_count': True}
         else:
-            self.terminal_scroller = TerminalScrollingBufferInterface()
-        self._determine_optimal_thresholds()
+            T = TerminalScrollingBufferInterface
+            kwargs = {}
+
+        with T(**kwargs) as buffer:
+            self.terminal_scoller = buffer
+            self._determine_optimal_thresholds()
 
     def get_optimal_thresholds(self) -> DataFrame:
         return self.thresholds
 
     def _determine_optimal_thresholds(self):
         thresholds = None
-        self.terminal_scroller.add_line(self.cell_data.columns)
+        self.terminal_scroller.add_line(str(self.cell_data.columns))
         for sample, sample_df in self.cell_data.groupby('sample', observed=True):
             self.terminal_scroller.add_line(f'Sample {sample}', sticky_header=f'Sample {sample}')
-            t = self._determine_optimal_thresholds_one_sample(sample, sample_df)
+            t = self._determine_optimal_thresholds_one_sample(str(sample), sample_df)
             if thresholds is None:
                 thresholds = t
             else:
                 thresholds = concat([thresholds, t], axis=0)
             self.terminal_scroller.reset_header()
-        self.thresholds = thresholds
-        self.terminal_scroller.finish()
+        self.thresholds = cast(DataFrame, thresholds)
 
     def _determine_optimal_thresholds_one_sample(self, sample: str, sample_df: DataFrame) -> DataFrame:
         singly_optimized = self._single_channel_optimization(sample_df)
@@ -192,7 +199,7 @@ class ThresholdOptimizer:
                 e = SignatureConcordance(
                     sample_df.sample(self.single_channel_phase_subsample),
                     {phenotype: signature},
-                    [channel],
+                    (channel,),
                     self.column_namings,
                     ignore_negatives=True,
                 )
@@ -200,7 +207,7 @@ class ThresholdOptimizer:
                 optimal_thresholds: OptimizeResult = minimize_scalar(e.evaluate, initial_value, bounds=(0, 2*initial_value))
                 singly_optimized[channel] = float(optimal_thresholds.x)
                 self.terminal_scroller.add_line(f'{channel}: {optimal_thresholds.x} ')
-        return singly_optimized
+        return cast(dict[str, float|None], singly_optimized)
 
     def _main_phase_optimization(self, sample_df: DataFrame, singly_optimized) -> OptimizeResult:
         self.terminal_scroller.add_line('\n')
@@ -221,8 +228,9 @@ class ThresholdOptimizer:
     def _report_sample_thresholds(self, sample_df: DataFrame, thresholds: DataFrame, optimal_thresholds: OptimizeResult, sample: str):
         self.terminal_scroller.add_line('')
         self.terminal_scroller.add_line(f'Best thresholds ({sample}):')
-        self.terminal_scroller.add_line(thresholds)
+        self.terminal_scroller.add_line(str(thresholds))
         self.terminal_scroller.add_line(f'Average Jaccard index over signatures in {self.main_phase_subsample} subsample: {optimal_thresholds.fun}')
         self.terminal_scroller.add_line('Evaluating Jaccard over all...')
         v = SignatureConcordance(sample_df, self.signatures, self.channels, self.column_namings).evaluate(optimal_thresholds.x)
         self.terminal_scroller.add_line(f'Average Jaccard index over signatures in all {sample_df.shape[0]}: {v}')
+

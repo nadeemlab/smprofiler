@@ -52,9 +52,14 @@ class StudyDataAccessor(ChainableDestructableResource):
     def get_subresources(self) -> tuple[KeyValueStore]:
         return (self.cache,)
 
-    def counts(self, phenotypes: tuple[PhenotypeCriteria, ...]):
+    def _pad_channel_lists(self, p: PhenotypeCriteria) -> PhenotypeCriteria:
+        m1 = ('',) if len(p.positive_markers) == 0 else p.positive_markers
+        m2 = ('',) if len(p.negative_markers) == 0 else p.negative_markers
+        return PhenotypeCriteria(positive_markers=m1, negative_markers=m2)
+
+    def fractions(self, phenotypes: tuple[PhenotypeCriteria, ...]):
         individual_counts_series = [
-            self._get_counts_series(p, f'p{i+1}')
+            self._get_counts_series(self._pad_channel_lists(p), f'p{i+1}')
             for i, p in enumerate(phenotypes)
         ]
         df = concat(
@@ -62,13 +67,17 @@ class StudyDataAccessor(ChainableDestructableResource):
             axis=1,
         )
         df.replace([inf, -inf], nan, inplace=True)
-        return df
+        if len(phenotypes) == 1:
+            return append_fractions_feature(df, 'p1', 'all cells', 'fraction')
+        if len(phenotypes) == 2:
+            return append_fractions_feature(df, 'p1', 'p2', 'fraction')
+        raise ValueError('Fractions feature supported for one or two phenotypes.')
 
-    def two_phenotype_spatial_metric(self, feature_class: str, criteria: tuple[PhenotypeCriteria, ...]):
+    def two_phenotype_spatial_metric(self, feature_class: str, criteria: tuple[PhenotypeCriteria, ...], feature_name: str):
         p1 = criteria[0]
         p2 = criteria[1]
         parts1 = self._form_query_parameters_key_values(p1)
-        parts2 = self._form_query_parameters_key_values(p2)
+        parts2 = self._form_query_parameters_key_values(p2, ordinality=2)
         parts = parts1 + parts2 + [('study', self.study), ('feature_class', feature_class)]
         if feature_class == 'co-occurrence':
             parts.append(('radius', '100'))
@@ -76,27 +85,26 @@ class StudyDataAccessor(ChainableDestructableResource):
             parts.append(('radius', '100'))
         query = urlencode(parts)
         endpoint = 'request-spatial-metrics-computation-custom-phenotypes'
-        return self._polling_retrieve_values(endpoint, query)
+        return self._polling_retrieve_values(endpoint, query, feature_name)
 
     def _retrieve_cohorts(self):
         summary_obj, _ = self._retrieve('study-summary', urlencode([('study', self.study)]))
         summary = StudySummary.model_validate(summary_obj)
-        return DataFrame(summary.cohorts.assignments).set_index('sample')
+        return DataFrame([model.model_dump() for model in summary.cohorts.assignments]).set_index('sample')
 
     def _retrieve_feature_names(self) -> list[str]:
         names_obj, _ = self._retrieve('cell-data-binary-feature-names', urlencode([('study', self.study)]))
         names = BitMaskFeatureNames.model_validate(names_obj)
         return list(map(lambda d: d.symbol, names.names))
 
-    def _one_phenotype_spatial_metric(self, feature_class: str, criteria: PhenotypeCriteria):
+    def _one_phenotype_spatial_metric(self, feature_class: str, criteria: PhenotypeCriteria, feature_name: str):
         parts1 = self._form_query_parameters_key_values(criteria)
         parts = parts1 + [('study', self.study), ('feature_class', feature_class)]
         query = urlencode(parts)
         endpoint = 'request-spatial-metrics-computation-custom-phenotype'
-        return self._polling_retrieve_values(endpoint, query)
+        return self._polling_retrieve_values(endpoint, query, feature_name)
 
-
-    def _polling_retrieve_values(self, endpoint: str, query: str) -> DataFrame:
+    def _polling_retrieve_values(self, endpoint: str, query: str, feature_name: str) -> DataFrame:
         while True:
             response_obj, _ = self._retrieve(endpoint, query)
             response = UnivariateMetricsComputationResult.model_validate(response_obj)
@@ -105,7 +113,7 @@ class StudyDataAccessor(ChainableDestructableResource):
             else:
                 break
         rows = [
-            {'sample': key, 'value': value}
+            {'sample': key, feature_name: value}
             for key, value in response.values.items()
         ]
         df = DataFrame(rows).set_index('sample')
@@ -118,9 +126,10 @@ class StudyDataAccessor(ChainableDestructableResource):
         endpoint = 'phenotype-counts'
         return endpoint, query
 
-    def _form_query_parameters_key_values(self, p: PhenotypeCriteria) -> list[tuple[str, str]]:
+    def _form_query_parameters_key_values(self, p: PhenotypeCriteria, ordinality: int=1) -> list[tuple[str, str]]:
         positives = p.positive_markers
         negatives = p.negative_markers
+        o = '' if ordinality == 1 else str(ordinality)
         if (not positives) and (not negatives):
             raise ValueError('At least one positive or negative marker is required.')
         if not positives:
@@ -128,7 +137,7 @@ class StudyDataAccessor(ChainableDestructableResource):
         elif not negatives:
             negatives = ('',)
         parts = list(chain(*[
-            [(f'{keyword}_marker', channel) for channel in argument]
+            [(f'{keyword}_marker{o}', channel) for channel in argument]
             for keyword, argument in zip(['positive', 'negative'], [positives, negatives])
         ]))
         parts = sorted(list(set(parts)))
@@ -137,7 +146,7 @@ class StudyDataAccessor(ChainableDestructableResource):
     def _get_counts_series(self, p: PhenotypeCriteria, column_name: str) -> Series:
         endpoint, query = self._form_counts_query(p)
         counts = PhenotypeCounts.model_validate(self._retrieve(endpoint, query)[0])
-        df = DataFrame(counts.counts)
+        df = DataFrame([model.model_dump() for model in counts.counts])
         mapper = {'specimen': 'sample', 'count': column_name}
         return df.rename(columns=mapper).set_index('sample')[column_name]
 
@@ -187,7 +196,7 @@ class StudyDataAccessor(ChainableDestructableResource):
         raise ValueError(f'Processing downloaded payload failed: {key}')
 
 
-def univariate_pair_compare(series1: Series[float], series2: Series[float]):
+def univariate_pair_compare(series1: 'Series[float]', series2: 'Series[float]'):
     def finite(value):
         return not isnan(value) and not value==inf
     list1 = list(filter(finite, series1.values))
@@ -196,8 +205,23 @@ def univariate_pair_compare(series1: Series[float], series2: Series[float]):
     mean2 = float(mean(list2))
     actual = mean2 / mean1
     result = ttest_ind(list1, list2, equal_var=False)
-    return result.pvalue, actual
+    return getattr(result, 'pvalue'), actual
 
+
+def append_fractions_feature(
+    df: DataFrame,
+    column_numerator: str,
+    column_denominator: str,
+    feature_name: str
+) -> DataFrame:
+    """
+    Forms the fraction column between two provided columns, omitting
+    rows for which either numerator or denominator equal to 0.
+    """
+    fractions = df[column_numerator] / df[column_denominator]
+    mask = ~ ( (df[column_numerator] == 0) | (df[column_denominator] == 0) )
+    df[feature_name] = fractions
+    return df[mask]
 
 def get_fractions(df: DataFrame, column_numerator: str, column_denominator: str, cohort1: str, cohort2: str):
     fractions = df[column_numerator] / df[column_denominator]
