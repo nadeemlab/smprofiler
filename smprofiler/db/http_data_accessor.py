@@ -52,11 +52,6 @@ class StudyDataAccessor(ChainableDestructableResource):
     def get_subresources(self) -> tuple[KeyValueStore]:
         return (self.cache,)
 
-    def _pad_channel_lists(self, p: PhenotypeCriteria) -> PhenotypeCriteria:
-        m1 = ('',) if len(p.positive_markers) == 0 else p.positive_markers
-        m2 = ('',) if len(p.negative_markers) == 0 else p.negative_markers
-        return PhenotypeCriteria(positive_markers=m1, negative_markers=m2)
-
     def fractions(self, phenotypes: tuple[PhenotypeCriteria, ...]):
         individual_counts_series = [
             self._get_counts_series(self._pad_channel_lists(p), f'p{i+1}')
@@ -86,6 +81,11 @@ class StudyDataAccessor(ChainableDestructableResource):
         query = urlencode(parts)
         endpoint = 'request-spatial-metrics-computation-custom-phenotypes'
         return self._polling_retrieve_values(endpoint, query, feature_name)
+
+    def _pad_channel_lists(self, p: PhenotypeCriteria) -> PhenotypeCriteria:
+        m1 = ('',) if len(p.positive_markers) == 0 else p.positive_markers
+        m2 = ('',) if len(p.negative_markers) == 0 else p.negative_markers
+        return PhenotypeCriteria(positive_markers=m1, negative_markers=m2)
 
     def _retrieve_cohorts(self):
         summary_obj, _ = self._retrieve('study-summary', urlencode([('study', self.study)]))
