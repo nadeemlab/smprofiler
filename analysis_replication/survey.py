@@ -220,7 +220,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
                 if len(confounding) == 0:
                     proximity_significants.append(result)
                 self.logger.log_proximity(result, confounding = confounding)
-        return FilteredResults(tuple(singleton_significants), tuple(ratio_significants), tuple(proximity_significants)) 
+        return FilteredResults(tuple(singleton_significants), tuple(ratio_significants), tuple(proximity_significants))
 
     def _get_cases(self, phase: int) -> tuple[Case, ...]:
         if phase == 1:
