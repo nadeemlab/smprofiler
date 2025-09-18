@@ -181,7 +181,12 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 
 ### <a id="single-marker"></a> Using all single marker cell phenotypes, frequency
 
-![alt](docs/image_assets/ccutoff.png)
+<p align="center">
+<a href="https://smprofiler.io/channel-overview">
+<img src="docs/image_assets/ccutoff.png"/>
+</a>
+</p>
+
 ### <a id="marker-pairs"></a> Using all marker pairs, spatial proximity
 
 # Data management
