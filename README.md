@@ -117,7 +117,7 @@ The new cell count for each phenotype is now shown, together with the new percen
 
 ![alt](docs/image_assets/f10.png)
 
-## Example: Spatially-informed metrics
+## <a id="spatially-informed-metrics"></a> Example: Spatially-informed metrics
 1. [Compute a cell-set-to-cell-set proximity metric in realtime](#compute-proximity)
 2. [Save and share results](#save-and-share)
 
