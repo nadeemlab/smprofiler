@@ -6,7 +6,17 @@
 - [What do cell profiles tell us about biology and disease?](#what-do-cell-profiles-tell-us-about-biology-and-disease)
 - [User tutorial](#user-tutorial)
   - [Example: Exploratory data analysis of immunotherapy response in melanoma](#example-exploratory-data-analysis-of-immunotherapy-response-in-melanoma)
+    1. [Select a study](#select-a-study)
+    2. [Choose cell phenotypes](#choose-cell-phenotypes)
+    3. [Aggregate cell population fractions and overlaps](#aggregate-cell-population-fractions-and-overlaps)
+    4. [Check per-sample values](#check-per-sample-values)
+    5. [Assess phenotype fractions between cohorts](#assess-fractions)
+    6. [Assess ratios between cohorts](#assess-ratios)
+    7. [Open slide viewer](#open-slide-viewer)
+    8. [Region selection and UMAP visualization](#umap-simple)
   - [Example: Spatially-informed metrics](#spatially-informed-metrics)
+    1. [Compute a cell-set-to-cell-set proximity metric in realtime](#compute-proximity)
+    2. [Save and share results](#save-and-share)
 - [Data management](#data-management)
 - [CLI command reference](#cli-command-reference)
   - [Dataset uploader](#dataset-uploader)
@@ -50,7 +60,7 @@ SMProfiler is available to the public at [smprofiler.io](https://smprofiler.io).
 5. [Assess phenotype fractions between cohorts](#assess-fractions)
 6. [Assess ratios between cohorts](#assess-ratios)
 7. [Open slide viewer](#open-slide-viewer)
-8. [UMAP visualization](#umap-simple)
+8. [Region selection and UMAP visualization](#umap-simple)
 
 ### <a id="select-a-study"></a> 1. Select a study
 On the main page, select **Melanoma CyTOF ICI**. This brings up a dataset that was collected and published by Moldoveanu et al.[^1].
@@ -102,7 +112,7 @@ The "virtual slide viewer" opens. Choose a few phenotypes, and the corresponding
 
 ![alt](docs/image_assets/f8.png)
 
-### <a id="umap-simple"></a> 8. UMAP visualization
+### <a id="umap-simple"></a> 8. Region selection and UMAP visualization
 A UMAP dimensional reduction of the cell set across the whole data collection is available in this case. Click **UMAP**.
 
 > [!NOTE]
