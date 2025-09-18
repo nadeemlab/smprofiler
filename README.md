@@ -189,6 +189,13 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 
 ### <a id="marker-pairs"></a> Using all marker pairs, spatial proximity
 
+<p align="center">
+<a href="https://smprofiler.io/proximity-overview">
+<img src="docs/image_assets/pcutoff_lores.png" width="400"/>
+</a>
+</p>
+
+
 # Data management
 To support this project's semantic integrity goals, we designed a general data model and ontology for cell-resolved measurement studies, using a schema-authoring system we call the Application Data Interface (ADI) framework.
 
