@@ -10,7 +10,7 @@
         "component_name": "Pandas",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "2.3.1",
+        "version": "2.3.2",
         "relevant_to_reproducible_computation": true
     },
     {
@@ -24,14 +24,14 @@
         "component_name": "SciPy",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.16.1",
+        "version": "1.16.2",
         "relevant_to_reproducible_computation": true
     },
     {
         "component_name": "scikit-learn",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.7.1",
+        "version": "1.7.2",
         "relevant_to_reproducible_computation": true
     },
     {
@@ -45,7 +45,7 @@
         "component_name": "smprofiler",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.0.61",
+        "version": "1.0.67",
         "relevant_to_reproducible_computation": true
     },
     {
