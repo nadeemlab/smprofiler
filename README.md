@@ -38,7 +38,7 @@ SMProfiler is available to the public at [smprofiler.io](https://smprofiler.io).
 
 <p align="center">
 <a href="docs/image_assets/system_diagram.pdf">
-<img src="docs/image_assets/system_diagram.pdf"/>
+<img src="docs/image_assets/system_diagram_lores.png"/>
 </a>
 </p>
 
