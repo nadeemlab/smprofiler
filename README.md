@@ -100,7 +100,7 @@ Let's focus our attention on one of the samples that exhibited a large fraction 
 
 The "virtual slide viewer" opens. Choose a few phenotypes, and the corresponding cells will become highlighted. The fraction and count of the cells for each phenotype are shown.
 
-![alt](docs/image_assets/f7.png)
+![alt](docs/image_assets/f8.png)
 
 ### <a id="umap-simple"></a> 8. UMAP visualization
 A UMAP dimensional reduction of the cell set across the whole data collection is available in this case. Click **UMAP**.
@@ -115,7 +115,7 @@ The new cell count for each phenotype is now shown, together with the new percen
 > [!NOTE]
 > By careful use of the selection tool, noting enrichments in each virtual region, you can account for most of the cell types present and hone the focus of study.
 
-![alt](docs/image_assets/f10.png)
+![alt](docs/image_assets/f9.png)
 
 ## <a id="spatially-informed-metrics"></a> Example: Spatially-informed metrics
 1. [Compute a cell-set-to-cell-set proximity metric in realtime](#compute-proximity)
