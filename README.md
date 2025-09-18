@@ -153,8 +153,8 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 ![alt](docs/image_assets/f12.png)
 
 ## <a id="orion-slide-viewer"></a> Example: B cell aggregation in colon cancer
-[1. Observe tissue geometry patterning](#observe-tissue)
-[2. Assess region enrichment with Fisher test](#fisher-test)
+1. [Observe tissue geometry patterning](#observe-tissue)
+2. [Assess region enrichment with Fisher test](#fisher-test)
 
 ### <a id="choose-cell-phenotypes-orion"></a> Observe tissue geometry patterning 
 Select study **HTAN Orion CRC** and phenotypes:
