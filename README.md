@@ -179,7 +179,11 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 1. [Using all single marker cell phenotypes, frequency](#single-marker)
 2. [Using all marker pairs, spatial proximity](#marker-pairs)
 
+The datasets transformed and curated for the SMProfiler database are well-harmonized with each other, so that cross-cutting queries and whole-database surveys are readily performed.
+
 ### <a id="single-marker"></a> Using all single marker cell phenotypes, frequency
+
+In total around 50 markers were imaged across the 12 studies currently available. The all-markers overview assesses each marker for its utility in discriminating between key outcome cohorts within each given dataset, using the fractions of each cell set expressing the marker. The t-test provides a sense of the overall strength and statistical significance of each association found. In the plot (previewed below), each color corresponds to one sample cohort and relative size of each circle pair indicates the effective differential between the two cohorts using the given marker.
 
 <p align="center">
 <a href="https://smprofiler.io/channel-overview">
@@ -188,6 +192,8 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 </p>
 
 ### <a id="marker-pairs"></a> Using all marker pairs, spatial proximity
+
+We can involve the spatial context in our whole-database assessment by computing the cell-set-to-cell-set proximity metric for each pair of markers. It is expected that the cohort discriminations provided by such marker pairs augments the results identified using dissociated cell sets defined by single markers (the fractions features), since these are based on an independent source of information.
 
 <p align="center">
 <a href="https://smprofiler.io/proximity-overview">
