@@ -158,9 +158,10 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 
 ### <a id="choose-cell-phenotypes-orion"></a> Observe tissue geometry patterning 
 Select study **HTAN Orion CRC** and phenotypes:
-- T cytotoxic
-- Epithelium
-- B cell
+- **T cytotoxic**
+- **Epithelium**
+- **B cell**
+
 Review slide **C12** and observe the differing tissue localization.
 ![alt](docs/image_assets/o1.png)
 
