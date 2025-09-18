@@ -20,10 +20,10 @@
   - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
     - [1. Observe tissue geometry patterning](#observe-tissue)
     - [2. Assess region enrichment with Fisher test](#fisher-test)
+  - [Example: Intensity masking to highlight tissue structure in bone marrow](#intensity-masking)
   - [Whole-database assessments for outcome associations](#whole-database-assessments)
     - [1. Using all single marker cell phenotypes, frequency](#single-marker)
     - [2. Using all marker pairs, spatial proximity](#marker-pairs)
-  - [Example: Intensity masking to highlight tissue structure in bone marrow](#intensity-masking)
 - [Data management](#data-management)
 - [CLI command reference](#cli-command-reference)
   - [Dataset uploader](#dataset-uploader)
@@ -176,6 +176,13 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 
 ![alt](docs/image_assets/o2.png)
 
+## <a id="intensity-masking"></a> Example: Intensity masking to highlight tissue structure in bone marrow
+
+Select the **Bone marrow aging** study, and in the Slide Viewer choose sample **WCM32** and channel **distance_to_trabecules**. This is a virtual channel, associating to each cell its distance to a tissue structure identified by the study [^2]. The cells shown in gray have smaller distance, and so are closer to the tissue structure.
+
+![alt](docs/image_assets/bm_t.png)
+
+
 ## <a id="whole-database-assessments"></a> Whole-database assessments for outcome associations
 1. [Using all single marker cell phenotypes, frequency](#single-marker)
 2. [Using all marker pairs, spatial proximity](#marker-pairs)
@@ -201,12 +208,6 @@ We can involve the spatial context in our whole-database assessment by computing
 <img src="docs/image_assets/pcutoff_lores.png" width="400"/>
 </a>
 </p>
-
-## <a id="intensity-masking"></a> Example: Intensity masking to highlight tissue structure in bone marrow
-
-Select the **Bone marrow aging** study, and in the Slide Viewer choose sample **WCM32** and channel **distance_to_trabecules**. This is a virtual channel, associating to each cell its distance to a tissue structure identified by the study [^2]. The cells shown in gray have smaller distance, and so are closer to the tissue structure.
-
-![alt](docs/image_assets/bm_t.png)
 
 # Data management
 To support this project's semantic integrity goals, we designed a general data model and ontology for cell-resolved measurement studies, using a schema-authoring system we call the Application Data Interface (ADI) framework.
