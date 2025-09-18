@@ -1,6 +1,6 @@
 
 <p align="center">
-<img src="docs/image_assets/SMProfiler_logo_blue_on_transparent.png" width="400"/>
+<img src="docs/image_assets/smprofiler-logo.svg" width="400"/>
 </p>
 <br/>
 <br/>
@@ -19,13 +19,13 @@
 
 # What do cell profiles tell us about biology and disease?
 
-By studying microscopic images of specimens of tissue, like skin or organ resections, pathologists and basic scientists can draw inferences about the way that cells coordinate to set biological processes in motion, and how these processes are disrupted in the course of disease.
+By studying microscopic images of specimens of tissue, like skin or organ resections, pathologists and scientists draw inferences about the way that cells coordinate to set biological processes in motion and how these processes are disrupted in the course of disease.
 
-The taxonomy of cell types and their functional states is surprisingly diverse, and modeling biological processes at the cellular level is consequently a rich source of new insights. Imaging methods are needed that capture some of this diversity, by measuring multiple channels of information at the same time for each cell, to provide empirical data that ensures these models make sense in realistic scenarios.
+The taxonomy of cell types and their functional states is surprisingly diverse, and modeling biological processes at the cellular level is consequently a rich source of new insights. Imaging methods are needed that capture some of this diversity, by measuring multiple channels of information at the same time for each cell, to provide empirical data that ensures this modeling makes sense in realistic scenarios.
 
-Multiple-channel imaging technology, capable of measuring several dozen protein targets, is reaching maturity. Multiplexed immunofluoresence, imaging mass cytometry, and their variants measure data similar to what is measured by flow cytometry or single-cell RNA-seq, since this is also at the single-cell level and involves multiple quantitative features, but with the crucial advantage that cell positions are also observed -- spatial context.
+Multiple-channel imaging technology capable of measuring several dozen protein targets is reaching maturity. Multiplexed immunofluoresence, imaging mass cytometry, and their variants measure data similar to what is measured by flow cytometry or single-cell RNA-seq, since this is also at the single-cell level and involves multiple quantitative features, but with the crucial advantage that cell positions are also observed -- spatial context.
 
-The Spatial Multiomics Profiler (SMProfiler) project is about making the most of this informative data source using quality software. The guiding principles are:
+The Spatial Multiomics Profiler (SMProfiler) project is about making the most of this informative data source. The guiding principles are:
 
 |       |                      |         |
 |-------|----------------------|---------|
@@ -37,8 +37,8 @@ The Spatial Multiomics Profiler (SMProfiler) project is about making the most of
 SMProfiler is available to the public at [smprofiler.io](https://smprofiler.io).
 
 <p align="center">
-<a href="docs/image_assets/diagram_medium_res.png">
-<img src="docs/image_assets/diagram_low_res.png"/>
+<a href="docs/image_assets/system_diagram.pdf">
+<img src="docs/image_assets/system_diagram.pdf"/>
 </a>
 </p>
 
@@ -198,7 +198,7 @@ Some others are TUIs (Terminal User Interfaces) meant to make common tasks, like
 
 Example usage is shown below.
 
-![alt](docs/image_assets/uploader_example.png)
+![alt](docs/image_assets/dataset_upload.png)
 
 The ETL (Extract/Transform/Load) process includes a number of data integrity checks and the creation of several intermediate data artifacts.
 
