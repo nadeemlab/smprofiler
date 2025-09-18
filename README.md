@@ -18,7 +18,7 @@
     - [1. Compute a cell-set-to-cell-set proximity metric in realtime](#compute-proximity)
     - [2. Save and share results](#save-and-share)
   - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
-    - [1. Choose cell phenotypes](#choose-cell-phenotypes-orion)
+    - [1. Observe tissue geometry patterning](#observe-tissue)
     - [2. Assess region enrichment with Fisher test](#fisher-test)
 - [Data management](#data-management)
 - [CLI command reference](#cli-command-reference)
@@ -153,13 +153,22 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 ![alt](docs/image_assets/f12.png)
 
 ## <a id="orion-slide-viewer"></a> Example: B cell aggregation in colon cancer
-- [1. Choose cell phenotypes](#choose-cell-phenotypes-orion)
-- [2. Assess region enrichment with Fisher test](#fisher-test)
+[1. Observe tissue geometry patterning](#observe-tissue)
+[2. Assess region enrichment with Fisher test](#fisher-test)
 
-### <a id="choose-cell-phenotypes-orion"></a> Choose cell phenotypes
+### <a id="choose-cell-phenotypes-orion"></a> Observe tissue geometry patterning 
+Select study **HTAN Orion CRC** and phenotypes:
+- T cytotoxic
+- Epithelium
+- B cell
+Review slide **C12** and observe the differing tissue localization.
 ![alt](docs/image_assets/o1.png)
 
 ### <a id="fisher-test"></a> Assess region enrichment with Fisher test
+A cluster of B cells is apparent, which we can assess by selecting this region with the drawing tool.
+
+The assessment shows 25% baseline prevalence of B cells in this slide, elevated to 76% in the selected region. The Fisher test contingency table is shown.
+
 ![alt](docs/image_assets/o2.png)
 
 # Data management
