@@ -72,7 +72,7 @@ The next page shows the cell population breakdown with respect to the phenotypes
 In the grid, each *pair* of phenotypes is shown with the fraction of cells expressing *both* phenotypes. For example, the fraction of cells that are both **CD3+ CD4+ FOXP3+** and **CD3+** is 16.53%, the same as the fraction of cells that are **CD3+ CD4+ FOXP3+**, as expected since **CD3+** is part of the signature of this phenotype (the T regulatory cells).
 
 > [!NOTE]
-> :bar_chart: You could use this technique to make a standard heat map for assessment of clusters, by selecting all single-channel phenotypes. Depending on the size of the samples, since these metrics are computed live, this could take up to 1 minute per computed value, and sometimes longer.
+> :bar_chart: You could use this technique to make a standard heat map for assessment of clusters, by selecting all single-channel phenotypes. Since these metrics are computed live, depending on the size of the samples and the number of selected markers, this could take a few minutes.
 
 ![alt](docs/image_assets/f4.png)
 
