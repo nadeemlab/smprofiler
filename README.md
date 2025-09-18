@@ -201,6 +201,11 @@ We can involve the spatial context in our whole-database assessment by computing
 </a>
 </p>
 
+## <a id="intensity-masking"></a> Example: Intensity masking to highlight tissue structure in bone marrow
+
+Select the **Bone marrow aging** study, and in the Slide Viewer choose sample **WCM32** and channel **distance_to_trabecules**. This is a virtual channel, associating to each cell its distance to a tissue structure identified by the study [^2]. The cells shown in gray have smaller distance, and so are closer to the tissue structure.
+
+![alt](docs/image_assets/bm_t.png)
 
 # Data management
 To support this project's semantic integrity goals, we designed a general data model and ontology for cell-resolved measurement studies, using a schema-authoring system we call the Application Data Interface (ADI) framework.
@@ -296,6 +301,7 @@ The application can be deployed in several ways:
 - On a Kubernetes cluster using a cloud provider
 
 [^1]: Moldoveanu et al. [*Spatially mapping the immune landscape of melanoma using imaging mass cytometry*](https://doi.org/10.1126/sciimmunol.abi5072)
+[^2]: Sarachakov et al. [*Spatial mapping of human hematopoiesis at single-cell resolution reveals aging-associated topographic remodeling*](https://doi.org/10.1182/blood.2023021280)
 
 ## License
 © [Nadeem Lab](https://nadeemlab.org/) - SMProfiler code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes.
