@@ -20,6 +20,9 @@
   - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
     - [1. Observe tissue geometry patterning](#observe-tissue)
     - [2. Assess region enrichment with Fisher test](#fisher-test)
+  - [Whole-database assessments for outcome associations](#whole-database-assessments)
+    - [1. Using all single marker cell phenotypes, frequency](#single-marker)
+    - [2. Using all marker pairs, spatial proximity](#marker-pairs)
 - [Data management](#data-management)
 - [CLI command reference](#cli-command-reference)
   - [Dataset uploader](#dataset-uploader)
@@ -171,6 +174,15 @@ A cluster of B cells is apparent, which we can assess by selecting this region w
 The assessment shows 25% baseline prevalence of B cells in this slide, elevated to 76% in the selected region. The Fisher test contingency table is shown.
 
 ![alt](docs/image_assets/o2.png)
+
+## <a id="whole-database-assessments"></a> Whole-database assessments for outcome associations
+1. [Using all single marker cell phenotypes, frequency](#single-marker)
+2. [Using all marker pairs, spatial proximity](#marker-pairs)
+
+### <a id="single-marker"></a> Using all single marker cell phenotypes, frequency
+
+![alt](docs/image_assets/ccutoff.png)
+### <a id="marker-pairs"></a> Using all marker pairs, spatial proximity
 
 # Data management
 To support this project's semantic integrity goals, we designed a general data model and ontology for cell-resolved measurement studies, using a schema-authoring system we call the Application Data Interface (ADI) framework.
