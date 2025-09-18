@@ -159,7 +159,7 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 1. [Observe tissue geometry patterning](#observe-tissue)
 2. [Assess region enrichment with Fisher test](#fisher-test)
 
-### <a id="choose-cell-phenotypes-orion"></a> Observe tissue geometry patterning 
+### <a id="choose-cell-phenotypes-orion"></a> Observe tissue geometry patterning
 Select study **HTAN Orion CRC** and phenotypes:
 - **T cytotoxic**
 - **Epithelium**
@@ -183,7 +183,7 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 
 <p align="center">
 <a href="https://smprofiler.io/channel-overview">
-<img src="docs/image_assets/ccutoff.png" width="400" />
+<img src="docs/image_assets/ccutoff.png" width=""/>
 </a>
 </p>
 
@@ -285,7 +285,7 @@ The application can be deployed in several ways:
 [^1]: Moldoveanu et al. [*Spatially mapping the immune landscape of melanoma using imaging mass cytometry*](https://doi.org/10.1126/sciimmunol.abi5072)
 
 ## License
-© [Nadeem Lab](https://nadeemlab.org/) - SMProfiler code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes. 
+© [Nadeem Lab](https://nadeemlab.org/) - SMProfiler code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes.
 
 ## Funding
 This work is funded by the 7-year NIH/NCI R37 MERIT Award ([R37CA295658](https://reporter.nih.gov/search/5dgSOlHosEKepkZEAS5_kQ/project-details/11018883#description)).
