@@ -110,7 +110,7 @@ A UMAP dimensional reduction of the cell set across the whole data collection is
 
 We spot a region that looks "saturated" with Tc cells. Select it by clicking and dragging the mouse while holding either the **Ctrl** key or (on Mac) **CMD**.
 
-The new cell count for each phenotype is now shown, together with the new percentage, relative to the selection. In this case the Tc fraction approximately doubled, to **6996** cells (shown in green). This increase is assessed using the Fisher test (the entire contingency table is also shown, for reference). The test verifies that the increase is highly statistically significant in this case, as expected.
+The new cell count for each phenotype is now shown, together with the new percentage, relative to the selection. In this case the Tc fraction approximately doubled, to **5659** cells (shown in green). This increase is assessed using the Fisher test (the entire contingency table is also shown, for reference). The test verifies that the increase is highly statistically significant in this case, as expected.
 
 > [!NOTE]
 > By careful use of the selection tool, noting enrichments in each virtual region, you can account for most of the cell types present and hone the focus of study.
@@ -124,20 +124,20 @@ The new cell count for each phenotype is now shown, together with the new percen
 ### <a id="compute-proximity"></a> 1. Compute a cell-set-to-cell-set proximity metric in realtime
 Let's see an example of quantification over samples that makes use of the spatial arrangement of cells.
 
-Choose the phenotypes **Naive cytoxic T cell** and **T helper cell antigen-experienced**. Select the tile with row **T helper cell antigen-experienced** and column **Naive cytoxic T cell**, representing the pair of phenotypes.
+Using the same dataset as the previous example, **Melanoma CyTOF ICI**, choose the phenotypes **Naive cytotoxic T cell** and **T helper cell antigen-experienced**. Select the tile with row **T helper cell antigen-experienced** and column **Naive cytotoxic T cell**, representing the pair of phenotypes.
 
 In the column header that appears, click `>`. The **spatial metrics** dropdown appears. Click `v` to show the available metrics. Choose **cell-to-cell proximity**. After the metric is finished computing, click the column header **cell-to-cell proximity** and the two cohorts **1** and **2** to perform a univariate comparison.
 
 This metric is the average number of **Naive cytotoxic T cells** appearing within a specified radius of given **T helper antigen-experienced** cells. It measures generally how common it is to find cells of one phenotype in close proximity to those of another phenotype. There are several other metrics available, of various degrees of statistical sophistication, many computed using the [Squidpy](https://squidpy.readthedocs.io/en/stable/) package. These are explained in more detail in the [API documentation](#api-reference).
 
-![alt](docs/image_assets/f11.png)
+![alt](docs/image_assets/f10.png)
 
-![alt](docs/image_assets/f12.png)
+![alt](docs/image_assets/f11.png)
 
 ### <a id="save-and-share"></a> 2. Save and share results
 :clipboard: You can **share or save results like this for later** by copying the URL in the address bar. In fact, this result is highlighted on the study summary page. Try reproducing it by following the first link as shown below.
 
-![alt](docs/image_assets/f13.png)
+![alt](docs/image_assets/f12.png)
 
 # Data management
 To support this project's semantic integrity goals, we designed a general data model and ontology for cell-resolved measurement studies, using a schema-authoring system we call the Application Data Interface (ADI) framework.
