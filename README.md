@@ -214,7 +214,7 @@ To support this project's semantic integrity goals, we designed a general data m
 
 The schema is called `scstudies` and it is documented in detail [here](https://adiframework.com/docs_site/scstudies_quick_reference.html#).
 
-In our implementation, we sought to strike an effective balance between the completeness of annotation demanded by accurate record-keeping, on the one hand, and practical computational efficiency on the other. Much of the application is organized around a SQL database with a schema that conforms tightly to the formal `scstudies` data model, but we also make liberal use of derivative data artifacts to improve speed and performance. For example, a highly-compressed [binary format](docs/cells.md) is adopted for transmission of a given sample's cell-feature matrix.
+In our implementation, we sought to strike an effective balance between the completeness of annotation demanded by accurate record-keeping, on the one hand, and practicality and computational efficiency on the other. Much of the application is organized around a SQL database with a schema that conforms tightly to the formal `scstudies` data model, but we also make liberal use of derivative data artifacts to improve speed and performance. For example, a highly-compressed [binary format](docs/cells.md) is adopted for transmission of a given sample's cell-feature matrix.
 
 Similarly, datasets that we have curated for uniform data import are stored in a simple tabular file format which does not generally support all the features of the `scstudies` model. This intermediary format is designed for ease of creation and it is not entirely formalized. For an example, see [data_curation/](data_curation/).
 
