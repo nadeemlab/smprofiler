@@ -183,7 +183,7 @@ The datasets transformed and curated for the SMProfiler database are well-harmon
 
 ### <a id="single-marker"></a> 1. Using all single marker cell phenotypes, frequency
 
-In total around 50 markers were imaged across the 12 studies currently available. The all-markers overview assesses each marker for its utility in discriminating between key outcome cohorts within each given dataset, using the fractions of each cell set expressing the marker. The t-test provides a sense of the overall strength and statistical significance of each association found. In the plot (previewed below), each color corresponds to one sample cohort and relative size of each circle pair indicates the effective differential between the two cohorts using the given marker.
+In total around 50 markers were imaged across the 12 studies currently available. The all-markers overview assesses each marker for its utility in discriminating between key outcome cohorts within each given dataset, using the fractions of the cell set expressing the marker. The t-test provides a sense of the overall strength and statistical significance of any association found. In the plot (previewed below), the colors correspond to one sample cohort and relative size of a circle pair indicates the effective differential between the two cohorts using the given marker.
 
 <p align="center">
 <a href="https://smprofiler.io/channel-overview">
