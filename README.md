@@ -11,7 +11,7 @@
 - [CLI command reference](#cli-command-reference)
   - [Dataset uploader](#dataset-uploader)
 - [API reference](#api-reference)
-- [Development and maintenance](#development-and-maintenance)
+- [Testing, development, and maintenance](#testing-development-maintenance)
 - [Deployment options](#deployment-options)
   - [License](#license)
 
@@ -159,7 +159,6 @@ Installation makes several commands available in the shell. List them with `smpr
 
 ```sh
 $ smprofiler
-...
 
 smprofiler apiserver dump-schema
 
@@ -173,7 +172,9 @@ smprofiler graphs plot-interactives
 smprofiler graphs prepare-graph-creation
 smprofiler graphs upload-importances
 
+smprofiler db cache-subsample
 smprofiler db collection
+smprofiler db count-cells
 smprofiler db delete-feature
 smprofiler db do-fractions-tests
 smprofiler db drop
@@ -181,12 +182,14 @@ smprofiler db drop-ondemand-computations
 smprofiler db guess-channels-from-object-files
 smprofiler db interactive-uploader
 smprofiler db list-studies
-smprofiler db load-query
+smprofiler db load-testing
 smprofiler db retrieve-feature-matrices
+smprofiler db review-submissions
 smprofiler db status
+smprofiler db sync-annotations
 smprofiler db upload-sync-small
 
-smprofiler ondemand cache-expressions-data-array
+smprofiler ondemand assess-recreate-cache
 smprofiler ondemand start
 
 smprofiler workflow aggregate-core-results
@@ -195,7 +198,6 @@ smprofiler workflow core-job
 smprofiler workflow generate-run-information
 smprofiler workflow initialize
 smprofiler workflow merge-performance-reports
-smprofiler workflow report-on-logs
 smprofiler workflow report-run-configuration
 smprofiler workflow tail-logs
 ```
@@ -207,7 +209,7 @@ Several commands are mainly for use internal to the application components.
 Some others are TUIs (Terminal User Interfaces) meant to make common tasks, like uploading datasets or inspecting cache or metadata, more reliable.
 
 ## Dataset uploader
-`smprofiler db interactive-uploader` is a TUI that automatically determines available data sources and targets after you have created or located source datasets (format: [data_curation/](data_curation/)). It looks for [database configuration files](smprofiler//workflow/assets/.smprofiler_db.config.template) named `~/.smprofiler_db.config.*`, checks the environment variable `SMProfiler_S3_BUCKET`, and searches recursively for datasets in the current working directory named `generated_artifacts`. It presents available options and initiates the upload process.
+`smprofiler db interactive-uploader` is a TUI that automatically determines available data sources and targets after you have created or located source datasets (format: [data_curation/](data_curation/)). It looks for [database configuration files](smprofiler//workflow/assets/.smprofiler_db.config.template) named `~/.smprofiler_db.config.*`, checks the environment variable `SMPROFILER_S3_BUCKET`, and searches recursively for datasets in the current working directory named `generated_artifacts`. It presents available options and initiates the upload process.
 
 Example usage is shown below.
 
@@ -218,18 +220,17 @@ The ETL (Extract/Transform/Load) process includes a number of data integrity che
 # API reference
 The SMProfiler application is supported by a web API, which provides fine-grained access to specific components of a given dataset. The API is documented [here](https://smprofiler.io/api/redoc).
 
-# Development and maintenance
+# <a id="testing-development-maintenance"></a> Testing, development, and maintenance
 See [docs/maintenance.md](docs/maintenance.md).
 
 # Deployment options
-For assistance setting up a deployment of the SMProfiler application for your institution or lab, write to us at [nadeems@mskcc.org](nadeems@mskcc.org).
+For assistance setting up a deployment of the SMProfiler application for your institution or lab, send us an email at [nadeems@mskcc.org](nadeems@mskcc.org).
 
 The application can be deployed in several ways:
 
 - As manually-managed services on a single server
 - Using Docker compose
 - On a Kubernetes cluster using a cloud provider
-
 
 [^1]: Moldoveanu et al. [*Spatially mapping the immune landscape of melanoma using imaging mass cytometry*](https://doi.org/10.1126/sciimmunol.abi5072)
 
