@@ -50,6 +50,9 @@ SMProfiler is available to the public at [smprofiler.io](https://smprofiler.io).
 3. [Aggregate cell population fractions and overlaps](#aggregate-cell-population-fractions-and-overlaps)
 4. [Check per-sample values](#check-per-sample-values)
 5. [Assess phenotype fractions between cohorts](#assess-fractions)
+6. [Assess ratios between cohorts](#assess-ratios)
+7. [Open slide viewer](#open-slide-viewer)
+8. [UMAP visualization](#umap-simple)
 
 ### <a id="select-a-study"></a> 1. Select a study
 On the main page, select **Melanoma CyTOF ICI**. This brings up a dataset that was collected and published by Moldoveanu et al.[^1].
@@ -89,16 +92,19 @@ Click on the column header **CD3+ CD8A+** (it becomes underlined to indicate tha
 
 ![alt](docs/image_assets/f6.png)
 
+### <a id="assess-ratios"></a> 6. Assess ratios between cohorts
 We click on column **CD3+ CD4+ FOXP3+**, in addition to the prior selection. A similar assessment appears, this time with respect to the ratio of the number of **CD3+ CD8A+** (the first selection) to **CD3+ CD4+ FOXP3+** (the second selection).
 
 ![alt](docs/image_assets/f7.png)
 
+### <a id="open-slide-viewer"></a> 7. Open slide viewer
 Let's focus our attention on one of the samples that exhibited a large fraction of Tc cells. Click **31RD**.
-
-![alt](docs/image_assets/f8.png)
 
 The "virtual slide viewer" opens. Choose a few phenotypes, and the corresponding cells will become highlighted. The fraction and count of the cells for each phenotype are shown.
 
+![alt](docs/image_assets/f7.png)
+
+### <a id="umap-simple"></a> 8. UMAP visualization
 ![alt](docs/image_assets/f9.png)
 
 A UMAP dimensional reduction of the cell set across the whole data collection is available in this case. Click **UMAP**.
