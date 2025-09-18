@@ -45,21 +45,27 @@ SMProfiler is available to the public at [smprofiler.io](https://smprofiler.io).
 # User tutorial
 
 ## Example: Exploratory data analysis of immunotherapy response in melanoma
+1. [Select a study](#select-a-study)
+2. [Choose cell phenotypes](#choose-cell-phenotypes)
+3. [Aggregate cell population fractions and overlaps](#aggregate-cell-population-fractions-and-overlaps)
+4. [Check per-sample values](#check-per-sample-values)
+5. [Assess phenotype fractions between cohorts](#assess-fractions)
 
+### <a id="select-a-study"></a> 1. Select a study
 On the main page, select **Melanoma CyTOF ICI**. This brings up a dataset that was collected and published by Moldoveanu et al.[^1].
 
 You'll see a summary of this dataset, including the numbers of samples, cells, and channels, links to relevant publications, classification of the samples, and highlighted findings that can be observed by using the SMProfiler application. In this case the study collected samples from patients treated with immune-checkpoint inhibitor therapy, and the patients either responded favorably or poorly to this treatment.
 
 ![alt](docs/image_assets/f1.png)
 
+### <a id="choose-cell-phenotypes"></a> 2. Choose cell phenotypes
 On the next page you can choose which cell phenotypes you want to focus on. Click one of the pre-defined phenotypes, or define a custom phenotype by indicating positive and negative markers from among the channels which were imaged.
-
-![alt](docs/image_assets/f2.png)
 
 We select five custom phenotypes. The first phenotype, for example, was defined by clicking the **+** beside **CD3+**, then clicking **Add to selection**. This generally indicates the T cells. The second phenotype is **CD3+ CD4+**, the markers of T helper cells. We also include: **CD3+ CD8A+**, **CD3+ CD4+ FOXP3+**, and **CD20+ CD3-**. We are ascertaining the rough profile of lymphocytes in the dataset.
 
 ![alt](docs/image_assets/f3.png)
 
+### <a id="aggregate-cell-population-fractions-and-overlaps"></a> 3. Aggregate cell population fractions and overlaps
 The next page shows the cell population breakdown with respect to the phenotypes we've just selected. Each phenotype is shown with the fraction of cells expressing that phenotype across all samples, for example 54.02% are indicated as T cells.
 
 In the grid, each *pair* of phenotypes is shown with the fraction of cells expressing *both* phenotypes. For example, the fraction of cells that are both **CD3+ CD4+ FOXP3+** and **CD3+** is 16.53%, the same as the fraction of cells that are **CD3+ CD4+ FOXP3+**, as expected since **CD3+** is part of the signature of this phenotype (the T regulatory cells).
@@ -69,6 +75,7 @@ In the grid, each *pair* of phenotypes is shown with the fraction of cells expre
 
 ![alt](docs/image_assets/f4.png)
 
+### <a id="check-per-sample-values"></a> 4. Check per-sample values
 To continue with a finer analysis, click one of the "tiles", either for one phenotype (the tiles on the left) or two phenotypes (the grid on the right).
 
 We choose the tile at row **CD3+ CD4+ FOXP3+** (Treg) and column **CD3+ CD8A+** (Tc). The table below populates with the size of the population of cells expressing both signatures, broken down by sample. Note that in reality there are generally few cells expressing both of these two specific suites of markers, and the few cells occuring here are probably the result of an imperfect stain intensity dichotomization (thresholding, gating). So this tool can be used to do basic quality control in case some logical or illogical marker combinations are known in advance.
@@ -77,6 +84,7 @@ We also selected the single-phenotype tiles **CD3+ CD4+ FOXP3+** and **CD3+ CD8A
 
 ![alt](docs/image_assets/f5.png)
 
+### <a id="assess-fractions"></a> 5. Assess phenotype fractions between cohorts
 Click on the column header **CD3+ CD8A+** (it becomes underlined to indicate that it is selected). Then select the two cohorts by clicking one of the **1** values and one of the **2** values. A "verbalization" appears which states that the trend, according to a t-test, is that the fraction of Tc cells is increased about 1.5 times in the non-responder cohort compared to the responders, with statistical significance value p=0.1.
 
 ![alt](docs/image_assets/f6.png)
