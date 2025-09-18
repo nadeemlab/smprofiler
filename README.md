@@ -17,6 +17,9 @@
   - [Example: Spatially-informed metrics](#spatially-informed-metrics)
     - [1. Compute a cell-set-to-cell-set proximity metric in realtime](#compute-proximity)
     - [2. Save and share results](#save-and-share)
+  - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
+    - [1. Choose cell phenotypes](#choose-cell-phenotypes-orion)
+    - [2. Assess region enrichment with Fisher test](#fisher-test)
 - [Data management](#data-management)
 - [CLI command reference](#cli-command-reference)
   - [Dataset uploader](#dataset-uploader)
@@ -148,6 +151,16 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 :clipboard: You can **share or save results like this for later** by copying the URL in the address bar. In fact, this result is highlighted on the study summary page. Try reproducing it by following the first link as shown below.
 
 ![alt](docs/image_assets/f12.png)
+
+## <a id="orion-slide-viewer"></a> Example: B cell aggregation in colon cancer
+- [1. Choose cell phenotypes](#choose-cell-phenotypes-orion)
+- [2. Assess region enrichment with Fisher test](#fisher-test)
+
+### <a id="choose-cell-phenotypes-orion"></a> Choose cell phenotypes
+![alt](docs/image_assets/o1.png)
+
+### <a id="fisher-test"></a> Assess region enrichment with Fisher test
+![alt](docs/image_assets/o2.png)
 
 # Data management
 To support this project's semantic integrity goals, we designed a general data model and ontology for cell-resolved measurement studies, using a schema-authoring system we call the Application Data Interface (ADI) framework.
