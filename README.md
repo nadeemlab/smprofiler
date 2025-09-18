@@ -183,7 +183,7 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 
 <p align="center">
 <a href="https://smprofiler.io/channel-overview">
-<img src="docs/image_assets/ccutoff.png"/>
+<img src="docs/image_assets/ccutoff.png" width="400" />
 </a>
 </p>
 
