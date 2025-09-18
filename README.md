@@ -23,6 +23,7 @@
   - [Whole-database assessments for outcome associations](#whole-database-assessments)
     - [1. Using all single marker cell phenotypes, frequency](#single-marker)
     - [2. Using all marker pairs, spatial proximity](#marker-pairs)
+  - [Example: Intensity masking to highlight tissue structure in bone marrow](#intensity-masking)
 - [Data management](#data-management)
 - [CLI command reference](#cli-command-reference)
   - [Dataset uploader](#dataset-uploader)
