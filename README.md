@@ -2,13 +2,11 @@
 <p align="center">
 <img src="docs/image_assets/smprofiler-logo.svg" width="400"/>
 </p>
-<br/>
-<br/>
 
 - [What do cell profiles tell us about biology and disease?](#what-do-cell-profiles-tell-us-about-biology-and-disease)
 - [User tutorial](#user-tutorial)
   - [Example: Exploratory data analysis of immunotherapy response in melanoma](#example-exploratory-data-analysis-of-immunotherapy-response-in-melanoma)
-  - [Spatially-informed metrics](#spatially-informed-metrics)
+  - [Example: Spatially-informed metrics](#spatially-informed-metrics)
 - [Data management](#data-management)
 - [CLI command reference](#cli-command-reference)
   - [Dataset uploader](#dataset-uploader)
@@ -105,8 +103,6 @@ The "virtual slide viewer" opens. Choose a few phenotypes, and the corresponding
 ![alt](docs/image_assets/f7.png)
 
 ### <a id="umap-simple"></a> 8. UMAP visualization
-![alt](docs/image_assets/f9.png)
-
 A UMAP dimensional reduction of the cell set across the whole data collection is available in this case. Click **UMAP**.
 
 > [!NOTE]
@@ -121,8 +117,11 @@ The new cell count for each phenotype is now shown, together with the new percen
 
 ![alt](docs/image_assets/f10.png)
 
-## Spatially-informed metrics
+## Example: Spatially-informed metrics
+1. [Compute a cell-set-to-cell-set proximity metric in realtime](#compute-proximity)
+2. [Save and share results](#save-and-share)
 
+### <a id="compute-proximity"></a> 1. Compute a cell-set-to-cell-set proximity metric in realtime
 Let's see an example of quantification over samples that makes use of the spatial arrangement of cells.
 
 Choose the phenotypes **Naive cytoxic T cell** and **T helper cell antigen-experienced**. Select the tile with row **T helper cell antigen-experienced** and column **Naive cytoxic T cell**, representing the pair of phenotypes.
@@ -135,8 +134,8 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 
 ![alt](docs/image_assets/f12.png)
 
-> [!NOTE]
-> :clipboard: You can **save results like this for later** by copying the URL in the address bar. In fact, this result is highlighted on the study summary page. Try reproducing it by following the first link as shown below.
+### <a id="save-and-share"></a> 2. Save and share results
+:clipboard: You can **share or save results like this for later** by copying the URL in the address bar. In fact, this result is highlighted on the study summary page. Try reproducing it by following the first link as shown below.
 
 ![alt](docs/image_assets/f13.png)
 
