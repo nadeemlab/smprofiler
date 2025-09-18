@@ -57,12 +57,12 @@ Running docker compose rm (remove) <span style="color:olive;">...</span><span st
 </pre>
 4. `make build-application-images`
 <p align="center">
-<img src="docs/image_assets/make_build_example.png"/>
+<img src="image_assets/make_build_example.png"/>
 </p>
 
 5. `make test`
 <p align="center">
-<img src="docs/image_assets/make_test_example.png"/>
+<img src="image_assets/make_test_example.png"/>
 </p>
 
 Optionally, if the images are ready to be released: `make build-and-push-docker-images`.
