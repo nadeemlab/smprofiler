@@ -178,7 +178,7 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 
 ## <a id="channel-intensity"></a> Example: Channel intensity for phenotyping in bone marrow
 
-Select the **Bone marrow aging** study, channel **CD61** with additional phenotype **Megakaryocyte**, and in the Slide Viewer select sample **WCM10**. In this study, a detailed model was trained to detect specific cell types from a number of imaging features. Megakaryocytes were associated with elevated CD61 levels, and in this example we can compare the **Megakaryocyte** assignments with the **CD61** expression levels by using the channel intensity threshold adjustment.
+Select the **Bone marrow aging** study [^2], channel **CD61** with additional phenotype **Megakaryocyte**, and in the Slide Viewer select sample **WCM10**. In this study, a detailed model was trained to detect specific cell types from a number of imaging features. Megakaryocytes were associated with elevated CD61 levels, and in this example we can compare the **Megakaryocyte** assignments with the **CD61** expression levels by using the channel intensity threshold adjustment.
 
 ![alt](docs/image_assets/intensity_example_cd61.png)
 
