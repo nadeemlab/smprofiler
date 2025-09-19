@@ -178,9 +178,9 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 
 ## <a id="intensity-masking"></a> Example: Intensity masking to highlight tissue structure in bone marrow
 
-Select the **Bone marrow aging** study, and in the Slide Viewer choose sample **WCM32** and channel **distance_to_trabecules**. This is a virtual channel, associating to each cell its distance to a tissue structure identified by the study [^2]. The cells shown in gray have smaller distance, and so are closer to the tissue structure.
+Select the **Bone marrow aging** study, channel **CD61** with additional phenotype **Megakaryocyte**, and in the Slide Viewer select sample **WCM10**. In this study, a detailed model was trained to detect specific cell types from a number of imaging features. Megakaryocytes were associated with elevated CD61 levels, and in this example we can compare the **Megakaryocyte** assignments with the **CD61** expression levels by using the channel intensity threshold adjustment.
 
-![alt](docs/image_assets/bm_t.png)
+![alt](docs/image_assets/intensity_example_cd61.png)
 
 
 ## <a id="whole-database-assessments"></a> Whole-database assessments for outcome associations
