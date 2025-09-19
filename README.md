@@ -20,7 +20,7 @@
   - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
     - [1. Observe tissue geometry patterning](#observe-tissue)
     - [2. Assess region enrichment with Fisher test](#fisher-test)
-  - [Example: Intensity masking to highlight tissue structure in bone marrow](#channel-intensity)
+  - [Example: Example: Channel intensity for phenotyping in bone marrow](#channel-intensity)
   - [Whole-database assessments for outcome associations](#whole-database-assessments)
     - [1. Using all single marker cell phenotypes, frequency](#single-marker)
     - [2. Using all marker pairs, spatial proximity](#marker-pairs)
