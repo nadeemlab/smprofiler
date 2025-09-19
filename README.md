@@ -20,7 +20,7 @@
   - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
     - [1. Observe tissue geometry patterning](#observe-tissue)
     - [2. Assess region enrichment with Fisher test](#fisher-test)
-  - [Example: Intensity masking to highlight tissue structure in bone marrow](#intensity-masking)
+  - [Example: Intensity masking to highlight tissue structure in bone marrow](#channel-intensity)
   - [Whole-database assessments for outcome associations](#whole-database-assessments)
     - [1. Using all single marker cell phenotypes, frequency](#single-marker)
     - [2. Using all marker pairs, spatial proximity](#marker-pairs)
@@ -176,7 +176,7 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 
 ![alt](docs/image_assets/o2.png)
 
-## <a id="intensity-masking"></a> Example: Intensity masking to highlight tissue structure in bone marrow
+## <a id="channel-intensity"></a> Example: Channel intensity for phenotyping in bone marrow
 
 Select the **Bone marrow aging** study, channel **CD61** with additional phenotype **Megakaryocyte**, and in the Slide Viewer select sample **WCM10**. In this study, a detailed model was trained to detect specific cell types from a number of imaging features. Megakaryocytes were associated with elevated CD61 levels, and in this example we can compare the **Megakaryocyte** assignments with the **CD61** expression levels by using the channel intensity threshold adjustment.
 
