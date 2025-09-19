@@ -160,7 +160,7 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 1. [Observe tissue geometry patterning](#observe-tissue)
 2. [Assess region enrichment with Fisher test](#fisher-test)
 
-### <a id="choose-cell-phenotypes-orion"></a> Observe tissue geometry patterning
+### <a id="choose-cell-phenotypes-orion"></a> 1. Observe tissue geometry patterning
 Select study **HTAN Orion CRC** and phenotypes:
 - **T cytotoxic**
 - **Epithelium**
@@ -169,7 +169,7 @@ Select study **HTAN Orion CRC** and phenotypes:
 Review slide **C12** and observe the differing tissue localization.
 ![alt](docs/image_assets/o1.png)
 
-### <a id="fisher-test"></a> Assess region enrichment with Fisher test
+### <a id="fisher-test"></a> 2. Assess region enrichment with Fisher test
 A cluster of B cells is apparent, which we can assess by selecting this region with the drawing tool.
 
 The assessment shows 25% baseline prevalence of B cells in this slide, elevated to 76% in the selected region. The Fisher test contingency table is shown.
