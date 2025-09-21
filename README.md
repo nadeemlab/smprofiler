@@ -156,6 +156,25 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 
 ![alt](docs/image_assets/f12.png)
 
+## <a id="uc-orcid"></a> Example: Submit significant results for attribution
+
+1. [Identify a specific result](#identify-result)
+2. [Submit for attribution using ORCID](#submit-orcid)
+3. [Review contribution on study page](#review-contribution)
+
+### <a id="identify-result"></a> 1. Identify a specific result
+The SMProfiler supports extensive secondary analysis with features computed ondemand that you request during exploratory data analysis. So there is a good chance that you will discover a significant new result relating specific cell phenotypes or spatial statistics to treatment response or prognosis.
+
+### <a id="submit-orcid"></a> 2. Submit for attribution using ORCID
+You can send your contribution for inclusion on the summary page for the study using **Submit significant result**. [ORCID](https://orcid.org/) researcher identifiers are used to attribute the result to you.
+
+![alt](docs/image_assets/u1.png)
+
+### <a id="review-contribution"></a> 3. Review contribution on study page
+Once your contribution has been checked by the SMProfiler team, it is posted on the summary page for the study as in the example below.
+
+![alt](docs/image_assets/u2.png)
+
 ## <a id="orion-slide-viewer"></a> Example: B cell aggregation in colon cancer
 1. [Observe tissue geometry patterning](#observe-tissue)
 2. [Assess region enrichment with Fisher test](#fisher-test)
