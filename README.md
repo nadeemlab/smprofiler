@@ -20,7 +20,7 @@
   - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
     - [1. Observe tissue geometry patterning](#observe-tissue)
     - [2. Assess region enrichment with Fisher test](#fisher-test)
-  - [Example: Intensity masking to highlight tissue structure in bone marrow](#intensity-masking)
+  - [Example: Channel intensity for phenotyping in bone marrow](#channel-intensity)
   - [Whole-database assessments for outcome associations](#whole-database-assessments)
     - [1. Using all single marker cell phenotypes, frequency](#single-marker)
     - [2. Using all marker pairs, spatial proximity](#marker-pairs)
@@ -160,7 +160,7 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 1. [Observe tissue geometry patterning](#observe-tissue)
 2. [Assess region enrichment with Fisher test](#fisher-test)
 
-### <a id="choose-cell-phenotypes-orion"></a> Observe tissue geometry patterning
+### <a id="choose-cell-phenotypes-orion"></a> 1. Observe tissue geometry patterning
 Select study **HTAN Orion CRC** and phenotypes:
 - **T cytotoxic**
 - **Epithelium**
@@ -169,19 +169,18 @@ Select study **HTAN Orion CRC** and phenotypes:
 Review slide **C12** and observe the differing tissue localization.
 ![alt](docs/image_assets/o1.png)
 
-### <a id="fisher-test"></a> Assess region enrichment with Fisher test
+### <a id="fisher-test"></a> 2. Assess region enrichment with Fisher test
 A cluster of B cells is apparent, which we can assess by selecting this region with the drawing tool.
 
 The assessment shows 25% baseline prevalence of B cells in this slide, elevated to 76% in the selected region. The Fisher test contingency table is shown.
 
 ![alt](docs/image_assets/o2.png)
 
-## <a id="intensity-masking"></a> Example: Intensity masking to highlight tissue structure in bone marrow
+## <a id="channel-intensity"></a> Example: Channel intensity for phenotyping in bone marrow
 
-Select the **Bone marrow aging** study, and in the Slide Viewer choose sample **WCM32** and channel **distance_to_trabecules**. This is a virtual channel, associating to each cell its distance to a tissue structure identified by the study [^2]. The cells shown in gray have smaller distance, and so are closer to the tissue structure.
+Select the **Bone marrow aging** study [^2], channel **CD61** with additional phenotype **Megakaryocyte**, and in the Slide Viewer select sample **WCM10**. In this study, a detailed model was trained to detect specific cell types from a number of imaging features. Megakaryocytes were associated with elevated CD61 levels, and in this example we can compare the **Megakaryocyte** assignments with the **CD61** expression levels by using the channel intensity threshold adjustment.
 
-![alt](docs/image_assets/bm_t.png)
-
+![alt](docs/image_assets/intensity_example_cd61.png)
 
 ## <a id="whole-database-assessments"></a> Whole-database assessments for outcome associations
 1. [Using all single marker cell phenotypes, frequency](#single-marker)
