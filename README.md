@@ -182,7 +182,6 @@ Select the **Bone marrow aging** study [^2], channel **CD61** with additional ph
 
 ![alt](docs/image_assets/intensity_example_cd61.png)
 
-
 ## <a id="whole-database-assessments"></a> Whole-database assessments for outcome associations
 1. [Using all single marker cell phenotypes, frequency](#single-marker)
 2. [Using all marker pairs, spatial proximity](#marker-pairs)
