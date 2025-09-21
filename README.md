@@ -203,6 +203,8 @@ For example, in the row for antigen-experience-indicating marker **CD45RO** for 
 
 We can involve the spatial context in our whole-database assessment by computing the cell-set-to-cell-set proximity metric for each pair of markers. It is expected that the cohort discriminations provided by such marker pairs augments the results identified using dissociated cell sets defined by single markers (the fractions features), since these are based on an independent source of information.
 
+As an example, in the row for **CD31** (typically indicating endothelium) and column **FOXP3** (indicating T regulatory cells), the circle plot (light and dark red) suggests that T regs are found near endothelial cells about twice as frequently in glioblastomas of patients who will not survive to 1 year post-surgery, compared with those surviving 1-3 years.
+
 <p align="center">
 <a href="https://smprofiler.io/proximity-overview">
 <img src="docs/image_assets/pcutoff_lores.png" width="400"/>
