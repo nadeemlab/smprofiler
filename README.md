@@ -192,6 +192,7 @@ The datasets transformed and curated for the SMProfiler database are well-harmon
 
 In total around 50 markers were imaged across the 12 studies currently available. The all-markers overview assesses each marker for its utility in discriminating between key outcome cohorts within each given dataset, using the fractions of the cell set expressing the marker. The t-test provides a sense of the overall strength and statistical significance of any association found. In the plot (previewed below), the colors correspond to one sample cohort and relative size of a circle pair indicates the effective differential between the two cohorts using the given marker.
 
+For example, in the row for antigen-experience-indicating marker **CD45RO** for the **Head and neck mpIF** study column, the circles plot (green and gray) shows that about 50% more experienced lymphocytes are found in the samples from patients who will clear the disease (cancer) compared with patients who will not.
 <p align="center">
 <a href="https://smprofiler.io/channel-overview">
 <img src="docs/image_assets/ccutoff.png" width="400"/>
