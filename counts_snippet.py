@@ -6,7 +6,7 @@ from smprofiler.ondemand.cell_data_cache import CellDataCache
 from smprofiler.db.database_connection import DBConnection
 
 def count_precomputed_dichotomized():
-    study = open('study.txt', 'rt', encoding='utf-8').read() 
+    study = open('study.txt', 'rt', encoding='utf-8').read().rstrip() 
     job = ComputationJobReference(17, study, 'WCM1')
     connection = DBConnection(database_config_file=expanduser('~/.smprofiler_db.config.aws.prod'), study=study)
     connection.__enter__()
