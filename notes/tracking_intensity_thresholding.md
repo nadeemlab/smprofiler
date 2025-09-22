@@ -63,5 +63,24 @@ Sep 22 2025
 
 # Case C:
 - Run curation script portion which computes dichotomized values, save threshold (or use previously saved?) for specific channel.
+- threshold.csv entry:
+```txt
+sample,channel,final_threshold,singly_optimized,original_mean
+WCM1,CD15,30.515562807722702,30.515562807722702,29.731426239013672
+```
+- file_manifest.tsv mentions: 0.csv is WCM1
+- line count 0.csv: 46214
+- saved CD15 intensity column separate
+- thresholds.csv mentions: WCM1, CD15, 30.515562807722702
+- with given 0.csv values and given saved threshold for CD15, get total positives: 28134 (so, discrepant)
+- after recomputed thresholds.csv...
+- positives: 28611 (still discrepant)
 
+# Rerunning threshold optimization
+- works from original hdf5 dataframe
+- uses smprofiler threshold optimization, a per-sample optimization starting from given signature-defined assignments
+- results don't seem to be much different. specifically:
+  - WCM1, CD15: 29.64304469917444
+
+# Compare recreated generated_artifacts with saved intensity data, as well as S3 bucket snapshots
 
