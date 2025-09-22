@@ -88,7 +88,7 @@ class GenericJobComputer(ABC):
     def handle_insert_value(self, value: float | None, allow_null: bool=True) -> None:
         if value is not None:
             self._insert_value(value)
-            self._pop_off_queue()
+            #self._pop_off_queue()
         else:
             self._warn_no_value()
             if allow_null:
