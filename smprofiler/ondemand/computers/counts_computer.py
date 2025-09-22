@@ -64,6 +64,18 @@ class CountsComputer(GenericJobComputer):
         to 1 along the bits indicated by the positives mask, and equal to 0 along the bits indicated
         by the negatives mask.
         """
+        logger.info('_get_count called')
+        for i in range(15):
+            logger.info(f'Case {i}: {format(array_phenotype[i], "064b")}')
+        logger.info('...')
+        L = len(array_phenotype)
+        for i in range(15):
+            logger.info(f'Case {L-i-1}: {format(array_phenotype[L-i-1], "064b")}')
+        logger.info(f'positives_mask: {format(positives_mask, "064b")}')
+        logger.info(f'negatives_mask: {format(negatives_mask, "064b")}')
+        logger.info(f'len(array_phenotype): {len(array_phenotype)}')
+        logger.info(f'sum(array_phenoytpe | positives_mask == array_phenotype): {sum(array_phenotype | positives_mask == array_phenotype)}')
+        logger.info(f'sum(array_phenoytpe | negatives_mask == array_phenotype): {sum(array_phenotype | negatives_mask == array_phenotype)}')
         return sum((array_phenotype | positives_mask == array_phenotype) &
                    (~array_phenotype | negatives_mask == ~array_phenotype))
 
