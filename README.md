@@ -20,7 +20,7 @@
   - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
     - [1. Observe tissue geometry patterning](#observe-tissue)
     - [2. Assess region enrichment with Fisher test](#fisher-test)
-  - [Example: Submit significant results for attribution](#uc-orcid)
+  - [Example: Submit significant results with attribution](#uc-orcid)
     - [1. Identify a specific result](#identify-result)
     - [2. Submit for attribution using ORCID](#submit-orcid)
     - [3. Review contribution on study page](#review-contribution)
@@ -163,7 +163,7 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 
 ![alt](docs/image_assets/f12.png)
 
-## <a id="uc-orcid"></a> Example: Submit significant results for attribution
+## <a id="uc-orcid"></a> Example: Submit significant results with attribution
 
 1. [Identify a specific result](#identify-result)
 2. [Submit for attribution using ORCID](#submit-orcid)
@@ -172,8 +172,12 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 ### <a id="identify-result"></a> 1. Identify a specific result
 The SMProfiler supports extensive secondary analysis with features computed ondemand that you request during exploratory data analysis. So there is a good chance that you will discover a significant new result relating specific cell phenotypes or spatial statistics to treatment response or prognosis.
 
+Most of the time that you are using the application, you can use the URL as described above in [Save and share results](#save-and-share) to share what you have found with others.
+
+However for the **precise, quantitative results** found in the analysis tab, with statistical assessment, you can also submit your finding for official recognition on the summary page for the study.
+
 ### <a id="submit-orcid"></a> 2. Submit for attribution using ORCID
-You can send your contribution for inclusion on the summary page for the study using **Submit significant result**. [ORCID](https://orcid.org/) researcher identifiers are used to attribute the result to you.
+You can send your contribution using **Submit significant result**. [ORCID](https://orcid.org/) researcher identifiers are used to attribute the result to you.
 
 ![alt](docs/image_assets/u1.png)
 
