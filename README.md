@@ -25,6 +25,9 @@
     - [2. Submit for attribution using ORCID](#submit-orcid)
     - [3. Review contribution on study page](#review-contribution)
   - [Example: Channel intensity for phenotyping in bone marrow](#channel-intensity)
+  - [Example: Graph Neural Network detects motifs in immunotherapy non-responders](#gnn-non-responders)
+    - [1. Train the GNN](#train-gnn)
+    - [2. Profile of pertinent sub-networks by cohort](#important-cells)
   - [Whole-database assessments for outcome associations](#whole-database-assessments)
     - [1. Using all single marker cell phenotypes, frequency](#single-marker)
     - [2. Using all marker pairs, spatial proximity](#marker-pairs)
@@ -204,6 +207,21 @@ The assessment shows 25% baseline prevalence of B cells in this slide, elevated 
 Select the **Bone marrow aging** study [^2], channel **CD61** with additional phenotype **Megakaryocyte**, and in the Slide Viewer select sample **WCM10**. In this study, a detailed model was trained to detect specific cell types from a number of imaging features. Megakaryocytes were associated with elevated CD61 levels, and in this example we can compare the **Megakaryocyte** assignments with the **CD61** expression levels by using the channel intensity threshold adjustment.
 
 ![alt](docs/image_assets/intensity_example_cd61.png)
+
+## <a id="gnn-non-responders"></a> Example: Graph Neural Network detects motifs in immunotherapy non-responders
+
+For this example, select study **Melanoma intralesional IL2**. The study assesses responders and non-responders to interleukin-2 injection immunotherapy.
+
+### <a id="train-gnn"></a> 1. Train the GNN
+
+The information provided by spatial cell position can be used to define graphs or networks of neighboring cells. These cell graphs together with the multiple marker quantification, and response indication per-patient, are used to train a Graph Neural Network to predict this response. For more information on creating these models, see the [documentation](docs/graphs.md).
+
+### <a id="important-cells"></a> 2. Profile of pertinent sub-networks by cohort
+The 100 cells in each slide that are most important to the classification, according to the GNN model, were assessed for phenotype composition. In the plot below, the results of a Fisher test for over-representation are shown, for each phenotype and each slide. The circle size indicates p-value, ranging from p=0 for the largest radius to p=0.05 for the smallest radius 0. The red color indicates the fraction of the 100 most-important cells in the sample which belong to the given phenotype, with 100% corresponding to greatest saturation and 0% corresponding to white.
+
+Some of the most significant patterns are high over-representation of **Adipocytes or Langerhans cells** (defined largely by S100B), among the non-responders.
+
+![alt](docs/image_assets/gnn.png)
 
 ## <a id="whole-database-assessments"></a> Whole-database assessments for outcome associations
 1. [Using all single marker cell phenotypes, frequency](#single-marker)
