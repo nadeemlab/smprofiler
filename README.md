@@ -217,7 +217,7 @@ For this example, select study **Melanoma intralesional IL2**. The study assesse
 The information provided by spatial cell position can be used to define graphs or networks of neighboring cells. These cell graphs together with the multiple marker quantification, and response indication per-patient, are used to train a Graph Neural Network to predict this response. For more information on creating these models, see the [documentation](docs/graphs.md).
 
 ### <a id="important-cells"></a> 2. Profile of pertinent sub-networks by cohort
-The 100 cells in each slide that are most important to the classification, according to the GNN model, were assessed for phenotype composition. In the plot below, the results of a Fisher test for over-representation is shown, for each phenotype and each slide. The circle size indicates p-value, ranging from p=0 for the largest radius to 0.05 for the smallest radius 0. The red color indicates the fraction of the 100 most-important cells in the sample which belong to the given phenotype.
+The 100 cells in each slide that are most important to the classification, according to the GNN model, were assessed for phenotype composition. In the plot below, the results of a Fisher test for over-representation are shown, for each phenotype and each slide. The circle size indicates p-value, ranging from p=0 for the largest radius to 0.05 for the smallest radius 0. The red color indicates the fraction of the 100 most-important cells in the sample which belong to the given phenotype.
 
 Some of the most significant patterns are high over-representation of **Adipocytes or Langerhans cells** (defined largely by S100B), among the non-responders.
 
