@@ -174,7 +174,8 @@ The SMProfiler supports extensive secondary analysis with features computed onde
 
 Most of the time that you are using the application, you can use the URL as described above in [Save and share results](#save-and-share) to share what you have found with others.
 
-However for the **precise, quantitative results** found in the analysis tab, with statistical assessment, you can also submit your finding for official recognition on the summary page for the study.
+> [!NOTE]
+> However for the **precise, quantitative results** found in the analysis tab, with statistical assessment, you can also submit your finding for official recognition on the summary page for the study.
 
 ### <a id="submit-orcid"></a> 2. Submit for attribution using ORCID
 You can send your contribution using **Submit significant result**. [ORCID](https://orcid.org/) researcher identifiers are used to attribute the result to you.
