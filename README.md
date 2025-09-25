@@ -20,6 +20,10 @@
   - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
     - [1. Observe tissue geometry patterning](#observe-tissue)
     - [2. Assess region enrichment with Fisher test](#fisher-test)
+  - [Example: Submit significant results for attribution](#uc-orcid)
+    - [1. Identify a specific result](#identify-result)
+    - [2. Submit for attribution using ORCID](#submit-orcid)
+    - [3. Review contribution on study page](#review-contribution)
   - [Example: Channel intensity for phenotyping in bone marrow](#channel-intensity)
   - [Whole-database assessments for outcome associations](#whole-database-assessments)
     - [1. Using all single marker cell phenotypes, frequency](#single-marker)
@@ -156,6 +160,25 @@ This metric is the average number of **Naive cytotoxic T cells** appearing withi
 
 ![alt](docs/image_assets/f12.png)
 
+## <a id="uc-orcid"></a> Example: Submit significant results for attribution
+
+1. [Identify a specific result](#identify-result)
+2. [Submit for attribution using ORCID](#submit-orcid)
+3. [Review contribution on study page](#review-contribution)
+
+### <a id="identify-result"></a> 1. Identify a specific result
+The SMProfiler supports extensive secondary analysis with features computed ondemand that you request during exploratory data analysis. So there is a good chance that you will discover a significant new result relating specific cell phenotypes or spatial statistics to treatment response or prognosis.
+
+### <a id="submit-orcid"></a> 2. Submit for attribution using ORCID
+You can send your contribution for inclusion on the summary page for the study using **Submit significant result**. [ORCID](https://orcid.org/) researcher identifiers are used to attribute the result to you.
+
+![alt](docs/image_assets/u1.png)
+
+### <a id="review-contribution"></a> 3. Review contribution on study page
+Once your contribution has been checked by the SMProfiler team, it is posted on the summary page for the study as in the example below.
+
+![alt](docs/image_assets/u2.png)
+
 ## <a id="orion-slide-viewer"></a> Example: B cell aggregation in colon cancer
 1. [Observe tissue geometry patterning](#observe-tissue)
 2. [Assess region enrichment with Fisher test](#fisher-test)
@@ -192,6 +215,7 @@ The datasets transformed and curated for the SMProfiler database are well-harmon
 
 In total around 50 markers were imaged across the 12 studies currently available. The all-markers overview assesses each marker for its utility in discriminating between key outcome cohorts within each given dataset, using the fractions of the cell set expressing the marker. The t-test provides a sense of the overall strength and statistical significance of any association found. In the plot (previewed below), the colors correspond to one sample cohort and relative size of a circle pair indicates the effective differential between the two cohorts using the given marker.
 
+For example, in the row for antigen-experience-indicating marker **CD45RO** for the **Head and neck mpIF** study column, the circles plot (green and gray) shows that about 50% more experienced lymphocytes are found in the samples from patients who will clear the disease (cancer) compared with patients who will not.
 <p align="center">
 <a href="https://smprofiler.io/channel-overview">
 <img src="docs/image_assets/ccutoff.png" width="400"/>
@@ -201,6 +225,8 @@ In total around 50 markers were imaged across the 12 studies currently available
 ### <a id="marker-pairs"></a> 2. Using all marker pairs, spatial proximity
 
 We can involve the spatial context in our whole-database assessment by computing the cell-set-to-cell-set proximity metric for each pair of markers. It is expected that the cohort discriminations provided by such marker pairs augments the results identified using dissociated cell sets defined by single markers (the fractions features), since these are based on an independent source of information.
+
+As an example, in the row for **CD31** (typically indicating endothelium) and column **FOXP3** (indicating T regulatory cells), the circle plot (light and dark red) suggests that T regs are found near endothelial cells about twice as frequently in glioblastomas of patients who will not survive to 1 year post-surgery, compared with those surviving 1-3 years.
 
 <p align="center">
 <a href="https://smprofiler.io/proximity-overview">
