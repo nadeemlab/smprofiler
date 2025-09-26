@@ -1,3 +1,6 @@
+# v1.0.68
+- Adds a utility to perform targets synchronization of specific database tables with local files.
+
 # v1.0.67
 - First release of renamed package **smprofiler**.
 
