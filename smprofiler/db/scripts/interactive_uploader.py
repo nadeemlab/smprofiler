@@ -29,6 +29,7 @@ from psycopg import connect
 from boto3 import client as boto3_client
 from botocore.exceptions import ClientError
 from psycopg.errors import OperationalError
+from psycopg.errors import UndefinedTable
 
 from smprofiler.db.credentials import DBCredentials
 from smprofiler.db.credentials import retrieve_credentials_from_file
@@ -311,7 +312,7 @@ class InteractiveUploader:
                 with DBCursor(database_config_file=self.selected_database_config_file, verbose=False) as cursor:
                     cursor.execute('SELECT study, schema_name FROM study_lookup;')
                     name_schema = tuple(map(lambda row: (row[1], row[0]), cursor.fetchall()))
-            except OperationalError:
+            except (OperationalError, UndefinedTable):
                 return ''
             self.study_names_by_schema = dict(name_schema)
             self.existing_studies = tuple(sorted(list(self.study_names_by_schema.keys())))

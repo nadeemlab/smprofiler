@@ -57,6 +57,7 @@ data_curation/datasets/moldoveanu/Moldoveanu2022-cytof-RAW.tar.gz
 data_curation/datasets/moldoveanu/sciimmunol.abi5072_tables_s1 to_s5.xlsx
 data_curation/datasets/moldoveanu/sciimmunol.abi5072_tables_s1 to_s5.zip
 test/apiserver/response_decompressed.bin
+notes
 
 # Development files
 .vscode/

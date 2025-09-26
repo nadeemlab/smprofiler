@@ -1,1 +1,1 @@
-http://smprofiler.io/api
+smprofiler.io/api
