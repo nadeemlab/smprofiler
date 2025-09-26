@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smprofiler"
-version = "1.0.67"
+version = "1.0.68"
 authors = [
     { name = "James Mathews", email = "mathewj2@mskcc.org" }
 ]
