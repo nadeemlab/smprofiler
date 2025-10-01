@@ -22,6 +22,8 @@ def normalize_study_name(study: str) -> str:
 
 
 async def valid_study_name(study: str = Query(min_length=3, examples=['Breast cancer IMC', 'Urothelial ICI'])) -> str:
+    if re.search('HTAN Orion CRC', study):
+        raise ValueError('This study temporarily unavailable due to migration.')
     if study in query().retrieve_study_specifiers():
         return study
     raise ValueError(f'Study name invalid: "{abbreviate_string(study)}"')
