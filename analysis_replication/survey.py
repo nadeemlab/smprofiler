@@ -4,6 +4,7 @@ import re
 from decimal import Decimal
 from typing import cast
 from typing import Literal
+from typing import Callable
 from itertools import product
 from itertools import combinations
 from os.path import exists
@@ -190,37 +191,40 @@ class StudyAutoAssessor(ChainableDestructableResource):
         self.add_subresource(self.access)
         self.add_subresource(self.logger)
 
+    def _get_results_from_phase(self, phase: int, previous_results: tuple[Result, ...]):
+        results: list[Result] = []
+        log = self._get_logging(phase)
+        for case in self._get_cases(phase=phase):
+            result = self._assess_case(case)
+            if result.significant:
+                if phase > 1:
+                    possible_confounders = tuple(filter(
+                        lambda r0: SimpleConfounding(r0, result).probable_confounding(),
+                        previous_results,
+                    ))
+                    if len(possible_confounders) == 0:
+                        results.append(result)
+                        log(result, possible_confounders)
+                else:
+                    results.append(result)
+                    log(result, ())
+        return tuple(results)
+
+    def _get_logging(self, phase: int) -> Callable[[Result, tuple[Result, ...]], None]:
+        if phase == 1:
+            return self.logger.log_singleton
+        if phase == 2:
+            return self.logger.log_ratios
+        if phase == 3:
+            return self.logger.log_proximity
+        raise ValueError('Logging only available for known analysis phases.')
+
     def get_filtered_results(self) -> FilteredResults:
         self._initial_fetch()
-        singleton_significants: list[Result] = []
-        for case in self._get_cases(phase=1):
-            result = self._assess_case(case)
-            if result.significant:
-                singleton_significants.append(result)
-                self.logger.log_singleton(result)
-        ratio_significants: list[Result] = []
-        for case in self._get_cases(phase=2):
-            result = self._assess_case(case)
-            if result.significant:
-                confounding = tuple(filter(
-                    lambda r0: SimpleConfounding(r0, result).probable_confounding(),
-                    singleton_significants,
-                ))
-                if len(confounding) == 0:
-                    ratio_significants.append(result)
-                self.logger.log_ratios(result, confounding = confounding)
-        proximity_significants: list[Result] = []
-        for case in self._get_cases(phase=3):
-            result = self._assess_case(case)
-            if result.significant:
-                confounding = tuple(filter(
-                    lambda r0: SimpleConfounding(r0, result).probable_confounding(),
-                    singleton_significants,
-                ))
-                if len(confounding) == 0:
-                    proximity_significants.append(result)
-                self.logger.log_proximity(result, confounding = confounding)
-        return FilteredResults(tuple(singleton_significants), tuple(ratio_significants), tuple(proximity_significants))
+        singleton_significants = self._get_results_from_phase(1, ())
+        ratio_significants = self._get_results_from_phase(2, singleton_significants)
+        proximity_significants = self._get_results_from_phase(3, singleton_significants)
+        return FilteredResults(singleton_significants, ratio_significants, proximity_significants)
 
     def _get_cases(self, phase: int) -> tuple[Case, ...]:
         if phase == 1:
@@ -320,7 +324,7 @@ class AssessmentLogger(ChainableDestructableResource):
         else:
             logger.info(message)
 
-    def log_singleton(self, result: Result) -> None:
+    def log_singleton(self, result: Result, _: tuple[Result, ...]) -> None:
         message = self._format_singleton(result)
         self.log(f'Hit: {message}', sticky_header='Single channel assessment phase')
 
