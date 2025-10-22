@@ -1,0 +1,162 @@
+\usepackage{hyperref}
+\usepackage{graphicx} % Required for including images
+
+\usepackage[
+	a4paper, % Change to letterpaper for US Letter
+	top=2.5cm, 
+	bottom=2.5cm, 
+	left=2.5cm, 
+	right=2.5cm
+]{geometry} % Document margins
+
+\usepackage{fp} % Required for report calculations
+\usepackage{advdate} % Required for date calculation
+
+\setlength\parindent{0pt} % Stop paragraph indentation
+
+\usepackage[utf8]{inputenc} % Required for inputting international characters
+\usepackage[T1]{fontenc} % Output font encoding for international characters
+
+\usepackage{tgadventor} % Use the TeX Gyre Adventor font
+%\renewcommand*\familydefault{\sfdefault} % Set the base font of the document to sans serif
+
+\usepackage{xcolor} % Required for defining and using custom colours
+
+\definecolor{highlightcolour}{HTML}{DF0174} % Colour used for making text stand out
+\definecolor{rulecolour}{HTML}{B2BEB5} % Colour used for rules
+
+\usepackage{colortbl} % Required for colouring table cells (used for rules)
+\usepackage{booktabs} % Required for nicer table rules
+\usepackage{multirow} % Required for allowing cells to take up multiple rows in tables
+\usepackage{array} % Required for customizing table spacing and features
+\def\arraystretch{1.2} % Table row spacing, 1 is the default
+
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt}}m{#1}} % Define a fixed-width right-aligned column type
+
+\newcommand{\dataname}[1]{\renewcommand{\dataname}{#1}}
+\newcommand{\datajob}[1]{\renewcommand{\datajob}{#1}}
+\newcommand{\dataaddresslineone}[1]{\renewcommand{\dataaddresslineone}{#1}}
+\newcommand{\dataaddresslinetwo}[1]{\renewcommand{\dataaddresslinetwo}{#1}}
+\newcommand{\datacontactlineone}[1]{\renewcommand{\datacontactlineone}{#1}}
+\newcommand{\datacontactlinetwo}[1]{\renewcommand{\datacontactlinetwo}{#1}}
+
+\newcommand{\reportref}[1]{\renewcommand{\reportref}{#1}}
+\newcommand{\reportissued}[1]{\renewcommand{\reportissued}{#1}}
+\newcommand{\reportdue}[1]{\renewcommand{\reportdue}{#1}}
+\newcommand{\projectname}[1]{\renewcommand{\projectname}{#1}}
+
+\newcommand{\companyname}[1]{\renewcommand{\companyname}{#1}}
+\newcommand{\sendername}[1]{\renewcommand{\sendername}{#1}}
+\newcommand{\senderjob}[1]{\renewcommand{\senderjob}{#1}}
+\newcommand{\senderaddresslineone}[1]{\renewcommand{\senderaddresslineone}{#1}}
+\newcommand{\senderaddresslinetwo}[1]{\renewcommand{\senderaddresslinetwo}{#1}}
+\newcommand{\sendercontactlineone}[1]{\renewcommand{\sendercontactlineone}{#1}}
+\newcommand{\sendercontactlinetwo}[1]{\renewcommand{\sendercontactlinetwo}{#1}}
+
+\newcommand{\termsandconditions}[1]{\renewcommand{\termsandconditions}{#1}}
+\newcommand{\num}[1]{\renewcommand{\num}{num #1}}
+
+\gdef\variableA{0}
+\gdef\variableB{0}
+\gdef\variableC{0}
+\gdef\variableD{0}
+
+\gdef\TotalA{0} 
+\gdef\TotalB{0}
+\gdef\TotalC{0}
+
+
+\newcommand{\headertable}{
+	{
+		\footnotesize
+		\begin{tabular}{p{0.4\textwidth} p{0.2\textwidth} p{0.2\textwidth} p{0.2\textwidth}}
+			\arrayrulecolor{rulecolour}\toprule[0.5pt] % Horizontal line at the top of the table
+      \multirow{3}{*}{{\color{highlightcolour} \Huge Urothelial cancer  }} & \textbf{} & \\
+      & 2.5m cells imaged & 51 samples & Data published by \href{link.com}{Author et al.} \\ 
+			& \datajob & \dataaddresslinetwo & \datacontactlinetwo \\
+			\arrayrulecolor{rulecolour}\bottomrule[0.5pt] % Horizontal line at the bottom of the table
+		\end{tabular}
+	}
+}
+
+\newcommand{\reportinformation}{
+	{
+		\footnotesize
+		\begin{tabular}{p{0.1\textwidth} m{0.4\textwidth} p{0.3\textwidth} p{0.2\textwidth}}
+      \textbf{logo feature type} & \textbf{finding} & \textbf{N x} & \textbf{p value} \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt] % Horizontal line
+      shape & CD8+ T cells are elevated 2.5 times in Non-Responders (NR) compared with Complete Responders (CR). & \color{highlightcolour} \Huge 2.5 x & $p=0.05$ \\
+      a & a & \Huge 1.5 & $p=0.01$ \\
+      a & a & \Huge 1.5 & $p=0.01$ \\
+      a & a & a & a \\
+		\end{tabular}
+	}
+}
+
+\newenvironment{reporttable}
+{
+	\begin{tabular}{p{0.45\textwidth} R{0.15\textwidth} R{0.15\textwidth} R{0.15\textwidth}}
+		\textbf{item} & \textbf{quantity} & \textbf{value} & \textbf{total} \\
+		\arrayrulecolor{rulecolour}\toprule[0.5pt]
+}{	
+		\arrayrulecolor{rulecolour}\bottomrule[0.5pt]
+		\\ [-1em] 
+		&&  & \$\num{\TotalA} \\
+		&&  & \$\num{\TotalB} \\ 
+		&&  & \$\num{\TotalC} \\
+	\end{tabular}
+}
+
+\newcommand{\amount}{
+	{
+		\footnotesize
+		\begin{tabular}{>{\arraybackslash}m{0.625\textwidth} p{0.05\textwidth} R{0.25\textwidth}}
+			\textbf{Terms and Conditions} & & \textbf{} \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]\\[-1.25em] % Horizontal line at the top of the table
+			\termsandconditions & & {\color{highlightcolour} \Huge \$\num{\TotalC}}\\
+		\end{tabular}
+	}
+}
+
+\newcommand{\contactdetails}{
+	{
+		\footnotesize
+		\begin{tabular}{p{0.22\textwidth} p{0.22\textwidth} p{0.23\textwidth} p{0.22\textwidth}}
+			\arrayrulecolor{rulecolour}\toprule[0.5pt] % Horizontal line at the top of the table
+			\textbf{Sender} & & & \multirow{3}{0.22\textwidth}{\hfill{\color{highlightcolour}\Huge THANKS}}\\
+			\sendername & \senderaddresslineone & \sendercontactlineone & \\ 
+			\senderjob & \senderaddresslinetwo & \sendercontactlinetwo & \\
+			\arrayrulecolor{rulecolour}\bottomrule[0.5pt] % Horizontal line at the bottom of the table
+		\end{tabular}
+	}
+}
+
+
+\newenvironment{report}
+{
+    	\thispagestyle{empty} % Suppress headers and footers
+
+  \begin{tabular}{p{0.3\textwidth}p{0.4\textwidth}p{0.3\textwidth}}
+    (SMProfiler logo) & & \emph{Report generated 10/10/2025}
+  \end{tabular}
+	\begin{center}
+		{\color{highlightcolour}\Huge\companyname}
+	\end{center}
+	
+	\vspace{1cm}
+	
+	\headertable 
+
+{{ number }} samples were collected and analyzed by {{ author }} et al \footnote{Reference.},
+using {{ imagingmodality }} to capture abundance of {{ numberchannels }} proteins in single
+cells imaged in histology slides.
+
+	\vfill
+	\reportinformation
+	\vfill
+}{ 
+	\vfill
+	\amount % abc 
+	\vfill
+	\contactdetails % details table
+}
