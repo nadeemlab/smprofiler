@@ -5,7 +5,7 @@ from smprofiler.db.http_data_accessor import StudyDataAccessor
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 from smprofiler.workflow.automated_analysis.types import Result
-from smprofiler.workflow.automated_analysis.types import LIMITS_SEVERE
+from smprofiler.workflow.automated_analysis.limits import LIMITS_SEVERE
 from smprofiler.workflow.automated_analysis.types import FilteredResults
 from smprofiler.workflow.automated_analysis.types import Highlights
 from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentLogger
