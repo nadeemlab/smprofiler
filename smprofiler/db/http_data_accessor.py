@@ -173,7 +173,10 @@ class StudyDataAccessor(ChainableDestructableResource):
             payload = get_request(url, headers=headers)
             end = time()
             key = url
-            self.cache.add(key, payload)
+            if binary:
+                self.cache.add(key, payload)
+            elif 'is_pending' in payload.json() and not payload.json()['is_pending']:
+                self.cache.add(key, payload)
             delta = str(end - start)
             now = str(datetime.now())
             with open('requests_timing.txt', 'ta', encoding='utf-8') as file:
