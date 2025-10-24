@@ -1,5 +1,6 @@
 import sys
 from os.path import exists
+from argparse import ArgumentParser
 
 from smprofiler.db.http_data_accessor import StudyDataAccessor
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -43,8 +44,8 @@ def print_to_console(results, highlights, assessment_logger) -> None:
     print('Top 10s, after accounting for patterns:')
     print_to_console_3_metric_types(highlights.top10, assessment_logger)
 
-def survey(host: str, study: str, interactive: bool) -> tuple[FilteredResults, Highlights]:
-    with StudyAutoAssessor(StudyDataAccessor(study, host=host), interactive=interactive) as a:
+def survey(host: str, study: str, interactive: bool, omitted_cohorts: list[str] | None) -> tuple[FilteredResults, Highlights]:
+    with StudyAutoAssessor(StudyDataAccessor(study, host=host), interactive=interactive, omitted_cohorts=omitted_cohorts) as a:
         results, highlights = a.get_filtered_results()
         assessment_logger = a.logger
     print_to_console(results, highlights, assessment_logger)
@@ -62,12 +63,17 @@ def get_default_host(given: str | None) -> str | None:
     return host
 
 if __name__=='__main__':
-    if len(sys.argv) == 2:
-        study = sys.argv[1]
+    p = ArgumentParser(prog='survey', description='Automated basic analysis.')
+    p.add_argument('study')
+    p.add_argument('--omitted-cohorts', type=str, required=False)
+    args = vars(p.parse_args())
+    study = args['study']
+    if args['omitted_cohorts']:
+        omitted_cohorts = args['omitted_cohorts'].split(',')
     else:
-        raise ValueError('Supply a study name.')
+        omitted_cohorts = None
     host = get_default_host(None)
     if host is None:
         raise RuntimeError('Could not determine API server hostname.')
-    df = survey(host, study, True)
+    df = survey(host, study, True, omitted_cohorts=omitted_cohorts)
 

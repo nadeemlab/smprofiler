@@ -41,10 +41,12 @@ class StudyAutoAssessor(ChainableDestructableResource):
     limits: Limits
     channels: tuple[str, ...]
     cohorts: tuple[str, ...]
+    omitted_cohorts: tuple[str, ...]
 
-    def __init__(self, access: StudyDataAccessor, interactive: bool, limits: Limits=DEFAULT_LIMITS):
+    def __init__(self, access: StudyDataAccessor, interactive: bool, limits: Limits=DEFAULT_LIMITS, omitted_cohorts: list[str] | None=None):
         self.access = access
         self.limits = limits
+        self.omitted_cohorts = tuple(omitted_cohorts) if omitted_cohorts else ()
         self.logger = AssessmentLogger(interactive=interactive)
         self.add_subresource(self.access)
         self.add_subresource(self.logger)
@@ -133,7 +135,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
 
     def _initial_fetch(self) -> None:
         self.channels = tuple(self.access._retrieve_feature_names())
-        self.cohorts = tuple(sorted(list(set(self.access._retrieve_cohorts()['cohort'])), key=lambda x: int(x)))
+        self.cohorts = tuple(sorted(list(set(self.access._retrieve_cohorts()['cohort']).difference(set(self.omitted_cohorts))), key=lambda x: int(x)))
         self.logger.set_name_width(max(map(len, self.channels)))
         self._log(f'Using channels: {self.channels}')
         self._log(f'Using cohorts: {self.cohorts}')
