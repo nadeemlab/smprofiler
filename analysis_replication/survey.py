@@ -1,4 +1,3 @@
-import sys
 from os.path import exists
 from argparse import ArgumentParser
 

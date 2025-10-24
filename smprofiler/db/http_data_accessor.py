@@ -191,12 +191,8 @@ class StudyDataAccessor(ChainableDestructableResource):
             return payload.content, key
         else:
             parsed_payload = payload.json()
-            if 'is_pending' in parsed_payload:
-                if not parsed_payload['is_pending']:
-                    return parsed_payload, key
-            else:
-                return parsed_payload, key
-        raise ValueError(f'Processing downloaded payload failed: {key}')
+            return parsed_payload, key
+        #raise ValueError(f'Processing downloaded payload failed: {key}')
 
 
 def univariate_pair_compare(series1: 'Series[float]', series2: 'Series[float]'):
