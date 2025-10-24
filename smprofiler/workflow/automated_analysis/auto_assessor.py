@@ -13,17 +13,17 @@ from smprofiler.standalone_utilities.chainable_destructable_resource import Chai
 
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.db.http_data_accessor import StudyDataAccessor
-from smprofiler.db.http_data_accessor import univariate_pair_compare as compare
+from smprofiler.db.http_data_accessor import univariate_pair_compare_details as compare
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 from smprofiler.workflow.automated_analysis.types import Case
 from smprofiler.workflow.automated_analysis.types import Result
 from smprofiler.workflow.automated_analysis.types import ResultSignificance
-from smprofiler.workflow.automated_analysis.types import Limits
-from smprofiler.workflow.automated_analysis.types import DEFAULT_LIMITS
-from smprofiler.workflow.automated_analysis.types import LIMITS_SEVERE
 from smprofiler.workflow.automated_analysis.types import FilteredResults
 from smprofiler.workflow.automated_analysis.types import Highlights
+from smprofiler.workflow.automated_analysis.limits import Limits
+from smprofiler.workflow.automated_analysis.limits import DEFAULT_LIMITS
+from smprofiler.workflow.automated_analysis.limits import LIMITS_SEVERE
 from smprofiler.workflow.automated_analysis.confounding import SimpleConfounding
 from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentLogger
 
@@ -176,12 +176,14 @@ class StudyAutoAssessor(ChainableDestructableResource):
         cohorts = case.cohorts
         values1 = cast(Series, df[df['cohort'] == cohorts[0]][feature_name])
         values2 = cast(Series, df[df['cohort'] == cohorts[1]][feature_name])
-        p, effect = compare(values1, values2)
+        compare_result = compare(values1, values2)
+        p = compare_result.pvalue
+        effect = compare_result.effect
         higher_cohort = cohorts[1]
         if effect < 1.0:
             higher_cohort = cohorts[0]
             effect = 1.0 / effect
-        significance = ResultSignificance(float(p), effect)
+        significance = ResultSignificance(float(p), effect, compare_result.fraction_data_used())
         return Result(case, higher_cohort, significance, self.limits.acceptable(significance))
 
     def _log(self, *args, **kwargs) -> None:

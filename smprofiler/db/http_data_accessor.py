@@ -15,6 +15,7 @@ from numpy import nan
 from numpy import isnan
 from numpy import mean
 from scipy.stats import ttest_ind
+from attrs import define
 
 from smprofiler.standalone_utilities.key_value_store import KeyValueStore
 from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
@@ -206,6 +207,31 @@ def univariate_pair_compare(series1: 'Series[float]', series2: 'Series[float]'):
     result = ttest_ind(list1, list2, equal_var=False)
     return getattr(result, 'pvalue'), actual
 
+@define
+class CompareResult:
+    pvalue: float
+    effect: float
+    original_sizes: tuple[int, int]
+    final_sizes: tuple[int, int]
+
+    def fraction_data_used(self) -> float:
+        return sum(self.final_sizes) / sum(self.original_sizes)
+
+def univariate_pair_compare_details(series1: Series, series2: Series) -> CompareResult:
+    def finite(value):
+        return not isnan(value) and not value==inf
+    list1 = list(filter(finite, series1.values))
+    list2 = list(filter(finite, series2.values))
+    mean1 = float(mean(list1))
+    mean2 = float(mean(list2))
+    actual = mean2 / mean1
+    result = ttest_ind(list1, list2, equal_var=False)
+    return CompareResult(
+        getattr(result, 'pvalue'),
+        actual,
+        (len(series1), len(series2)),
+        (len(list1), len(list2)),
+    )
 
 def append_fractions_feature(
     df: DataFrame,
