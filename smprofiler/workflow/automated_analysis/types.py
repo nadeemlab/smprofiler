@@ -1,5 +1,6 @@
 """Data types to support the automated analysis."""
 from typing import Literal
+from typing import cast
 from math import log10
 
 from attrs import define
@@ -21,6 +22,14 @@ class Case:
     other: PhenotypeCriteria | None
     cohorts: tuple[str, str]
     metric: Metric
+
+    def get_phenotypes(self) -> tuple[PhenotypeCriteria, ...]:
+        return cast(tuple[PhenotypeCriteria, ...], tuple(
+            filter(
+                lambda p0: p0 is not None,
+                [self.phenotype, self.other]
+            )
+        ))
 
 @define
 class ResultSignificance:
@@ -63,4 +72,27 @@ class FilteredResults:
 class Highlights:
     top3: tuple[Result, ...]
     top10: FilteredResults
+
+@define
+class ReportCohort:
+    number_samples: int
+    name: str
+    abbreviation: str
+
+@define
+class ReportStudyMetadata:
+    study_description_phrase: str
+    cohorts: tuple[ReportCohort, ...]
+    number_samples: int
+    main_author: str
+    reference_footnote: str
+    data_collection_modality: str
+    number_channels: int
+
+@define
+class AnalysisSummary:
+    results: FilteredResults
+    highlights: Highlights
+    metadata: ReportStudyMetadata
+
 

@@ -17,6 +17,7 @@ from numpy import mean
 from scipy.stats import ttest_ind
 from attrs import define
 
+from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.standalone_utilities.key_value_store import KeyValueStore
 from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
@@ -83,16 +84,22 @@ class StudyDataAccessor(ChainableDestructableResource):
         endpoint = 'request-spatial-metrics-computation-custom-phenotypes'
         return self._polling_retrieve_values(endpoint, query, feature_name)
 
+    def get_study_name(self) -> str:
+        return StudyCollectionNaming.strip_token(self.study)[0]
+
     def _pad_channel_lists(self, p: PhenotypeCriteria) -> PhenotypeCriteria:
         m1 = ('',) if len(p.positive_markers) == 0 else p.positive_markers
         m2 = ('',) if len(p.negative_markers) == 0 else p.negative_markers
         return PhenotypeCriteria(positive_markers=m1, negative_markers=m2)
 
-    def _retrieve_cohorts(self):
-        summary_obj, _ = self._retrieve('study-summary', urlencode([('study', self.study)]))
-        summary = StudySummary.model_validate(summary_obj)
+    def _retrieve_cohorts(self) -> DataFrame:
+        summary = self._retrieve_study_summary()
         return DataFrame([model.model_dump() for model in summary.cohorts.assignments]).set_index('sample')
 
+    def _retrieve_study_summary(self) -> StudySummary:
+        summary_obj, _ = self._retrieve('study-summary', urlencode([('study', self.study)]))
+        return StudySummary.model_validate(summary_obj)
+ 
     def _retrieve_feature_names(self) -> list[str]:
         names_obj, _ = self._retrieve('cell-data-binary-feature-names', urlencode([('study', self.study)]))
         names = BitMaskFeatureNames.model_validate(names_obj)
@@ -211,11 +218,10 @@ def univariate_pair_compare(series1: 'Series[float]', series2: 'Series[float]'):
 class CompareResult:
     pvalue: float
     effect: float
-    original_sizes: tuple[int, int]
     final_sizes: tuple[int, int]
 
-    def fraction_data_used(self) -> float:
-        return sum(self.final_sizes) / sum(self.original_sizes)
+    def fraction_data_used(self, original_total_size: int) -> float:
+        return sum(self.final_sizes) / original_total_size
 
 def univariate_pair_compare_details(series1: Series, series2: Series) -> CompareResult:
     def finite(value):
@@ -229,7 +235,6 @@ def univariate_pair_compare_details(series1: Series, series2: Series) -> Compare
     return CompareResult(
         getattr(result, 'pvalue'),
         actual,
-        (len(series1), len(series2)),
         (len(list1), len(list2)),
     )
 

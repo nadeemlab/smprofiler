@@ -7,7 +7,6 @@ from numpy.linalg import inv
 from numpy import matmul
 
 from smprofiler.workflow.automated_analysis.types import ResultSignificance
-from smprofiler.workflow.automated_analysis.types import Result
 
 @define
 class Limits:
@@ -52,8 +51,8 @@ LIMITS_SEVERE = Limits(1.5, 0.005, 0.2, 3.0)
 @define
 class FullUsageAssessor:
     """
-    This filter imposes limits on result sets intended to account for cases where there
-    are too many null values omitted from the sample set before statistic evaluation.
+    This filter imposes limits on result sets intended to account for the phenonmenon of
+    too many null values omitted from the sample set before statistic evaluation.
     Usually the statistical test will be good enough at detecting this, since
     p-values get worse as less data is used, but a more conservative (severe)
     limit is often needed, usually indicated by suspiciously high effect size.
@@ -61,18 +60,26 @@ class FullUsageAssessor:
     Starting at effect sizes at the provided threshold, limits on the defect in
     the fraction of data used are imposed incrementally for each unit increase
     in the effect size. 
-    of data used
+    
+    The above is achieved by linear interpolation between the initial effect size
+    at which the limits begin to be imposed, and the final effect size after which
+    100% source data usage is required.
     """
     effect_size_initial_threshold: float
-    marginal_fraction_data_used_per_unit_effect_size: float
+    effect_size_final_threshold: float
 
     def acceptable(self, r: ResultSignificance) -> bool:
         effect = r.effect
-        effect_diff = effect - self.effect_size_initial_threshold
-        if effect_diff <= 0:
+        if effect <= self.effect_size_initial_threshold:
             return True
-        limit = self.marginal_fraction_data_used_per_unit_effect_size * effect_diff
-        return r.fraction_data_used_defect() < limit
+        if effect >= self.effect_size_final_threshold:
+            return r.fraction_data_used == 1.0
+        effect_diff = effect - self.effect_size_initial_threshold
+        limit = self._marginal_fraction_data_used_per_unit_effect_size() * effect_diff
+        return r.fraction_data_used_defect() <= limit
 
-DEFAULT_USAGE_LIMITS = FullUsageAssessor(2.0, 0)
+    def _marginal_fraction_data_used_per_unit_effect_size(self) -> float:
+        return 1.0 / (self.effect_size_final_threshold - self.effect_size_initial_threshold)
+
+DEFAULT_USAGE_LIMITS = FullUsageAssessor(2.0, 3.0)
 

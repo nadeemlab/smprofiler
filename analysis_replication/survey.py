@@ -1,9 +1,18 @@
 from os.path import exists
+from os import system as os_system
 from argparse import ArgumentParser
+from json import dumps as json_dumps
 
+from cattrs import Converter
+from pandas import DataFrame
+from jinja2 import BaseLoader
+from jinja2 import Environment
+
+from smprofiler.workflow.scripts.configure import _retrieve_from_library
 from smprofiler.db.http_data_accessor import StudyDataAccessor
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
+from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.workflow.automated_analysis.types import Result
 from smprofiler.workflow.automated_analysis.limits import LIMITS_SEVERE
 from smprofiler.workflow.automated_analysis.types import FilteredResults
@@ -12,6 +21,20 @@ from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentL
 from smprofiler.workflow.automated_analysis.auto_assessor import StudyAutoAssessor
 
 logger = colorized_logger(__name__)
+
+cattrs_converter = Converter()
+
+def _pydantic_adaptor(value: PhenotypeCriteria) -> dict[str, tuple[str, ...]]:
+    if isinstance(value, PhenotypeCriteria):
+        return {'positive_markers': value.positive_markers, 'negative_markers': value.negative_markers}
+
+def _pandas_adaptor(_: DataFrame) -> str:
+    return '(elided)'
+
+
+cattrs_converter.register_unstructure_hook(PhenotypeCriteria, _pydantic_adaptor)
+cattrs_converter.register_unstructure_hook(DataFrame, _pandas_adaptor)
+
 
 def result_quality(r: Result) -> float:
     return -1 * r.quality()
@@ -40,15 +63,29 @@ def print_to_console(results, highlights, assessment_logger) -> None:
     for result in sorted(highlights.top3, key=result_quality):
         print(assessment_logger._format_singleton(result))
     print('')
-    print('Top 10s, after accounting for patterns:')
+    print('Top 25s, after accounting for patterns:')
     print_to_console_3_metric_types(highlights.top10, assessment_logger)
+
+def generate_report(summary) -> None:
+    jinja_environment = Environment(loader=BaseLoader(), comment_start_string='###')
+    jinja_environment.filters['pvalue_filter'] = AssessmentLogger._format_p
+    jinja_environment.filters['effect_filter'] = AssessmentLogger._format_effect
+    contents = _retrieve_from_library('assets', 'analysis_summary.tex.jinja')
+    template = jinja_environment.from_string(contents)
+    rendered = template.render(**summary)
+    with open('analysis_summary.tex', 'wt', encoding='utf-8') as file:
+        file.write(rendered)
+    os_system('pdflatex analysis_summary.tex')
 
 def survey(host: str, study: str, interactive: bool, omitted_cohorts: list[str] | None) -> tuple[FilteredResults, Highlights]:
     with StudyAutoAssessor(StudyDataAccessor(study, host=host), interactive=interactive, omitted_cohorts=omitted_cohorts) as a:
-        results, highlights = a.get_filtered_results()
+        summary = a.get_filtered_results()
         assessment_logger = a.logger
-    print_to_console(results, highlights, assessment_logger)
-    return results, highlights
+    print_to_console(summary.results, summary.highlights, assessment_logger)
+    plain_structured = cattrs_converter.unstructure(summary) 
+    print(json_dumps(plain_structured, indent=2))
+    generate_report(plain_structured)
+    return summary.results, summary.highlights
 
 def get_default_host(given: str | None) -> str | None:
     if given is not None:

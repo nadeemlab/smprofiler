@@ -1,4 +1,6 @@
 from decimal import Decimal
+from typing import Callable
+from math import log10
 
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.standalone_utilities.terminal_scrolling import TerminalScrollingBuffer
@@ -43,6 +45,15 @@ class AssessmentLogger(ChainableDestructableResource):
         message = f'Hit: {message}   {qualification}'
         self.log(message, sticky_header='Proximity assessment phase')
 
+    def get_logging(self, phase: int) -> Callable[[Result, tuple[Result, ...]], None]:
+        if phase == 1:
+            return self.log_singleton
+        if phase == 2:
+            return self.log_ratios
+        if phase == 3:
+            return self.log_proximity
+        raise ValueError('Logging only available for known analysis phases.')
+
     def _form_qualification(self, confounding: tuple[Result, ...]) -> str:
         if len(confounding) > 0:
             strings = map(lambda r0: self._format_phenotype(r0.case.phenotype), confounding)
@@ -57,14 +68,21 @@ class AssessmentLogger(ChainableDestructableResource):
         w = self.name_width + 22
         p = self._format_phenotype((result.case.phenotype))
         pre = ('{:>' + str(w) + '}').format(f'{p} fractions in cohort {result.higher_cohort} (vs {result.lower_cohort()})')
-        message = f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())}'
+        message = f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())}  used = {"%.3f" % s.fraction_data_used}'
         return message
 
-    def _format_effect(self, e: float) -> str:
-        return '{:>12}'.format('%.4f' % e) + ' x'
+    @staticmethod
+    def _format_effect(e: float) -> str:
+        return '{:>12}'.format('%.1f' % e) + ' x'
 
-    def _format_p(self, p: float) -> str:
-        return '{:>12}'.format('p = ' + '%.5f' % p if p >= 0.0001 else '{:.2E}'.format(Decimal(p)))
+    @staticmethod
+    def _format_p(p: float) -> str:
+        def _parts(f: float) -> tuple[float, int]:
+            scale_int = round(log10(f) - 1)
+            fixed = round(f / pow(10, scale_int), ndigits=1)
+            return (fixed, scale_int)
+        fixed, scale_int = _parts(p)
+        return '{:>12}'.format('p = ' + '%.3f' % p) if p >= 0.001 else fr'p = {fixed} \times 10^{{{scale_int}}}'
 
     def _format_quality(self, q: float) -> str:
         return '{:>5}'.format('q = ' + '%.2f' % q)
@@ -79,7 +97,7 @@ class AssessmentLogger(ChainableDestructableResource):
         p1 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.phenotype))
         p2 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.other))
         pre = f'{p1} / {p2}   ratios in cohort {result.higher_cohort} (vs {result.lower_cohort()})'
-        return f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())}'
+        return f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())}  used = {"%.3f" % s.fraction_data_used}'
 
     def _format_proximity(self, result: Result) -> str:
         if result.case.other is None:
@@ -88,6 +106,6 @@ class AssessmentLogger(ChainableDestructableResource):
         p1 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.phenotype))
         p2 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.other))
         pre = f'{p1} have a number of nearby {p2}   cells in cohort {result.higher_cohort} (vs {result.lower_cohort()})'
-        return f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())} '
+        return f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())}  used = {"%.3f" % s.fraction_data_used}'
 
 

@@ -158,7 +158,7 @@ class ThresholdOptimizer:
             kwargs = {}
 
         with T(**kwargs) as buffer:
-            self.terminal_scoller = buffer
+            self.terminal_scroller = buffer
             self._determine_optimal_thresholds()
 
     def get_optimal_thresholds(self) -> DataFrame:

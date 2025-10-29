@@ -1,7 +1,6 @@
 """Data analysis script with automated multi-feature assessments."""
 import re
 from typing import cast
-from typing import Callable
 from itertools import product
 from itertools import combinations
 from itertools import chain
@@ -14,6 +13,9 @@ from smprofiler.standalone_utilities.chainable_destructable_resource import Chai
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.db.http_data_accessor import StudyDataAccessor
 from smprofiler.db.http_data_accessor import univariate_pair_compare_details as compare
+from smprofiler.db.exchange_data_formats.study import Cohort
+from smprofiler.db.exchange_data_formats.study import CohortAssignment
+from smprofiler.db.exchange_data_formats.study import Publication
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 from smprofiler.workflow.automated_analysis.types import Case
@@ -21,9 +23,13 @@ from smprofiler.workflow.automated_analysis.types import Result
 from smprofiler.workflow.automated_analysis.types import ResultSignificance
 from smprofiler.workflow.automated_analysis.types import FilteredResults
 from smprofiler.workflow.automated_analysis.types import Highlights
+from smprofiler.workflow.automated_analysis.types import AnalysisSummary
+from smprofiler.workflow.automated_analysis.types import ReportStudyMetadata
+from smprofiler.workflow.automated_analysis.types import ReportCohort
 from smprofiler.workflow.automated_analysis.limits import Limits
 from smprofiler.workflow.automated_analysis.limits import DEFAULT_LIMITS
 from smprofiler.workflow.automated_analysis.limits import LIMITS_SEVERE
+from smprofiler.workflow.automated_analysis.limits import DEFAULT_USAGE_LIMITS
 from smprofiler.workflow.automated_analysis.confounding import SimpleConfounding
 from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentLogger
 
@@ -42,6 +48,8 @@ class StudyAutoAssessor(ChainableDestructableResource):
     channels: tuple[str, ...]
     cohorts: tuple[str, ...]
     omitted_cohorts: tuple[str, ...]
+    number_samples: int
+    logger: AssessmentLogger
 
     def __init__(self, access: StudyDataAccessor, interactive: bool, limits: Limits=DEFAULT_LIMITS, omitted_cohorts: list[str] | None=None):
         self.access = access
@@ -51,41 +59,34 @@ class StudyAutoAssessor(ChainableDestructableResource):
         self.add_subresource(self.access)
         self.add_subresource(self.logger)
 
-    def get_filtered_results(self) -> tuple[FilteredResults, Highlights]:
+    def get_filtered_results(self) -> AnalysisSummary:
         self._initial_fetch()
         singleton_significants = self._get_results_from_phase(1, ())
         ratio_significants = self._get_results_from_phase(2, singleton_significants)
         proximity_significants = self._get_results_from_phase(3, singleton_significants)
-        args = (singleton_significants, ratio_significants, proximity_significants)
-        results = FilteredResults(*args, self._form_dataframe(*args))
+        def remove_nonfull_data_usage(rs: tuple[Result, ...]) -> tuple[Result, ...]:
+            return tuple(filter(lambda r: DEFAULT_USAGE_LIMITS.acceptable(r.significance), rs))
+        args = cast(
+            tuple[tuple[Result, ...], tuple[Result, ...],tuple[Result, ...]],
+            tuple(map(remove_nonfull_data_usage, (singleton_significants, ratio_significants, proximity_significants))),
+        )
+        results = FilteredResults(*args, self._form_results_dataframe(*args))
         highlights = HighlightExtractor.extract_highlights(results)
-        return (results, highlights)
+        metadata = StudyMetadataPresenter.form_presentation_extracts(self.access, self.omitted_cohorts) 
+        return AnalysisSummary(results, highlights, metadata)
 
-    def _form_dataframe(self, s1: tuple[Result, ...], s2: tuple[Result, ...], s3: tuple[Result, ...]):
-        df1 = DataFrame([self._form_record(r) for r in s1])
-        df1['metric'] = 'fraction'
-        df2 = DataFrame([self._form_record(r) for r in s2])
-        df2['metric'] = 'ratio'
-        df3 = DataFrame([self._form_record(r) for r in s3 if LIMITS_SEVERE.acceptable(r.significance)])
-        df3['metric'] = 'proximity'
-        df = concat([df1, df2, df3], axis=0)
-        return df
-
-    def _form_record(self, r: Result) -> dict[str, str | float | int]:
-        return {
-            'multiplier': r.significance.effect,
-            'p': r.significance.p,
-            'higher_cohort': r.higher_cohort,
-            'c1': r.case.cohorts[0],
-            'c2': r.case.cohorts[1],
-            'p1': self.logger._format_phenotype(r.case.phenotype),
-            'p2': self.logger._format_phenotype(r.case.other) if r.case.other else '',
-            'quality': r.quality(),
-        }
+    def _initial_fetch(self) -> None:
+        self.channels = tuple(self.access._retrieve_feature_names())
+        cohorts_df = self.access._retrieve_cohorts()
+        self.cohorts = tuple(sorted(list(set(cohorts_df['cohort']).difference(set(self.omitted_cohorts))), key=lambda x: int(x)))
+        self.number_samples = cohorts_df[cohorts_df['cohort'].apply(lambda x: x not in self.omitted_cohorts)].shape[0]
+        self.logger.set_name_width(max(map(len, self.channels)))
+        self.logger.log(f'Using channels: {self.channels}')
+        self.logger.log(f'Using cohorts: {self.cohorts}')
 
     def _get_results_from_phase(self, phase: int, previous_results: tuple[Result, ...]):
         results: list[Result] = []
-        log = self._get_logging(phase)
+        log = self.logger.get_logging(phase)
         for case in self._get_cases(phase=phase):
             result = self._assess_case(case)
             if not result.significant:
@@ -102,15 +103,6 @@ class StudyAutoAssessor(ChainableDestructableResource):
                 results.append(result)
                 log(result, possible_confounders)
         return tuple(results)
-
-    def _get_logging(self, phase: int) -> Callable[[Result, tuple[Result, ...]], None]:
-        if phase == 1:
-            return self.logger.log_singleton
-        if phase == 2:
-            return self.logger.log_ratios
-        if phase == 3:
-            return self.logger.log_proximity
-        raise ValueError('Logging only available for known analysis phases.')
 
     def _get_cases(self, phase: int) -> tuple[Case, ...]:
         if phase == 1:
@@ -133,14 +125,11 @@ class StudyAutoAssessor(ChainableDestructableResource):
             ))
         raise ValueError(f'Phase requested: {phase}')
 
-    def _initial_fetch(self) -> None:
-        self.channels = tuple(self.access._retrieve_feature_names())
-        self.cohorts = tuple(sorted(list(set(self.access._retrieve_cohorts()['cohort']).difference(set(self.omitted_cohorts))), key=lambda x: int(x)))
-        self.logger.set_name_width(max(map(len, self.channels)))
-        self._log(f'Using channels: {self.channels}')
-        self._log(f'Using cohorts: {self.cohorts}')
-
     def _form_single_phenotype(self, channel: str) -> PhenotypeCriteria:
+        """
+        Special treatment is given to the "distance dichotomized" virtual
+        features, to emphasize the case of low value (closer distance).
+        """
         if re.search('distance', channel):
             return PhenotypeCriteria(positive_markers=(), negative_markers=(channel,))
         return PhenotypeCriteria(positive_markers=(channel,), negative_markers=())
@@ -152,22 +141,14 @@ class StudyAutoAssessor(ChainableDestructableResource):
         }
         return handlers[case.metric](case)
 
-    def _get_phenotypes(self, case: Case) -> tuple[PhenotypeCriteria, ...]:
-        return cast(tuple[PhenotypeCriteria, ...], tuple(
-            filter(
-                lambda p0: p0 is not None,
-                [case.phenotype, case.other]
-            )
-        ))
-
     def _assess_fraction(self, case: Case) -> Result:
-        df = self.access.fractions(self._get_phenotypes(case))
+        df = self.access.fractions(case.get_phenotypes())
         return self._assess_case_df(df, case, 'fraction')
 
     def _assess_proximity(self, case: Case) -> Result:
         df = self.access.two_phenotype_spatial_metric(
             'proximity',
-            self._get_phenotypes(case),
+            case.get_phenotypes(),
             'proximity',
         )
         return self._assess_case_df(df, case, 'proximity')
@@ -183,11 +164,31 @@ class StudyAutoAssessor(ChainableDestructableResource):
         if effect < 1.0:
             higher_cohort = cohorts[0]
             effect = 1.0 / effect
-        significance = ResultSignificance(float(p), effect, compare_result.fraction_data_used())
-        return Result(case, higher_cohort, significance, self.limits.acceptable(significance))
+        N = self.number_samples
+        significance = ResultSignificance(float(p), effect, compare_result.fraction_data_used(N))
+        return Result(case, higher_cohort, significance, self.limits.acceptable(significance)) 
 
-    def _log(self, *args, **kwargs) -> None:
-        self.logger.log(*args, **kwargs)
+    def _form_results_dataframe(self, s1: tuple[Result, ...], s2: tuple[Result, ...], s3: tuple[Result, ...]):
+        df1 = DataFrame([self._form_result_record(r) for r in s1])
+        df1['metric'] = 'fraction'
+        df2 = DataFrame([self._form_result_record(r) for r in s2])
+        df2['metric'] = 'ratio'
+        df3 = DataFrame([self._form_result_record(r) for r in s3 if LIMITS_SEVERE.acceptable(r.significance)])
+        df3['metric'] = 'proximity'
+        df = concat([df1, df2, df3], axis=0)
+        return df
+
+    def _form_result_record(self, r: Result) -> dict[str, str | float | int]:
+        return {
+            'multiplier': r.significance.effect,
+            'p': r.significance.p,
+            'higher_cohort': r.higher_cohort,
+            'c1': r.case.cohorts[0],
+            'c2': r.case.cohorts[1],
+            'p1': self.logger._format_phenotype(r.case.phenotype),
+            'p2': self.logger._format_phenotype(r.case.other) if r.case.other else '',
+            'quality': r.quality(),
+        }
 
 
 class HighlightExtractor:
@@ -195,7 +196,7 @@ class HighlightExtractor:
     def extract_highlights(cls, results: FilteredResults) -> Highlights:
         extracted: list[tuple[Result, ...]] = []
         for results_metric in (results.single_fractions, results.ratios, results.proximity):
-            results20 = cls.get_top(20, results_metric)
+            results20 = cls.get_top(25, results_metric)
             pared = cls.remove_common_patterns(results20)
             extracted.append(pared)
         top3 = cls.get_top(3, tuple(chain(*extracted)))
@@ -244,4 +245,36 @@ class HighlightExtractor:
         results_no_pattern = list(map(lambda pair: pair[1], filter(lambda pair: not pair[0], zip(pattern_membership, results))))
         return tuple(representatives + results_no_pattern)
 
+
+class StudyMetadataPresenter:
+    @classmethod
+    def form_presentation_extracts(cls, access: StudyDataAccessor, omitted_cohorts: tuple[str, ...]) -> ReportStudyMetadata:
+        summary = access._retrieve_study_summary()
+        cohorts = tuple(map(
+            lambda c: cls._summarize_cohort(
+                c,
+                list(filter(lambda a: a.cohort == c.identifier, summary.cohorts.assignments))
+            ),
+            filter(lambda c: c.identifier not in omitted_cohorts, summary.cohorts.cohorts),
+        ))
+        author = summary.products.publication.first_author_name.split(' ')[-1]
+        return ReportStudyMetadata(
+            access.get_study_name(),
+            cohorts,
+            sum(map(lambda c: c.number_samples, cohorts)),
+            author,
+            cls._form_reference(summary.products.publication, author),
+            summary.context.assay.name,
+            summary.counts.channels,
+        )
+
+    @classmethod
+    def _summarize_cohort(cls, c: Cohort, assignments: list[CohortAssignment]) -> ReportCohort:
+        long_name = ', '.join((c.diagnosis, c.result.lower()))
+        abbreviation = ''.join(map(lambda part: part[0].upper(), filter(lambda part: part not in ['to', 'and', 'of'], re.split(r'[ \-/]', c.result))))
+        return ReportCohort(len(assignments), long_name, abbreviation)
+
+    @classmethod
+    def _form_reference(cls, p: Publication, author: str) -> str:
+        return f'{author} et al. \\href{{{p.url}}}{{{p.title}}} ({p.date})'
 
