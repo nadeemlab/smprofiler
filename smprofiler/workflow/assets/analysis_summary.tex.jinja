@@ -75,18 +75,6 @@
 \gdef\TotalC{0}
 
 
-\newcommand{\headertable}{
-	{
-		\footnotesize
-		\begin{tabular}{p{0.4\textwidth} p{0.2\textwidth} p{0.2\textwidth} p{0.2\textwidth} }
-			\arrayrulecolor{rulecolour}\toprule[0.5pt] % Horizontal line at the top of the table
-      \multirow{2}{*}{ {\color{highlightcolour} \Huge {{ metadata.study_description_phrase }} } } & 2.5m cells imaged & 51 samples & Data published by \href{link.com}{Author et al.} \\ 
-			& \datajob & \dataaddresslinetwo & \datacontactlinetwo \\
-			\arrayrulecolor{rulecolour}\bottomrule[0.5pt] % Horizontal line at the bottom of the table
-		\end{tabular}
-	}
-}
-
 \newcommand{\reportinformation}{
 	{
     \fontfamily{\sfdefault}
@@ -155,10 +143,12 @@
   {
     \fontfamily{\sfdefault} 
     \large
-		\begin{tabular}{p{0.4\textwidth} r p{0.3\textwidth} p{0.1\textwidth} }
+		\begin{tabular}{p{0.3\textwidth} r p{0.4\textwidth} p{0.1\textwidth} }
 			\arrayrulecolor{rulecolour}\toprule[0.5pt] % Horizontal line at the top of the table
-      \multirow{2}{*}{ {\color{highlightcolour} \LARGE {{ metadata.study_description_phrase }}  } } & 22 samples & Non-responders & \textbf{NR} \\ 
-                                                                             & 26 samples & Complete responders & \textbf{CR} \\
+       \multirow{ {{ metadata.number_cohorts }} }{*}{ {\color{highlightcolour} \LARGE {{ metadata.study_description_phrase }}  } } & & & \\
+      {% for cohort in metadata.cohorts %}
+      &  {{ cohort.number_samples }} samples & {{ cohort.name }} & \textbf{ {{ cohort.abbreviation }} } \\
+      {% endfor %}
 			\arrayrulecolor{rulecolour}\bottomrule[0.5pt] % Horizontal line at the bottom of the table
 		\end{tabular}
 	}

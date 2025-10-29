@@ -261,6 +261,7 @@ class StudyMetadataPresenter:
         return ReportStudyMetadata(
             access.get_study_name(),
             cohorts,
+            len(cohorts),
             sum(map(lambda c: c.number_samples, cohorts)),
             author,
             cls._form_reference(summary.products.publication, author),

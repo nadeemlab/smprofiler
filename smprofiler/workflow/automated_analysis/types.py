@@ -83,6 +83,7 @@ class ReportCohort:
 class ReportStudyMetadata:
     study_description_phrase: str
     cohorts: tuple[ReportCohort, ...]
+    number_cohorts: int
     number_samples: int
     main_author: str
     reference_footnote: str
