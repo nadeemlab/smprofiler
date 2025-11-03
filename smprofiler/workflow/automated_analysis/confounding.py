@@ -60,9 +60,9 @@ class SimpleConfounding:
         common = self._get_common_phenotype()
         if self.r2.case.metric == 'fractions':
             if common == 'phenotype':
-                return (self.r1.higher_cohort == self.r2.higher_cohort) or (self.r1.lower_cohort() == self.r2.lower_cohort())
+                return (self.r1.higher_cohort == self.r2.higher_cohort) or (self.r1.lower_cohort == self.r2.lower_cohort)
             if common == 'other':
-                return (self.r1.higher_cohort == self.r2.lower_cohort()) or (self.r1.lower_cohort() == self.r2.higher_cohort)
+                return (self.r1.higher_cohort == self.r2.lower_cohort) or (self.r1.lower_cohort == self.r2.higher_cohort)
         if self.r2.case.metric == 'proximity':
             return self.r1.higher_cohort == self.r2.higher_cohort
         return False

@@ -4,6 +4,7 @@ from typing import cast
 from itertools import product
 from itertools import combinations
 from itertools import chain
+import datetime
 
 from pandas import concat
 from pandas import DataFrame
@@ -35,6 +36,9 @@ from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentL
 
 logger = colorized_logger(__name__)
 
+def form_case(*args) -> Case:
+    return Case(*args, Case._form_phenotype_str(args[0]), Case._form_phenotype_str(args[1]))
+
 class StudyAutoAssessor(ChainableDestructableResource):
     """
     Automatically search and filter significant results from among, first, elementary
@@ -50,6 +54,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
     omitted_cohorts: tuple[str, ...]
     number_samples: int
     logger: AssessmentLogger
+    cohorts_by_key: dict[str, ReportCohort]
 
     def __init__(self, access: StudyDataAccessor, interactive: bool, limits: Limits=DEFAULT_LIMITS, omitted_cohorts: list[str] | None=None):
         self.access = access
@@ -61,6 +66,8 @@ class StudyAutoAssessor(ChainableDestructableResource):
 
     def get_filtered_results(self) -> AnalysisSummary:
         self._initial_fetch()
+        metadata = StudyMetadataPresenter.form_presentation_extracts(self.access, self.omitted_cohorts)
+        self.cohorts_by_key = metadata.cohorts_by_key
         singleton_significants = self._get_results_from_phase(1, ())
         ratio_significants = self._get_results_from_phase(2, singleton_significants)
         proximity_significants = self._get_results_from_phase(3, singleton_significants)
@@ -72,7 +79,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
         )
         results = FilteredResults(*args, self._form_results_dataframe(*args))
         highlights = HighlightExtractor.extract_highlights(results)
-        metadata = StudyMetadataPresenter.form_presentation_extracts(self.access, self.omitted_cohorts) 
+        
         return AnalysisSummary(results, highlights, metadata)
 
     def _initial_fetch(self) -> None:
@@ -107,12 +114,12 @@ class StudyAutoAssessor(ChainableDestructableResource):
     def _get_cases(self, phase: int) -> tuple[Case, ...]:
         if phase == 1:
             return tuple(map(
-                lambda c: Case(self._form_single_phenotype(c[0]), None, c[1], 'fractions'),
+                lambda c: form_case(self._form_single_phenotype(c[0]), None, c[1], 'fractions'),
                 product(self.channels, combinations(self.cohorts, 2))
             ))
         if phase == 2:
             return tuple(map(
-                lambda c: Case(self._form_single_phenotype(c[0]), self._form_single_phenotype(c[1]), c[2], 'fractions'),
+                lambda c: form_case(self._form_single_phenotype(c[0]), self._form_single_phenotype(c[1]), c[2], 'fractions'),
                 filter(
                     lambda c: c[0] != c[1],
                     product(self.channels, self.channels, combinations(self.cohorts, 2))
@@ -120,7 +127,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
             ))
         if phase == 3:
             return tuple(map(
-                lambda c: Case(self._form_single_phenotype(c[0]), self._form_single_phenotype(c[1]), c[2], 'proximity'),
+                lambda c: form_case(self._form_single_phenotype(c[0]), self._form_single_phenotype(c[1]), c[2], 'proximity'),
                 product(self.channels, self.channels, combinations(self.cohorts, 2)),
             ))
         raise ValueError(f'Phase requested: {phase}')
@@ -166,7 +173,18 @@ class StudyAutoAssessor(ChainableDestructableResource):
             effect = 1.0 / effect
         N = self.number_samples
         significance = ResultSignificance(float(p), effect, compare_result.fraction_data_used(N))
-        return Result(case, higher_cohort, significance, self.limits.acceptable(significance)) 
+        l = Result._find_lower_cohort(case, higher_cohort)
+        return Result(
+            case,
+            higher_cohort,
+            significance,
+            self.limits.acceptable(significance),
+            l,
+            Result._form_report_cohorts(higher_cohort, l, self._report_cohorts()),
+        ) 
+
+    def _report_cohorts(self) -> dict[str, ReportCohort]:
+        return self.cohorts_by_key
 
     def _form_results_dataframe(self, s1: tuple[Result, ...], s2: tuple[Result, ...], s3: tuple[Result, ...]):
         df1 = DataFrame([self._form_result_record(r) for r in s1])
@@ -195,12 +213,16 @@ class HighlightExtractor:
     @classmethod
     def extract_highlights(cls, results: FilteredResults) -> Highlights:
         extracted: list[tuple[Result, ...]] = []
+        by_metric: list[tuple[Result, ...]] = []
         for results_metric in (results.single_fractions, results.ratios, results.proximity):
-            results20 = cls.get_top(25, results_metric)
-            pared = cls.remove_common_patterns(results20)
+            results25 = cls.get_top(25, results_metric)
+            pared = cls.remove_common_patterns(results25)
             extracted.append(pared)
+            by_metric.append(cls.get_top(10, pared))
         top3 = cls.get_top(3, tuple(chain(*extracted)))
-        return Highlights(top3, FilteredResults(*extracted, None))
+        # still need to dedup, remove those top3 from the others.
+        highlights = Highlights(top3, FilteredResults(*by_metric, None))
+        return highlights
 
     @classmethod
     def get_top(cls, number: int, results: tuple[Result, ...]) -> tuple[Result, ...]:
@@ -246,34 +268,48 @@ class HighlightExtractor:
         return tuple(representatives + results_no_pattern)
 
 
+def _summarize_cohort(c: Cohort, assignments: list[CohortAssignment]) -> ReportCohort:
+        long_name = ', '.join((c.diagnosis, c.result.lower()))
+        abbreviation = ''.join(map(lambda part: part[0].upper(), filter(lambda part: part not in ['to', 'and', 'of'], re.split(r'[ \-/]', c.result))))
+        return ReportCohort(len(assignments), long_name, abbreviation)
+
+
 class StudyMetadataPresenter:
     @classmethod
     def form_presentation_extracts(cls, access: StudyDataAccessor, omitted_cohorts: tuple[str, ...]) -> ReportStudyMetadata:
         summary = access._retrieve_study_summary()
         cohorts = tuple(map(
-            lambda c: cls._summarize_cohort(
+            lambda c: _summarize_cohort(
                 c,
                 list(filter(lambda a: a.cohort == c.identifier, summary.cohorts.assignments))
             ),
             filter(lambda c: c.identifier not in omitted_cohorts, summary.cohorts.cohorts),
         ))
+        cohorts_by_key = dict(tuple(map(
+            lambda c: (c.identifier, _summarize_cohort(
+                c,
+                list(filter(lambda a: a.cohort == c.identifier, summary.cohorts.assignments))
+            )),
+            filter(lambda c: c.identifier not in omitted_cohorts, summary.cohorts.cohorts),
+        )))
         author = summary.products.publication.first_author_name.split(' ')[-1]
         return ReportStudyMetadata(
             access.get_study_name(),
             cohorts,
-            len(cohorts),
+            len(cohorts) + 1,
             sum(map(lambda c: c.number_samples, cohorts)),
             author,
             cls._form_reference(summary.products.publication, author),
             summary.context.assay.name,
             summary.counts.channels,
+            cls._form_current_date(),
+            cohorts_by_key,
         )
 
     @classmethod
-    def _summarize_cohort(cls, c: Cohort, assignments: list[CohortAssignment]) -> ReportCohort:
-        long_name = ', '.join((c.diagnosis, c.result.lower()))
-        abbreviation = ''.join(map(lambda part: part[0].upper(), filter(lambda part: part not in ['to', 'and', 'of'], re.split(r'[ \-/]', c.result))))
-        return ReportCohort(len(assignments), long_name, abbreviation)
+    def _form_current_date(cls) -> str:
+        today = datetime.date.today()
+        return today.strftime('%b %-d %Y')
 
     @classmethod
     def _form_reference(cls, p: Publication, author: str) -> str:

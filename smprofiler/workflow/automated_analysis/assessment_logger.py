@@ -67,13 +67,13 @@ class AssessmentLogger(ChainableDestructableResource):
         s = result.significance
         w = self.name_width + 22
         p = self._format_phenotype((result.case.phenotype))
-        pre = ('{:>' + str(w) + '}').format(f'{p} fractions in cohort {result.higher_cohort} (vs {result.lower_cohort()})')
+        pre = ('{:>' + str(w) + '}').format(f'{p} fractions in cohort {result.higher_cohort} (vs {result.lower_cohort})')
         message = f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())}  used = {"%.3f" % s.fraction_data_used}'
         return message
 
     @staticmethod
     def _format_effect(e: float) -> str:
-        return '{:>12}'.format('%.1f' % e) + ' x'
+        return '{:>12}'.format('%.1f' % e) + r' $\times$ ' 
 
     @staticmethod
     def _format_p(p: float) -> str:
@@ -96,7 +96,7 @@ class AssessmentLogger(ChainableDestructableResource):
         s = result.significance
         p1 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.phenotype))
         p2 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.other))
-        pre = f'{p1} / {p2}   ratios in cohort {result.higher_cohort} (vs {result.lower_cohort()})'
+        pre = f'{p1} / {p2}   ratios in cohort {result.higher_cohort} (vs {result.lower_cohort})'
         return f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())}  used = {"%.3f" % s.fraction_data_used}'
 
     def _format_proximity(self, result: Result) -> str:
@@ -105,7 +105,7 @@ class AssessmentLogger(ChainableDestructableResource):
         s = result.significance
         p1 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.phenotype))
         p2 = ('{:>' + str(self.name_width + 1) + '}').format(self._format_phenotype(result.case.other))
-        pre = f'{p1} have a number of nearby {p2}   cells in cohort {result.higher_cohort} (vs {result.lower_cohort()})'
+        pre = f'{p1} have a number of nearby {p2}   cells in cohort {result.higher_cohort} (vs {result.lower_cohort})'
         return f'{pre} {self._format_effect(s.effect)}   {self._format_p(s.p)}  {self._format_quality(s.quality())}  used = {"%.3f" % s.fraction_data_used}'
 
 

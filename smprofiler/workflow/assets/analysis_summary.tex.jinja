@@ -2,77 +2,45 @@
 
 \usepackage{hyperref}
 \hypersetup{
-    colorlinks=true,
-    linkcolor=blue,
-    filecolor=magenta,      
-    urlcolor=blue,
-    pdftitle={Analysis report},
+  colorlinks=true,
+  linkcolor=blue,
+  filecolor=magenta,      
+  urlcolor=blue,
+  pdftitle={Analysis report},
 }
-\usepackage{graphicx} % Required for including images
+\usepackage{graphicx}
 
 \usepackage[
-	%a4paper, % Change to letterpaper for US Letter
 	top=2cm, 
 	bottom=2cm, 
 	left=2cm, 
 	right=2cm
-]{geometry} % Document margins
+]{geometry}
 
-\usepackage{fp} % Required for report calculations
-\usepackage{advdate} % Required for date calculation
+\usepackage{advdate}
 
-\setlength\parindent{0pt} % Stop paragraph indentation
+\setlength\parindent{0pt}
 
-\usepackage[utf8]{inputenc} % Required for inputting international characters
-\usepackage[T1]{fontenc} % Output font encoding for international characters
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 
-\usepackage{tgadventor} % Use the TeX Gyre Adventor font
-%\renewcommand*\familydefault{\sfdefault} % Set the base font of the document to sans serif
+\usepackage{tgadventor}
+%\renewcommand*\familydefault{\sfdefault}
 
-\usepackage{xcolor} % Required for defining and using custom colours
+\usepackage{xcolor}
 
-\definecolor{highlightcolour}{HTML}{DF0174} % Colour used for making text stand out
-\definecolor{rulecolour}{HTML}{B2BEB5} % Colour used for rules
+\definecolor{highlightcolour}{HTML}{DF0174}
+\definecolor{rulecolour}{HTML}{B2BEB5}
 
-\usepackage{colortbl} % Required for colouring table cells (used for rules)
-\usepackage{booktabs} % Required for nicer table rules
-\usepackage{multirow} % Required for allowing cells to take up multiple rows in tables
-\usepackage{array} % Required for customizing table spacing and features
-\def\arraystretch{1.2} % Table row spacing, 1 is the default
+\usepackage{colortbl}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\def\arraystretch{1.2}
 
 \newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt} }m { #1 } }
 
-\newcommand{\dataname}[1]{\renewcommand{\dataname}{ #1} }
-\newcommand{\datajob}[1]{\renewcommand{\datajob}{ #1} }
-\newcommand{\dataaddresslineone}[1]{\renewcommand{\dataaddresslineone}{ #1} }
-\newcommand{\dataaddresslinetwo}[1]{\renewcommand{\dataaddresslinetwo}{ #1} }
-\newcommand{\datacontactlineone}[1]{\renewcommand{\datacontactlineone}{ #1} }
-\newcommand{\datacontactlinetwo}[1]{\renewcommand{\datacontactlinetwo}{ #1} }
-
-\newcommand{\reportref}[1]{\renewcommand{\reportref}{ #1} }
-\newcommand{\reportissued}[1]{\renewcommand{\reportissued}{ #1} }
-\newcommand{\reportdue}[1]{\renewcommand{\reportdue}{ #1} }
-\newcommand{\projectname}[1]{\renewcommand{\projectname}{ #1} }
-
-\newcommand{\companyname}[1]{\renewcommand{\companyname}{ #1} }
-\newcommand{\sendername}[1]{\renewcommand{\sendername}{ #1} }
-\newcommand{\senderjob}[1]{\renewcommand{\senderjob}{ #1} }
-\newcommand{\senderaddresslineone}[1]{\renewcommand{\senderaddresslineone}{ #1} }
-\newcommand{\senderaddresslinetwo}[1]{\renewcommand{\senderaddresslinetwo}{ #1} }
-\newcommand{\sendercontactlineone}[1]{\renewcommand{\sendercontactlineone}{ #1} }
-\newcommand{\sendercontactlinetwo}[1]{\renewcommand{\sendercontactlinetwo}{ #1} }
-
 \newcommand{\termsandconditions}[1]{\renewcommand{\termsandconditions}{ #1} }
-\newcommand{\num}[1]{\renewcommand{\num}{num #1} }
-
-\gdef\variableA{0}
-\gdef\variableB{0}
-\gdef\variableC{0}
-\gdef\variableD{0}
-
-\gdef\TotalA{0} 
-\gdef\TotalB{0}
-\gdef\TotalC{0}
 
 
 \newcommand{\reportinformation}{
@@ -80,40 +48,56 @@
     \fontfamily{\sfdefault}
     \begin{tabular}{p{0.1\textwidth} m{0.6\textwidth} m{0.15\textwidth} p{0.15\textwidth} }
       & \textbf{Top findings} &  & \textbf{t-test} \\
-			\arrayrulecolor{rulecolour}\toprule[0.5pt] % Horizontal line
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       \includegraphics[width=24pt]{Pie4} & CD8+ T cells are elevated 2.5 times in Non-Responders (NR) compared with Complete Responders (CR). & \color{highlightcolour} \Huge 2.5 $\times$ & $p=0.05$ \\
       \includegraphics[width=24pt]{Pie4} & FOXP3+ cells are elevated 1.5 times in Responders (R) compared with Non-Responders (NR). & \Huge 1.5 $\times$ & $p=0.5$ \\
       \includegraphics[width=24pt]{Pie4} & PDL1+ cells are elevated 1.3 times in Responders (R) compared with Non-Responders (NR). & \Huge 1.3 $\times$ & $p=0.5$ \\
       {% for result in highlights.top3 %}
-      \includegraphics[width=24pt]{Pie4} & {{ result.case.metric }} {{ result.case.higher_cohort }} {{ result.case.phenotype.positive_markers }} & \Huge \color{highlightcolour} {{ result.significance.effect | effect_filter }}  & $ {{ result.significance.p | pvalue_filter }} $  \\
+      \includegraphics[width=24pt]{Pie4} & {{ result.case.metric }} {{ result.higher_cohort }} {{ result.phenotype_str }} {{ result.other_str }} & \Huge \color{highlightcolour} {{ result.significance.effect | effect_filter }}  & $ {{ result.significance.p | pvalue_filter }} $  \\
       {% endfor %}
 		\end{tabular}
-	}
-}
 
-\newenvironment{reporttable}
-{
-	\begin{tabular}{p{0.45\textwidth} R{0.15\textwidth} R{0.15\textwidth} R{0.15\textwidth} }
-		\textbf{item} & \textbf{quantity} & \textbf{value} & \textbf{total} \\
-		\arrayrulecolor{rulecolour}\toprule[0.5pt]
-}{	
-		\arrayrulecolor{rulecolour}\bottomrule[0.5pt]
-		\\ [-1em] 
-		&&  & \num{\TotalA} \\
-		&&  & \num{\TotalB} \\ 
-		&&  & \num{\TotalC} \\
-	\end{tabular}
-}
+    \vspace{2pc}
 
-\newcommand{\amount}{
-	{
-		\footnotesize
-		\begin{tabular}{>{\arraybackslash}m{0.625\textwidth} p{0.05\textwidth} R{0.25\textwidth} }
-			\textbf{Notes and disclaimers} & & \textbf{} \\
-			\arrayrulecolor{rulecolour}\toprule[0.5pt]\\[-1.25em] % Horizontal line at the top of the table
-			\termsandconditions & & {\color{highlightcolour} \Huge \num{\TotalC} }\\
+    \begin{center}
+      \fontfamily{\sfdefault}
+      { \LARGE Additional findings }
+    \end{center}
+
+    \vspace{2pc}
+    \begin{center}\includegraphics[width=24pt]{Pie4}\textbf{Cell population fractions}\end{center}
+
+    \begin{tabular}{p{0.2\textwidth} p{0.2\textwidth} p{0.2\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
+      Cell type & Elevated in & Compared to & By amount & t-test \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+      {% for result in highlights.top10.single_fractions %}
+      {{ result.case.phenotype_str }} & {{ result.report_cohorts[0].abbreviation }} & {{ result.report_cohorts[1].abbreviation }} & {{ result.significance.effect | effect_filter }}  & $ {{ result.significance.p | pvalue_filter }} $  \\
+      {% endfor %}
 		\end{tabular}
-	}
+
+    \vspace{2pc}
+    \begin{center}\textbf{Cell population pair ratios}\end{center}
+
+    \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
+      Cell type & Other cell type & Ratio elevated in & Compared to & By amount & t-test \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+      {% for result in highlights.top10.ratios %}
+      {{ result.case.phenotype_str }} & {{ result.case.other_str}} & {{ result.report_cohorts[0].abbreviation }} & {{ result.report_cohorts[1].abbreviation }} & {{ result.significance.effect | effect_filter }}  & $ {{ result.significance.p | pvalue_filter }} $  \\
+      {% endfor %}
+		\end{tabular}
+ 
+    \vspace{2pc}
+    \begin{center}\textbf{Cell population pair proximity}\end{center}
+
+    \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
+      Cell type & Other cell type & Proximity elevated in & Compared to & By amount & t-test \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+      {% for result in highlights.top10.proximity %}
+      {{ result.case.phenotype_str }} & {{ result.case.other_str}} & {{ result.report_cohorts[0].abbreviation }} & {{ result.report_cohorts[1].abbreviation }} & {{ result.significance.effect | effect_filter }}  & $ {{ result.significance.p | pvalue_filter }} $  \\
+      {% endfor %}
+		\end{tabular}
+ 
+  }
 }
 
 \usepackage{everypage}
@@ -127,29 +111,31 @@
 
 \newenvironment{report}
 {
-  \thispagestyle{empty} % Suppress headers and footers
-  \atxy{0.2in}{0.6in}{\includegraphics[width=3.5cm]{smprofiler_logo} }
-  \atxy{6in}{0.4in}{\emph{Report generated 10/10/2025} }
+  \thispagestyle{empty}
+  \atxy{-0.35cm}{0.6in}{ \href{https://smprofiler.io}{\includegraphics[width=3.5cm]{smprofiler_logo}} }
+  \atxy{6.2in}{0.4in}{\emph{Report generated {{ metadata.date_generated }} }}
 
   \begin{center}
     \fontfamily{\sfdefault}
-    {\color{blue(pigment)}\Huge Multiplex imaging dataset} \\
-    {\color{blue(pigment)}\Huge Spatial analysis report}
+    {
+      {\color{blue(pigment)}\Huge Multiplex imaging dataset} \\
+      \vspace{1pc}
+      {\color{blue(pigment)}\LARGE Spatial pattern analysis report}
+    }
 	\end{center}
 	
 	\vspace{1cm}
 
-  % section with very, very brief summary of dataset; name, cohorts with counts
   {
     \fontfamily{\sfdefault} 
     \large
 		\begin{tabular}{p{0.3\textwidth} r p{0.4\textwidth} p{0.1\textwidth} }
-			\arrayrulecolor{rulecolour}\toprule[0.5pt] % Horizontal line at the top of the table
-       \multirow{ {{ metadata.number_cohorts }} }{*}{ {\color{highlightcolour} \LARGE {{ metadata.study_description_phrase }}  } } & & & \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+       \multirow{ {{ metadata.number_cohorts_plus_one }} }{*}{ {\color{highlightcolour} \LARGE \parbox[c][4em]{\hsize}{ {{ metadata.study_description_phrase }} } } } & & & \\
       {% for cohort in metadata.cohorts %}
       &  {{ cohort.number_samples }} samples & {{ cohort.name }} & \textbf{ {{ cohort.abbreviation }} } \\
       {% endfor %}
-			\arrayrulecolor{rulecolour}\bottomrule[0.5pt] % Horizontal line at the bottom of the table
+			\arrayrulecolor{rulecolour}\bottomrule[0.5pt]
 		\end{tabular}
 	}
 \vspace{2pc}	
@@ -163,28 +149,8 @@ cells imaged in histology slides.
 	\vfill
 }{ 
 	\vfill
-	\amount % abc 
 }
 
-\reportref{x}
-\reportissued{s}
-\reportdue{s}
-\projectname{s}
-
-\dataname{name}
-\datajob{job}
-\dataaddresslineone{addr1}
-\dataaddresslinetwo{addr2}
-\datacontactlineone{abc@abc.com}
-\datacontactlinetwo{smprofiler.io}
-
-\companyname{Multiplex imaging \\ Spatial analysis report}
-\sendername{report generator}
-\senderjob{job}
-\senderaddresslineone{addr1}
-\senderaddresslinetwo{addr2}
-\sendercontactlineone{smprofiler.io}
-\sendercontactlinetwo{smprofiler.io}
 
 \termsandconditions{Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent porttitor arcu luctus, imperdiet urna iaculis, mattis eros. Pellentesque iaculis odio vel nisl ullamcorper, nec faucibus ipsum molestie. Sed dictum nisl non aliquet porttitor. Etiam vulputate arcu dignissim, finibus sem et, viverra nisl. Aenean luctus congue massa, ut laoreet metus ornare in. \newline\newline Aliquam arcu turpis, ultrices sed luctus ac, vehicula id metus. Morbi eu feugiat velit, et tempus augue. Proin ac mattis tortor. Donec tincidunt, ante rhoncus luctus semper, arcu lorem lobortis justo, nec convallis ante quam quis lectus. Aenean tincidunt sodales massa, et hendrerit tellus mattis ac. Sed non pretium nibh.} 
 

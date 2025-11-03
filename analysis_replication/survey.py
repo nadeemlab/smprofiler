@@ -22,8 +22,6 @@ from smprofiler.workflow.automated_analysis.auto_assessor import StudyAutoAssess
 
 logger = colorized_logger(__name__)
 
-cattrs_converter = Converter()
-
 def _pydantic_adaptor(value: PhenotypeCriteria) -> dict[str, tuple[str, ...]]:
     if isinstance(value, PhenotypeCriteria):
         return {'positive_markers': value.positive_markers, 'negative_markers': value.negative_markers}
@@ -31,10 +29,9 @@ def _pydantic_adaptor(value: PhenotypeCriteria) -> dict[str, tuple[str, ...]]:
 def _pandas_adaptor(_: DataFrame) -> str:
     return '(elided)'
 
-
+cattrs_converter = Converter()
 cattrs_converter.register_unstructure_hook(PhenotypeCriteria, _pydantic_adaptor)
 cattrs_converter.register_unstructure_hook(DataFrame, _pandas_adaptor)
-
 
 def result_quality(r: Result) -> float:
     return -1 * r.quality()
@@ -82,7 +79,7 @@ def survey(host: str, study: str, interactive: bool, omitted_cohorts: list[str] 
         summary = a.get_filtered_results()
         assessment_logger = a.logger
     print_to_console(summary.results, summary.highlights, assessment_logger)
-    plain_structured = cattrs_converter.unstructure(summary) 
+    plain_structured = cattrs_converter.unstructure_attrs_asdict(summary) 
     print(json_dumps(plain_structured, indent=2))
     generate_report(plain_structured)
     return summary.results, summary.highlights
