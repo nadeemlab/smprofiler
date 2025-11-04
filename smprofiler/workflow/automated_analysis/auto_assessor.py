@@ -228,14 +228,16 @@ class StatementAugmentor:
     def _generate_statement(self, result: Result) -> str:
         cohorts = self._reportable_cohorts(result)
         case = form_reportable_case(result.case)
-        effect = AssessmentLogger._format_effect(result.significance.effect)
+        effect = AssessmentLogger._format_effect_no_times(result.significance.effect)
         p = AssessmentLogger._format_p(result.significance.p)
         if result.case.metric == 'fractions':
             if result.case.other is None:
                 return fr'The overall fraction of {case.phenotype_str} cells is elevated by {effect} times in \textbf{{{cohorts.higher_cohort.abbreviation}}} samples compared with \textbf{{{cohorts.lower_cohort.abbreviation}}} samples, the difference being significant at level ${p}$ by the t-test.'
             else:
                 return fr'The ratio of {case.phenotype_str} cells to {case.other_phenotype_str} cells is elevated by {effect} times in \textbf{{{cohorts.higher_cohort.abbreviation}}} samples compared with \textbf{{{cohorts.lower_cohort.abbreviation}}} samples, the difference being significant at level ${p}$ by the t-test.'
-        return ''
+        if result.case.metric == 'proximity':
+            return fr'The average number of {case.other_phenotype_str} cells within 50px of a given {case.phenotype_str} cell is {effect} times higher in \textbf{{{cohorts.higher_cohort.abbreviation}}} samples compared with \textbf{{{cohorts.lower_cohort.abbreviation}}} samples, the difference being significant at level ${p}$ by the t-test.'
+        raise ValueError('This case is not covered for verbalization.')
 
     def _reportable_cohorts(self, result: Result) -> ReportableCohorts:
         return ReportableCohorts(

@@ -40,9 +40,6 @@
 
 \newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt} }m { #1 } }
 
-\newcommand{\termsandconditions}[1]{\renewcommand{\termsandconditions}{ #1} }
-
-
 \newcommand{\reportinformation}{
 	{
     \fontfamily{\sfdefault}
@@ -56,7 +53,7 @@
       &  &  & \textbf{t-test} \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top3 %}
-      \includegraphics[width=24pt]{Pie4} & {{ result.statement }} & \Huge \color{highlightcolour} {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $  \\
+      \includegraphics[width=24pt]{Pie4} & {{ result.statement }} & \Huge \color{highlightcolour} {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $  \\[2pc]
       {% endfor %}
 		\end{tabular}
 
@@ -134,34 +131,29 @@
     \large
 		\begin{tabular}{p{0.3\textwidth} r p{0.4\textwidth} p{0.1\textwidth} }
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
-       \multirow{ {{ metadata.number_cohorts_plus_one }} }{*}{ {\color{highlightcolour} \LARGE \parbox[c][4em]{\hsize}{ {{ metadata.study_description_phrase }} } } } & & & \\
+       \multirow{ {{ metadata.number_cohorts_plus_one }} }{*}{ {\color{highlightcolour} \LARGE \parbox[c][4em]{\hsize}{ \raggedright {{ metadata.study_description_phrase }} } } } & & & \\
       {% for cohort in metadata.cohorts %}
       &  {{ cohort.number_samples }} samples & {{ cohort.name }} & \textbf{ {{ cohort.abbreviation }} } \\
       {% endfor %}
 			\arrayrulecolor{rulecolour}\bottomrule[0.5pt]
 		\end{tabular}
 	}
-\vspace{2pc}	
+
+  \vspace{2pc}	
 
 {{ metadata.number_samples }} samples were collected and analyzed by {{ metadata.main_author }} et al \footnote{ {{ metadata.reference_footnote }} },
 using {{ metadata.data_collection_modality }} to capture abundance of {{ metadata.number_channels }} proteins in single
 cells imaged in histology slides.
-\vspace{2pc}	
 
+  \vspace{2pc}	
 	\reportinformation
 	\vfill
 }{ 
 	\vfill
 }
 
-
-\termsandconditions{Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent porttitor arcu luctus, imperdiet urna iaculis, mattis eros. Pellentesque iaculis odio vel nisl ullamcorper, nec faucibus ipsum molestie. Sed dictum nisl non aliquet porttitor. Etiam vulputate arcu dignissim, finibus sem et, viverra nisl. Aenean luctus congue massa, ut laoreet metus ornare in. \newline\newline Aliquam arcu turpis, ultrices sed luctus ac, vehicula id metus. Morbi eu feugiat velit, et tempus augue. Proin ac mattis tortor. Donec tincidunt, ante rhoncus luctus semper, arcu lorem lobortis justo, nec convallis ante quam quis lectus. Aenean tincidunt sodales massa, et hendrerit tellus mattis ac. Sed non pretium nibh.} 
-
-
 \begin{document}
-
 \begin{report}
 \end{report}
-
 \end{document}
 

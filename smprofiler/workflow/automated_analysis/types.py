@@ -43,10 +43,18 @@ class ReportableCase:
     def _form_phenotype_str(cls, phenotype: PhenotypeCriteria | None) -> str | None:
         if phenotype is None:
             return None
-        return ' '.join(chain(
+        form = ' '.join(chain(
             map(lambda m: cls._sanitize_channel(m) + '+', phenotype.positive_markers),
             map(lambda m: cls._sanitize_channel(m) + '-', phenotype.negative_markers),
         ))
+        return cls._handle_special_cases(form)
+
+    @classmethod
+    def _handle_special_cases(cls, form: str) -> str:
+        pattern = r'^distance to (\w+)\-$' 
+        if re.search(pattern, form):
+            return re.sub(pattern, r'\1-near', form)
+        return form
 
     @classmethod
     def _sanitize_channel(cls, c: str) -> str:
