@@ -131,10 +131,14 @@
     \large
 		\begin{tabular}{p{0.3\textwidth} r p{0.4\textwidth} p{0.1\textwidth} }
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
-       \multirow{ {{ metadata.number_cohorts_plus_one }} }{*}{ {\color{highlightcolour} \LARGE \parbox[c][4em]{\hsize}{ \raggedright {{ metadata.study_description_phrase }} } } } & & & \\
+      \multirow{ {{ metadata.number_cohorts }} }{*}{ {\color{highlightcolour} \LARGE
+          \parbox[c][2em]{\hsize}{ \raggedright {{ metadata.study_description_phrase }}
+        } } }
+      & & & \\
       {% for cohort in metadata.cohorts %}
       &  {{ cohort.number_samples }} samples & {{ cohort.name }} & \textbf{ {{ cohort.abbreviation }} } \\
       {% endfor %}
+      & & & \\
 			\arrayrulecolor{rulecolour}\bottomrule[0.5pt]
 		\end{tabular}
 	}

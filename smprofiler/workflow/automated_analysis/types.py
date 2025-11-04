@@ -135,7 +135,7 @@ class Highlights:
 class ReportStudyMetadata:
     study_description_phrase: str
     cohorts: tuple[ReportableCohort, ...]
-    number_cohorts_plus_one: int
+    number_cohorts: int
     number_samples: int
     main_author: str
     reference_footnote: str
