@@ -35,7 +35,7 @@ cattrs_converter.register_unstructure_hook(DataFrame, _pandas_adaptor)
 
 def result_quality(r: Result) -> float:
     return -1 * r.quality()
- 
+
 def print_to_console_3_metric_types(results: FilteredResults, assessment_logger: AssessmentLogger) -> None:
     print('')
     print('Single channel fractions results:')
@@ -55,13 +55,13 @@ def print_to_console_3_metric_types(results: FilteredResults, assessment_logger:
 
 def print_to_console(results, highlights, assessment_logger) -> None:
     print_to_console_3_metric_types(results, assessment_logger)
-    print('')
-    print('Top 3 from filtered:')
-    for result in sorted(highlights.top3, key=result_quality):
-        print(assessment_logger._format_singleton(result))
-    print('')
-    print('Top 25s, after accounting for patterns:')
-    print_to_console_3_metric_types(highlights.top10, assessment_logger)
+    #print('')
+    #print('Top 3 from filtered:')
+    #for result in sorted(highlights.top3, key=result_quality):
+    #    print(assessment_logger._format_singleton(result))
+    #print('')
+    #print('Top 25s, after accounting for patterns:')
+    #print_to_console_3_metric_types(highlights.top10, assessment_logger)
 
 def generate_report(summary) -> None:
     jinja_environment = Environment(loader=BaseLoader(), comment_start_string='###')
@@ -77,11 +77,12 @@ def generate_report(summary) -> None:
 def survey(host: str, study: str, interactive: bool, omitted_cohorts: list[str] | None) -> tuple[FilteredResults, Highlights]:
     with StudyAutoAssessor(StudyDataAccessor(study, host=host), interactive=interactive, omitted_cohorts=omitted_cohorts) as a:
         summary = a.get_filtered_results()
-        assessment_logger = a.logger
-    print_to_console(summary.results, summary.highlights, assessment_logger)
-    plain_structured = cattrs_converter.unstructure_attrs_asdict(summary) 
+        #assessment_logger = a.logger
+    #print_to_console(summary.results, summary.highlights, assessment_logger)
+    plain_structured = cattrs_converter.unstructure(summary) 
     print(json_dumps(plain_structured, indent=2))
     generate_report(plain_structured)
+    #generate_report(summary)
     return summary.results, summary.highlights
 
 def get_default_host(given: str | None) -> str | None:

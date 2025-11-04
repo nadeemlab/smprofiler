@@ -6,7 +6,6 @@ from itertools import chain
 import re
 
 from attrs import define
-from attrs import field
 from pandas import DataFrame
 
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
@@ -25,11 +24,23 @@ class Case:
     other: PhenotypeCriteria | None
     cohorts: tuple[str, str]
     metric: Metric
+
+    def get_phenotypes(self) -> tuple[PhenotypeCriteria, ...]:
+        return cast(tuple[PhenotypeCriteria, ...], tuple(
+            filter(
+                lambda p0: p0 is not None,
+                [self.phenotype, self.other]
+            )
+        ))
+
+@define
+class ReportableCase:
+    metric: Metric
     phenotype_str: str
-    other_str: str
+    other_phenotype_str: str | None
 
     @classmethod
-    def _form_phenotype_str(cls, phenotype: PhenotypeCriteria) -> str:
+    def _form_phenotype_str(cls, phenotype: PhenotypeCriteria | None) -> str | None:
         if phenotype is None:
             return None
         return ' '.join(chain(
@@ -41,13 +52,9 @@ class Case:
     def _sanitize_channel(cls, c: str) -> str:
         return re.sub(r'_', ' ', c)
 
-    def get_phenotypes(self) -> tuple[PhenotypeCriteria, ...]:
-        return cast(tuple[PhenotypeCriteria, ...], tuple(
-            filter(
-                lambda p0: p0 is not None,
-                [self.phenotype, self.other]
-            )
-        ))
+def form_reportable_case(case: Case) -> ReportableCase:
+    c = ReportableCase._form_phenotype_str
+    return ReportableCase(case.metric, cast(str, c(case.phenotype)), c(case.other))
 
 @define
 class ResultSignificance:
@@ -63,7 +70,7 @@ class ResultSignificance:
         return 1.0 - self.fraction_data_used
 
 @define
-class ReportCohort:
+class ReportableCohort:
     number_samples: int
     name: str
     abbreviation: str
@@ -79,11 +86,6 @@ class Result:
     significance: ResultSignificance
     significant: bool
     lower_cohort: str
-    report_cohorts: tuple[ReportCohort, ReportCohort]
-
-    @classmethod
-    def _form_report_cohorts(cls, higher_cohort: str, lower_cohort: str, key: dict[str, ReportCohort]) -> tuple[ReportCohort, ReportCohort]:
-        return (key[higher_cohort], key[lower_cohort])
 
     @classmethod
     def _find_lower_cohort(cls, case: Case, higher_cohort: str) -> str:
@@ -91,6 +93,21 @@ class Result:
 
     def quality(self) -> float:
         return self.significance.quality()
+
+def form_result(case: Case, higher_cohort: str, significance: ResultSignificance, significant: bool) -> Result:
+    return Result(case, higher_cohort, significance, significant, Result._find_lower_cohort(case, higher_cohort))
+
+@define
+class ReportableCohorts:
+    higher_cohort: ReportableCohort
+    lower_cohort: ReportableCohort
+
+@define
+class ReportableResult:
+    base: Result
+    case: ReportableCase
+    cohorts: ReportableCohorts
+    statement: str
 
 @define
 class FilteredResults:
@@ -101,13 +118,15 @@ class FilteredResults:
 
 @define
 class Highlights:
-    top3: tuple[Result, ...]
-    top10: FilteredResults
+    top3: tuple[ReportableResult, ...]
+    top10_single_fractions: tuple[ReportableResult, ...]
+    top10_ratios: tuple[ReportableResult, ...] 
+    top10_proximity: tuple[ReportableResult, ...]
 
 @define
 class ReportStudyMetadata:
     study_description_phrase: str
-    cohorts: tuple[ReportCohort, ...]
+    cohorts: tuple[ReportableCohort, ...]
     number_cohorts_plus_one: int
     number_samples: int
     main_author: str
@@ -115,7 +134,7 @@ class ReportStudyMetadata:
     data_collection_modality: str
     number_channels: int
     date_generated: str
-    cohorts_by_key: dict[str, ReportCohort]
+    cohorts_by_key: dict[str, ReportableCohort]
 
 @define
 class AnalysisSummary:
