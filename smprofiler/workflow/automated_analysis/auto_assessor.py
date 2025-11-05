@@ -68,15 +68,15 @@ class StudyAutoAssessor(ChainableDestructableResource):
     number_samples: int
     logger: AssessmentLogger
 
-    def __init__(self, access: StudyDataAccessor, interactive: bool, limits: Limits=DEFAULT_LIMITS, omitted_cohorts: list[str] | None=None):
+    def __init__(self, access: StudyDataAccessor, limits: Limits=DEFAULT_LIMITS, omitted_cohorts: list[str] | None=None):
         self.access = access
         self.limits = limits
         self.omitted_cohorts = tuple(omitted_cohorts) if omitted_cohorts else ()
-        self.logger = AssessmentLogger(interactive=interactive)
+        self.logger = AssessmentLogger(interactive=True)
         self.add_subresource(self.access)
         self.add_subresource(self.logger)
 
-    def get_filtered_results(self) -> AnalysisSummary:
+    def get_summary(self) -> AnalysisSummary:
         self._initial_fetch()
         metadata = StudyMetadataPresenter.form_presentation_extracts(self.access, self.omitted_cohorts)
         singleton_significants = self._get_results_from_phase(1, ())
@@ -355,6 +355,7 @@ class CohortSummarizer:
     def get_cohorts_by_key(self) -> dict[str, ReportableCohort]:
         return self.cohorts_by_key
 
+
 class StudyMetadataPresenter:
     @classmethod
     def form_presentation_extracts(cls, access: StudyDataAccessor, omitted_cohorts: tuple[str, ...]) -> ReportStudyMetadata:
@@ -375,14 +376,8 @@ class StudyMetadataPresenter:
             cls._form_reference(summary.products.publication, author),
             summary.context.assay.name.lower(),
             summary.counts.channels,
-            cls._form_current_date(),
             cohorts_by_key,
         )
-
-    @classmethod
-    def _form_current_date(cls) -> str:
-        today = datetime.date.today()
-        return today.strftime('%b %-d %Y')
 
     @classmethod
     def _form_reference(cls, p: Publication, author: str) -> str:

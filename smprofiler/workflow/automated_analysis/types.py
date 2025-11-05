@@ -141,7 +141,6 @@ class ReportStudyMetadata:
     reference_footnote: str
     data_collection_modality: str
     number_channels: int
-    date_generated: str
     cohorts_by_key: dict[str, ReportableCohort]
 
 @define

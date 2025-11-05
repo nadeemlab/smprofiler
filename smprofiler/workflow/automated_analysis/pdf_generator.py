@@ -1,0 +1,73 @@
+from os import system as os_system
+
+from cattrs import Converter
+from pandas import DataFrame
+from jinja2 import BaseLoader
+from jinja2 import Environment
+from smprofiler.workflow.scripts.configure import _retrieve_from_library
+from smprofiler.db.http_data_accessor import StudyDataAccessor
+from smprofiler.standalone_utilities.timestamping import now
+
+from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
+from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentLogger
+from smprofiler.workflow.automated_analysis.auto_assessor import StudyAutoAssessor
+from smprofiler.db.database_connection import DBCursor
+
+def _pydantic_adaptor(value: PhenotypeCriteria) -> dict[str, tuple[str, ...]]:
+    if isinstance(value, PhenotypeCriteria):
+        return {'positive_markers': value.positive_markers, 'negative_markers': value.negative_markers}
+
+def _pandas_adaptor(_: DataFrame) -> str:
+    return '(elided)'
+
+
+class PDFReportGenerator:
+    api_host: str
+    database_config_file: str
+    study: str
+    omitted_cohorts: list[str] | None
+    parameters: dict
+    pdf: bytes
+
+    def __init__(self, api_host: str, database_config_file: str, study: str, omitted_cohorts: list[str] | None):
+        self.api_host = api_host
+        self.database_config_file = database_config_file
+        self.study = study
+        self.omitted_cohorts = omitted_cohorts
+
+    def generate_and_save(self) -> None:
+        self._generate_template_parameters()
+        self._fill_report_template()
+        self._save_pdf_to_database()
+
+    def _generate_template_parameters(self) -> None:
+        with StudyAutoAssessor(StudyDataAccessor(self.study, host=self.api_host), omitted_cohorts=self.omitted_cohorts) as a:
+            summary = a.get_summary()
+        cattrs_converter = Converter()
+        cattrs_converter.register_unstructure_hook(PhenotypeCriteria, _pydantic_adaptor)
+        cattrs_converter.register_unstructure_hook(DataFrame, _pandas_adaptor)
+        self.parameters = cattrs_converter.unstructure(summary) 
+
+    def _fill_report_template(self) -> None:
+        jinja_environment = Environment(loader=BaseLoader(), comment_start_string='###')
+        jinja_environment.filters['pvalue_filter'] = AssessmentLogger._format_p
+        jinja_environment.filters['effect_filter'] = AssessmentLogger._format_effect
+        contents = _retrieve_from_library('assets', 'analysis_summary.tex.jinja')
+        template = jinja_environment.from_string(contents)
+        rendered = template.render(**self.parameters)
+        with open('analysis_summary.tex', 'wt', encoding='utf-8') as file:
+            file.write(rendered)
+        os_system('pdflatex analysis_summary.tex')
+        self.pdf = open('analysis_summary.pdf', 'rb').read()
+
+    def _save_pdf_to_database(self) -> None:
+        with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
+            create = '''
+            CREATE TABLE IF NOT EXISTS pdf_reports ( blob bytea, date_generated timestamptz );
+            '''
+            insert = '''
+            INSERT INTO pdf_reports VALUES (%s, %s) ;
+            '''
+            cursor.execute(create)
+            cursor.execute(insert, (self.pdf, now()))
+
