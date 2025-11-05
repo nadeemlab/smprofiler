@@ -1,4 +1,7 @@
 from os import system as os_system
+from os.path import exists
+from json import loads as json_loads
+from json import dumps as json_dumps
 
 from cattrs import Converter
 from pandas import DataFrame
@@ -41,12 +44,18 @@ class PDFReportGenerator:
         self._save_pdf_to_database()
 
     def _generate_template_parameters(self) -> None:
+        cache_file = 'template_parameters.json'
+        if exists(cache_file):
+            self.parameters = json_loads(open(cache_file, 'rt', encoding='utf-8').read())
+            return
         with StudyAutoAssessor(StudyDataAccessor(self.study, host=self.api_host), omitted_cohorts=self.omitted_cohorts) as a:
             summary = a.get_summary()
         cattrs_converter = Converter()
         cattrs_converter.register_unstructure_hook(PhenotypeCriteria, _pydantic_adaptor)
         cattrs_converter.register_unstructure_hook(DataFrame, _pandas_adaptor)
         self.parameters = cattrs_converter.unstructure(summary) 
+        with open(cache_file, 'wt', encoding='utf-8') as file:
+            file.write(json_dumps(self.parameters, indent=2))
 
     def _fill_report_template(self) -> None:
         jinja_environment = Environment(loader=BaseLoader(), comment_start_string='###')
@@ -57,7 +66,7 @@ class PDFReportGenerator:
         rendered = template.render(**self.parameters)
         with open('analysis_summary.tex', 'wt', encoding='utf-8') as file:
             file.write(rendered)
-        os_system('pdflatex analysis_summary.tex')
+        os_system('pdflatex analysis_summary.tex --interaction=nonstopmode')
         self.pdf = open('analysis_summary.pdf', 'rb').read()
 
     def _save_pdf_to_database(self) -> None:

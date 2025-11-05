@@ -1,3 +1,4 @@
+\errorcontextlines=10
 \documentclass[10pt]{article}
 
 \usepackage{hyperref}
@@ -27,6 +28,7 @@
 \usepackage{tgadventor}
 %\renewcommand*\familydefault{\sfdefault}
 
+\usepackage{enumitem}
 \usepackage{xcolor}
 
 \definecolor{highlightcolour}{HTML}{DF0174}
@@ -97,6 +99,19 @@
       {% endfor %}
 		\end{tabular}
  
+  \newpage
+  \mbox{}
+  \vfill
+  \begin{center}
+    \fontfamily{\sfdefault}
+    { \Large Notes}
+  \end{center}
+  \begin{enumerate}[label=\alph*.]
+    \item{\rmfamily\emph{This report was generated using the SMProfiler system produced by the Nadeem lab at MSKCC.}}
+    \item{\rmfamily\emph{The following software pacakages may have been used during preparation of this report: ...}}
+    \item{\rmfamily\emph{The findings highlighted are provided for research purposes only. They were determined by automated computational analysis and may not represent the most precise or relevant results available. The clinical and statistical significance should be evaluated by a bioinformatician, statistician, and appropriate medical professionals.}}
+    \item{\rmfamily\emph{The data on which this report is based was published by {{ metadata.main_author }} et al and retrieved by the Nadeem lab from (Zenodo etc. link). The study's authors are not responsible for the contents of this report.}}
+  \end{enumerate}
   }
 }
 
@@ -150,9 +165,8 @@ cells imaged in histology slides.
 
   \vspace{2pc}	
 	\reportinformation
-	\vfill
+
 }{ 
-	\vfill
 }
 
 \begin{document}
