@@ -7,7 +7,6 @@ from itertools import product
 from itertools import combinations
 from itertools import chain
 from typing import Iterable
-import datetime
 
 from pandas import concat
 from pandas import DataFrame
@@ -40,6 +39,7 @@ from smprofiler.workflow.automated_analysis.limits import LIMITS_SEVERE
 from smprofiler.workflow.automated_analysis.limits import DEFAULT_USAGE_LIMITS
 from smprofiler.workflow.automated_analysis.confounding import SimpleConfounding
 from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentLogger
+from smprofiler.workflow.automated_analysis.urls import form_url
 
 logger = colorized_logger(__name__)
 
@@ -218,9 +218,11 @@ class StudyAutoAssessor(ChainableDestructableResource):
 
 class StatementAugmentor:
     cohort_details: dict[str, ReportableCohort]
+    study_name: str
 
-    def __init__(self, cohort_details: dict[str, ReportableCohort]):
+    def __init__(self, cohort_details: dict[str, ReportableCohort], study_name: str):
         self.cohort_details = cohort_details
+        self.study_name = study_name
 
     def augment(self, result: Result) -> ReportableResult:
         return self._form_reportable_result(result, self._generate_statement(result))
@@ -255,6 +257,7 @@ class StatementAugmentor:
             self._reportable_cohorts(result),
             statement,
             metric,
+            form_url(result, self.study_name),
         )
 
 
@@ -271,7 +274,7 @@ class HighlightExtractor:
         top3 = cls.get_top(3, tuple(chain(*extracted)))
         by_metric = list(map(lambda t: cls.remove_specific_set(top3, t), extracted))
         by_metric = list(map(lambda t: cls.get_top(3, t), by_metric))
-        a = StatementAugmentor(metadata.cohorts_by_key)
+        a = StatementAugmentor(metadata.cohorts_by_key, metadata.study_description_phrase)
         f = a.augment
         reportables = tuple_map(lambda t: tuple_map(lambda r: f(r), t), by_metric)
         highlights = Highlights(tuple_map(lambda r: f(r), top3), *reportables)

@@ -66,6 +66,11 @@ class PDFReportGenerator:
         rendered = template.render(**self.parameters)
         with open('analysis_summary.tex', 'wt', encoding='utf-8') as file:
             file.write(rendered)
+        for filename in ('blue_tile.pdf', 'fractions.pdf', 'ratios.pdf', 'proximity.pdf', 'smprofiler_logo.pdf'):
+            file_contents = _retrieve_from_library('assets', filename, binary=True)
+            with open(filename, 'wb') as file:
+                file.write(file_contents)
+        os_system('pdflatex analysis_summary.tex --interaction=nonstopmode')
         os_system('pdflatex analysis_summary.tex --interaction=nonstopmode')
         self.pdf = open('analysis_summary.pdf', 'rb').read()
 

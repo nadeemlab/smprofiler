@@ -48,6 +48,7 @@
 \definecolor{highlightcolour}{HTML}{DF0174}
 \definecolor{rulecolour}{HTML}{B2BEB5}
 
+\usepackage{changepage}
 \usepackage{colortbl}
 \usepackage{booktabs}
 \usepackage{multirow}
@@ -65,14 +66,14 @@
       { \LARGE Top findings }
     \end{center}
 
-    \begin{tabular}{p{0.07\textwidth} m{0.53\textwidth} m{0.15\textwidth} p{0.15\textwidth} }
+    \begin{tabular}{p{0.09\textwidth} m{0.48\textwidth} m{0.15\textwidth} p{0.15\textwidth} p{0.05\textwidth} }
       &  &  & \textbf{t-test} \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top3 %}
       {% if result.metric_inferred == 'fractions' %} \includegraphics[width=35pt]{fractions} {% endif %}
-      {% if result.metric_inferred == 'ratios' %} \includegraphics[width=35pt]{ratios} {% endif %}
+      {% if result.metric_inferred == 'ratios' %} \includegraphics[width=45pt]{ratios} {% endif %}
       {% if result.metric_inferred == 'proximity' %} \includegraphics[width=35pt]{proximity} {% endif %}
-       & {{ result.statement }} & \Huge \color{highlightcolour} {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $  \\[2pc]
+       & {{ result.statement }} & \Huge \color{highlightcolour} {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=18pt]{link-out}}  \\[2pc]
       {% endfor %}
 		\end{tabular}
 
@@ -87,33 +88,33 @@
 
     \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=25pt]{fractions}}\hspace{10pt}\textbf{Cell population fractions}\end{center}
 
-    \begin{tabular}{p{0.2\textwidth} p{0.2\textwidth} p{0.2\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
+    \begin{tabular}{p{0.2\textwidth} p{0.2\textwidth} p{0.2\textwidth} p{0.1\textwidth} p{0.1\textwidth} p{0.05\textwidth}}
       Cell type & Elevated in & Compared to & By amount & t-test \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_single_fractions %}
-      {{ result.case.phenotype_str }} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $  \\
+      {{ result.case.phenotype_str }} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
 
     \vspace{2pc}
     \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=35pt]{ratios}}\hspace{10pt}\textbf{Cell population pair ratios}\end{center}
 
-    \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
+    \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth} p{0.05\textwidth}}
       Cell type & Other cell type & Ratio elevated in & Compared to & By amount & t-test \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_ratios %}
-      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $  \\
+      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
  
     \vspace{2pc}
     \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=35pt]{proximity}}\hspace{10pt}\textbf{Cell population pair proximity}\end{center}
 
-    \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
+    \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth} p{0.05\textwidth}}
       Cell type & Other cell type & Proximity elevated in & Compared to & By amount & t-test \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_proximity %}
-      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $  \\
+      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
  
@@ -175,10 +176,11 @@
 	}
 
   \vspace{2pc}	
-
+  \begin{adjustwidth}{2cm}{2cm}
 {{ metadata.number_samples }} samples were collected and analyzed by {{ metadata.main_author }} et al \footnote{ {{ metadata.reference_footnote }} },
 using {{ metadata.data_collection_modality }} to capture abundance of {{ metadata.number_channels }} proteins in single
 cells imaged in histology slides.
+  \end{adjustwidth}
 
   \vspace{2pc}	
 	\reportinformation

@@ -49,11 +49,15 @@ logger = colorized_logger('smprofiler db configure')
 NF_CONFIG_FILE = 'nextflow.config'
 
 
-def _retrieve_from_library(subpackage: str, filename: str) -> str:
+def _retrieve_from_library(subpackage: str, filename: str, binary: bool=False) -> str:
     filepath = files('.'.join(('smprofiler.workflow', subpackage))).joinpath(filename)
     with as_file(filepath) as path:
-        with open(path, 'rt', encoding='utf-8') as file:
-            contents = file.read()
+        if not binary:
+            with open(path, 'rt', encoding='utf-8') as file:
+                contents = file.read()
+        else:
+            with open(path, 'rb') as file:
+                contents = file.read()
     return contents
 
 

@@ -186,6 +186,11 @@ packages = [
     "log_table.html.jinja",
     "main_visitor.nf",
     "nextflow.config.jinja",
+    "blue_tile.pdf",
+    "fractions.pdf",
+    "ratios.pdf",
+    "proximity.pdf",
+    "smprofiler_logo.pdf",
 ]
 "smprofiler.workflow.graph_generation" = [
     "graph_generation.nf",

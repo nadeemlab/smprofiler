@@ -40,14 +40,16 @@ class ReportableCase:
     other_phenotype_str: str | None
 
     @classmethod
-    def _form_phenotype_str(cls, phenotype: PhenotypeCriteria | None) -> str | None:
+    def _form_phenotype_str(cls, phenotype: PhenotypeCriteria | None, special_cases: bool=True) -> str | None:
         if phenotype is None:
             return None
         form = ' '.join(chain(
             map(lambda m: cls._sanitize_channel(m) + '+', phenotype.positive_markers),
             map(lambda m: cls._sanitize_channel(m) + '-', phenotype.negative_markers),
         ))
-        return cls._handle_special_cases(form)
+        if special_cases:
+            form = cls._handle_special_cases(form)
+        return form
 
     @classmethod
     def _handle_special_cases(cls, form: str) -> str:
@@ -117,6 +119,7 @@ class ReportableResult:
     cohorts: ReportableCohorts
     statement: str
     metric_inferred: str
+    url: str
 
 @define
 class FilteredResults:
