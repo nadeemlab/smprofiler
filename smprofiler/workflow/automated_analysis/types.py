@@ -116,6 +116,7 @@ class ReportableResult:
     case: ReportableCase
     cohorts: ReportableCohorts
     statement: str
+    metric_inferred: str
 
 @define
 class FilteredResults:

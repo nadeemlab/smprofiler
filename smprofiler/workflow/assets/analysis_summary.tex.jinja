@@ -65,11 +65,14 @@
       { \LARGE Top findings }
     \end{center}
 
-    \begin{tabular}{p{0.1\textwidth} m{0.6\textwidth} m{0.15\textwidth} p{0.15\textwidth} }
+    \begin{tabular}{p{0.07\textwidth} m{0.53\textwidth} m{0.15\textwidth} p{0.15\textwidth} }
       &  &  & \textbf{t-test} \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top3 %}
-      \includegraphics[width=24pt]{Pie4} & {{ result.statement }} & \Huge \color{highlightcolour} {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $  \\[2pc]
+      {% if result.metric_inferred == 'fractions' %} \includegraphics[width=35pt]{fractions} {% endif %}
+      {% if result.metric_inferred == 'ratios' %} \includegraphics[width=35pt]{ratios} {% endif %}
+      {% if result.metric_inferred == 'proximity' %} \includegraphics[width=35pt]{proximity} {% endif %}
+       & {{ result.statement }} & \Huge \color{highlightcolour} {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $  \\[2pc]
       {% endfor %}
 		\end{tabular}
 
@@ -82,7 +85,7 @@
       { \LARGE Additional findings }
     \end{center}
 
-    \begin{center}\includegraphics[width=24pt]{Pie4}\textbf{Cell population fractions}\end{center}
+    \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=25pt]{fractions}}\hspace{10pt}\textbf{Cell population fractions}\end{center}
 
     \begin{tabular}{p{0.2\textwidth} p{0.2\textwidth} p{0.2\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
       Cell type & Elevated in & Compared to & By amount & t-test \\
@@ -93,7 +96,7 @@
 		\end{tabular}
 
     \vspace{2pc}
-    \begin{center}\textbf{Cell population pair ratios}\end{center}
+    \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=35pt]{ratios}}\hspace{10pt}\textbf{Cell population pair ratios}\end{center}
 
     \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
       Cell type & Other cell type & Ratio elevated in & Compared to & By amount & t-test \\
@@ -104,7 +107,7 @@
 		\end{tabular}
  
     \vspace{2pc}
-    \begin{center}\textbf{Cell population pair proximity}\end{center}
+    \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=35pt]{proximity}}\hspace{10pt}\textbf{Cell population pair proximity}\end{center}
 
     \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth}}
       Cell type & Other cell type & Proximity elevated in & Compared to & By amount & t-test \\

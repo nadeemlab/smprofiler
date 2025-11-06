@@ -246,11 +246,15 @@ class StatementAugmentor:
         )
 
     def _form_reportable_result(self, result: Result, statement: str) -> ReportableResult:
+        metric = result.case.metric
+        if metric == 'fractions' and result.case.other is not None:
+            metric = 'ratios'
         return ReportableResult(
             result,
             form_reportable_case(result.case),
             self._reportable_cohorts(result),
             statement,
+            metric,
         )
 
 
