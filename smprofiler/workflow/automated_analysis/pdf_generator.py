@@ -2,6 +2,7 @@ from os import system as os_system
 from os.path import exists
 from json import loads as json_loads
 from json import dumps as json_dumps
+from typing import cast
 
 from cattrs import Converter
 from pandas import DataFrame
@@ -67,7 +68,7 @@ class PDFReportGenerator:
         with open('analysis_summary.tex', 'wt', encoding='utf-8') as file:
             file.write(rendered)
         for filename in ('blue_tile.pdf', 'fractions.pdf', 'ratios.pdf', 'proximity.pdf', 'smprofiler_logo.pdf'):
-            file_contents = _retrieve_from_library('assets', filename, binary=True)
+            file_contents = cast(bytes, _retrieve_from_library('assets', filename, binary=True))
             with open(filename, 'wb') as file:
                 file.write(file_contents)
         os_system('pdflatex analysis_summary.tex --interaction=nonstopmode')

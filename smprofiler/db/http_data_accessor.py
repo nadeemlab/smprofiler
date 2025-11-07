@@ -21,6 +21,7 @@ from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.standalone_utilities.key_value_store import KeyValueStore
 from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
+from smprofiler.db.exchange_data_formats.metrics import SoftwareComponentVersion
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCounts
 from smprofiler.db.exchange_data_formats.metrics import UnivariateMetricsComputationResult
@@ -104,6 +105,11 @@ class StudyDataAccessor(ChainableDestructableResource):
         names_obj, _ = self._retrieve('cell-data-binary-feature-names', urlencode([('study', self.study)]))
         names = BitMaskFeatureNames.model_validate(names_obj)
         return list(map(lambda d: d.symbol, names.names))
+
+    def _retrieve_software_versions(self) -> list[SoftwareComponentVersion]:
+        versions_obj, _ = self._retrieve('software-component-versions', '')
+        versions = list(map(SoftwareComponentVersion.model_validate, versions_obj))
+        return versions
 
     def _one_phenotype_spatial_metric(self, feature_class: str, criteria: PhenotypeCriteria, feature_name: str):
         parts1 = self._form_query_parameters_key_values(criteria)

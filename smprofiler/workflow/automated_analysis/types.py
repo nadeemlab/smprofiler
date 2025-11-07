@@ -146,6 +146,8 @@ class ReportStudyMetadata:
     data_collection_modality: str
     number_channels: int
     cohorts_by_key: dict[str, ReportableCohort]
+    software_component_versions: str
+    data_download_url: str
 
 @define
 class AnalysisSummary:

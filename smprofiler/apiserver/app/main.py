@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt  # type: ignore
 import jwt
 from pydantic import BaseModel
 from pydantic_core import from_json
-from brotli import compress as brotli_compress  # type: ignore
 from brotli import decompress as brotli_decompress  # type: ignore
 
 from smprofiler.db.simple_method_cache import simple_function_cache

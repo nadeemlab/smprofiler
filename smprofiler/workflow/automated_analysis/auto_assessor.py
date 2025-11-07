@@ -374,6 +374,8 @@ class StudyMetadataPresenter:
         cohorts = s.get_cohorts()
         cohorts_by_key = s.get_cohorts_by_key()
         author = summary.products.publication.first_author_name.split(' ')[-1]
+        versions = access._retrieve_software_versions()
+        library_versions = ' '.join(map(lambda v: f'{v.component_name} v{v.version}', versions))
         return ReportStudyMetadata(
             access.get_study_name(),
             cohorts,
@@ -384,6 +386,8 @@ class StudyMetadataPresenter:
             summary.context.assay.name.lower(),
             summary.counts.channels,
             cohorts_by_key,
+            library_versions,
+            summary.products.data_release.url,
         )
 
     @classmethod
