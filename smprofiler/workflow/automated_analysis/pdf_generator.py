@@ -62,12 +62,12 @@ class PDFReportGenerator:
         jinja_environment = Environment(loader=BaseLoader(), comment_start_string='###')
         jinja_environment.filters['pvalue_filter'] = AssessmentLogger._format_p
         jinja_environment.filters['effect_filter'] = AssessmentLogger._format_effect
-        contents = _retrieve_from_library('assets', 'analysis_summary.tex.jinja')
+        contents = cast(str, _retrieve_from_library('assets', 'analysis_summary.tex.jinja'))
         template = jinja_environment.from_string(contents)
         rendered = template.render(**self.parameters)
         with open('analysis_summary.tex', 'wt', encoding='utf-8') as file:
             file.write(rendered)
-        for filename in ('blue_tile.pdf', 'fractions.pdf', 'ratios.pdf', 'proximity.pdf', 'smprofiler_logo.pdf'):
+        for filename in ('blue_tile.pdf', 'fractions.pdf', 'ratios.pdf', 'proximity.pdf', 'smprofiler_logo.pdf', 'link-out.pdf'):
             file_contents = cast(bytes, _retrieve_from_library('assets', filename, binary=True))
             with open(filename, 'wb') as file:
                 file.write(file_contents)

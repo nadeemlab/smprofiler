@@ -195,6 +195,7 @@ packages = [
     "ratios.pdf",
     "proximity.pdf",
     "smprofiler_logo.pdf",
+    "link-out.pdf",
     "analysis_summary.tex.jinja",
 ]
 "smprofiler.workflow.graph_generation" = [
