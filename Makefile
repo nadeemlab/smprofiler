@@ -197,7 +197,7 @@ development-image: ${PACKAGE_SOURCE_FILES} ${SCRIPTS}/development.Dockerfile dev
 >@rm -f .dockerignore
 
 pyproject.toml.unversioned: pyproject.toml
->@if [[ ! -f pyproject.toml.unversioned ]]; then grep -v 'version=' pyproject.toml > pyproject.toml.unversioned; fi;
+>@grep -v 'version=' pyproject.toml > pyproject.toml.unversioned;
 
 ${DEPENDENCY_LISTS}: pyproject.toml.unversioned ${SCRIPTS}/determine_prerequisites.sh | initialize_message_cache
 >@${MESSAGE} start "$@" "Determining $@"
