@@ -6,6 +6,7 @@ from requests import get as get_request
 from time import sleep
 from time import time
 from datetime import datetime
+from os import environ as os_environ
 
 from pandas import Series
 from pandas import DataFrame
@@ -30,6 +31,8 @@ from smprofiler.db.exchange_data_formats.study import StudySummary
 
 def sleep_poll():
     seconds = 10
+    if 'SMPROFILER_FAST_POLLING' in os_environ:
+        seconds = 1
     print(f'Waiting {seconds} seconds to poll.')
     sleep(seconds)
 
@@ -208,18 +211,6 @@ class StudyDataAccessor(ChainableDestructableResource):
             return parsed_payload, key
         #raise ValueError(f'Processing downloaded payload failed: {key}')
 
-
-def univariate_pair_compare(series1: 'Series[float]', series2: 'Series[float]'):
-    def finite(value):
-        return not isnan(value) and not value==inf
-    list1 = list(filter(finite, series1.values))
-    list2 = list(filter(finite, series2.values))
-    mean1 = float(mean(list1))
-    mean2 = float(mean(list2))
-    actual = mean2 / mean1
-    result = ttest_ind(list1, list2, equal_var=False)
-    return getattr(result, 'pvalue'), actual
-
 @define
 class CompareResult:
     pvalue: float
@@ -234,8 +225,13 @@ def univariate_pair_compare_details(series1: Series, series2: Series) -> Compare
         return not isnan(value) and not value==inf
     list1 = list(filter(finite, series1.values))
     list2 = list(filter(finite, series2.values))
+    null = CompareResult(1.0, inf, (len(list1), len(list2)))
+    if len(list1) == 0 or len(list2) == 0:
+        return null
     mean1 = float(mean(list1))
     mean2 = float(mean(list2))
+    if mean1 == 0:
+        return null
     actual = mean2 / mean1
     result = ttest_ind(list1, list2, equal_var=False)
     return CompareResult(
@@ -243,6 +239,10 @@ def univariate_pair_compare_details(series1: Series, series2: Series) -> Compare
         actual,
         (len(list1), len(list2)),
     )
+
+def univariate_pair_compare(series1: 'Series[float]', series2: 'Series[float]'):
+    cr = univariate_pair_compare_details(series1, series2)
+    return cr.pvalue
 
 def append_fractions_feature(
     df: DataFrame,

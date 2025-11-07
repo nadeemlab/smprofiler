@@ -180,7 +180,8 @@ class StudyAutoAssessor(ChainableDestructableResource):
         higher_cohort = cohorts[1]
         if effect < 1.0:
             higher_cohort = cohorts[0]
-            effect = 1.0 / effect
+            if effect != 0:
+                effect = 1.0 / effect
         N = self.number_samples
         significance = ResultSignificance(float(p), effect, compare_result.fraction_data_used(N))
         return form_result(
