@@ -190,3 +190,11 @@ class SoftwareComponentVersion(BaseModel):
             ]
         }
     }
+
+
+class AnalysisSummaryAvailable(BaseModel):
+    """
+    Tells whether a PDF summary report is available for the given study.
+    """
+    available: bool
+

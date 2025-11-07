@@ -29,6 +29,7 @@ from smprofiler.db.database_connection import DBConnection
 from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.apiserver.request_scheduling.ondemand_requester import OnDemandRequester
 from smprofiler.db.sqlite_builder import SQLiteBuilder
+from smprofiler.workflow.automated_analysis.pdf_server import PDFReportServer
 from smprofiler.db.exchange_data_formats.study import StudyHandle
 from smprofiler.db.exchange_data_formats.study import StudySummary
 from smprofiler.db.exchange_data_formats.study import ChannelAnnotations
@@ -43,6 +44,7 @@ from smprofiler.db.exchange_data_formats.metrics import (
     UnivariateMetricsComputationResult,
     AvailableGNN,
     SoftwareComponentVersion,
+    AnalysisSummaryAvailable,
 )
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
 from smprofiler.db.querying import query
@@ -962,3 +964,36 @@ def get_sqlite_dump(
             "Content-Disposition": f'attachment; filename="{normalize_study_name(study)}.sqlite"'
         },
     )
+
+
+@app.get("/analysis-summary-available/")
+def analysis_summary_available(
+    study: ValidStudy,
+) -> AnalysisSummaryAvailable:
+    report = PDFReportServer(None, study)
+    return AnalysisSummaryAvailable(available=report.exists())
+
+
+@app.get("/analysis-summary/")
+def get_analysis_summary(
+    study: ValidStudy,
+):
+    """
+    Get a PDF report of most salient statistical results.
+    """
+    report = PDFReportServer(None, study)
+    if report.exists():
+        return Response(
+            report.datestamp_and_retrieve(),
+            headers={
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': f'attachment; filename="{normalize_study_name(study)}.pdf"',
+            },
+        )
+    raise HTTPException(
+        status_code=404,
+        detail=f'No PDF analysis report is available for: {study}',
+    )
+
+
+

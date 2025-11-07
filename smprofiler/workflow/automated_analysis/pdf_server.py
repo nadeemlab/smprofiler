@@ -11,13 +11,25 @@ def form_current_date() -> str:
     return today.strftime('%b %-d %Y')
 
 
+class NoReportFound(ValueError):
+    def __init__(self, study: str):
+        super().__init__(f'No report found for study: {study}')
+
+
 class PDFReportServer:
-    database_config_file: str
+    database_config_file: str | None
     study: str
 
-    def __init__(self, database_config_file:str, study: str):
+    def __init__(self, database_config_file:str | None, study: str):
         self.database_config_file = database_config_file
         self.study = study
+
+    def exists(self) -> bool:
+        try:
+            self._retrieve_pdf_from_database()
+        except NoReportFound:
+            return False
+        return True
 
     def datestamp_and_retrieve(self) -> bytes:
         data = self._retrieve_pdf_from_database()
@@ -43,7 +55,7 @@ class PDFReportServer:
             cursor.execute(query)
             rows = tuple(cursor.fetchall())
         if len(rows) == 0:
-            raise ValueError(f'No saved PDFs for study: {self.study}')
+            raise NoReportFound(self.study)
         return rows[0][0]
 
 
