@@ -52,7 +52,7 @@ class PDFReportGenerator:
         if exists(cache_file):
             self.parameters = json_loads(open(cache_file, 'rt', encoding='utf-8').read())
             return
-        with StudyAutoAssessor(StudyDataAccessor(self.study, host=self.api_host), omitted_cohorts=self.omitted_cohorts) as a:
+        with StudyAutoAssessor(StudyDataAccessor(self.study, host=self.api_host, use_session=True), omitted_cohorts=self.omitted_cohorts) as a:
             summary = a.get_summary()
         self._generate_kde_plot(summary.results.dataframe, summary.highlights)
         cattrs_converter = Converter()
@@ -68,15 +68,18 @@ class PDFReportGenerator:
         label = 'Quality score'
         df = df.rename(columns={'quality': label})
         sns.set_theme(rc={'figure.figsize':(8, 3)})
+        plt.figure()
         sns.histplot(df, x=label, kde=True, bins=15, stat='percent')
         for i, r in enumerate(highlights.top3):
             plt.text(r.base.significance.quality(), 20, s=f'{i+1}', color='#a0119e')
         plt.savefig('kde.pdf', bbox_inches='tight')
+        plt.close()
 
     def _fill_report_template(self) -> None:
         jinja_environment = Environment(loader=BaseLoader(), comment_start_string='###')
         jinja_environment.filters['pvalue_filter'] = AssessmentLogger._format_p
         jinja_environment.filters['effect_filter'] = AssessmentLogger._format_effect
+        jinja_environment.filters['quality_filter'] = AssessmentLogger._format_quality_score
         contents = cast(str, _retrieve_from_library('assets', 'analysis_summary.tex.jinja'))
         template = jinja_environment.from_string(contents)
         rendered = template.render(**self.parameters)

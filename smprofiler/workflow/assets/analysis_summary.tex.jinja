@@ -93,7 +93,7 @@
       Cell type & Elevated in & Compared to & By amount & t-test & quality & \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_single_fractions %}
-      {{ result.case.phenotype_str }} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & {{ result.quality | effect_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {{ result.case.phenotype_str }} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & {{ result.quality | quality_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
 
@@ -104,7 +104,7 @@
       Cell type & Other cell type & Ratio elevated in & Compared to & By amount & t-test & quality & \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_ratios %}
-      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & {{ result.quality | effect_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & {{ result.quality | quality_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
  
@@ -115,7 +115,7 @@
       Cell type & Other cell type & Proximity elevated in & Compared to & By amount & t-test & quality & \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_proximity %}
-      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ &  {{ result.quality | effect_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ &  {{ result.quality | quality_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
     \begin{center}

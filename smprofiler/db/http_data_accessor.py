@@ -3,6 +3,7 @@ import re
 from itertools import chain
 from urllib.parse import urlencode
 from requests import get as get_request
+from requests import Session as RequestsSession
 from time import sleep
 from time import time
 from datetime import datetime
@@ -42,8 +43,9 @@ class StudyDataAccessor(ChainableDestructableResource):
     Convenience caller of HTTP methods for data access (study metadata, computed metrics).
     """
     cache: KeyValueStore
+    session: RequestsSession
 
-    def __init__(self, study: str, host: str):
+    def __init__(self, study: str, host: str, use_session: bool = False):
         self.cache = KeyValueStore()
         use_http = False
         if re.search('^http://', host):
@@ -52,8 +54,17 @@ class StudyDataAccessor(ChainableDestructableResource):
         self.host = host
         self.study = study
         self.use_http = use_http
+        if use_session:
+            self.session = RequestsSession()
         self.cohorts = self._retrieve_cohorts()
         self.all_cells = self._retrieve_all_cells_counts()
+
+    def release(self) -> None:
+        if self._using_session():
+            self.session.close()
+
+    def _using_session(self) -> bool:
+        return hasattr(self, 'session')
 
     def get_subresources(self) -> tuple[KeyValueStore]:
         return (self.cache,)
@@ -189,7 +200,10 @@ class StudyDataAccessor(ChainableDestructableResource):
         try:
             start = time()
             headers = {} if not binary else {'Accept-Encoding': 'br'}
-            payload = get_request(url, headers=headers)
+            if self._using_session():
+                payload = self.session.get(url, headers=headers)
+            else:
+                payload = get_request(url, headers=headers)
             end = time()
             key = url
             if binary:
