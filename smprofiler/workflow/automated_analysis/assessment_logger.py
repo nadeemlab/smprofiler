@@ -76,6 +76,11 @@ class AssessmentLogger(ChainableDestructableResource):
         return '{:>12}'.format('%.1f' % e) + r' $\times$ '
 
     @staticmethod
+    def _format_effect_no_times(e: float) -> str:
+        return '{:>12}'.format('%.1f' % e)
+
+
+    @staticmethod
     def _format_quality_score(e: float) -> str:
         return '{:>12}'.format('%.1f' % e)
 
