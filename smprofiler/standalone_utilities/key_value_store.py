@@ -1,3 +1,4 @@
+from typing import cast
 
 from sqlite3 import connect
 from sqlite3 import Cursor as SQLiteCursor
@@ -14,7 +15,10 @@ class SQLiteConnectionManager(ChainableDestructableResource):
         self.connection = connect(handle)
 
     def release(self) -> None:
-        self.connection.close()
+        try:
+            self.connection.close()
+        except Exception:
+            pass
 
 
 class KeyValueStore(ChainableDestructableResource):
@@ -24,11 +28,15 @@ class KeyValueStore(ChainableDestructableResource):
     Supply ":memory" as the `handle` to use the in-memory version.
     """
     connection_manager: SQLiteConnectionManager
+    read_only_db: SQLiteConnectionManager | None
 
     def __init__(self, handle: str = 'cache.sqlite3'):
         self.connection_manager = SQLiteConnectionManager(handle)
+        self.read_only_db = SQLiteConnectionManager(':memory:')
+        self.connection_manager.connection.backup(self.read_only_db.connection)
         self.cursor().execute('CREATE TABLE IF NOT EXISTS cache(key TEXT, contents BLOB);')
         self.add_subresource(self.connection_manager)
+        self.add_subresource(self.read_only_db)
 
     def cursor(self) -> SQLiteCursor:
         return self.connection_manager.connection.cursor()
@@ -39,10 +47,18 @@ class KeyValueStore(ChainableDestructableResource):
         self.connection_manager.connection.commit()
 
     def drop(self, key: str) -> None:
+        self._stop_using_read_only()
         self.cursor().execute('DELETE FROM cache WHERE key=?;', (key,))
 
+    def _stop_using_read_only(self) -> None:
+        cast(SQLiteConnectionManager, self.read_only_db).connection.close()
+        self.read_only_db = None
+
     def lookup(self, key: str):
-        cursor = self.cursor()
+        if self.read_only_db is None:
+            cursor = self.cursor()
+        else:
+            cursor = self.read_only_db.connection.cursor()
         cursor.execute('SELECT contents FROM cache WHERE key=?;', (key,))
         rows = cursor.fetchall()
         if len(rows) > 0:
