@@ -1,5 +1,6 @@
 import datetime
 
+from psycopg.errors import UndefinedTable
 from pymupdf import Point as pymupdf_Point
 from pymupdf import Document as pymupdf_Document
 
@@ -24,11 +25,14 @@ class PDFReportServer:
         self.study = study
 
     def exists(self) -> bool:
-        with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
-            cursor.execute('SELECT COUNT(*) FROM pdf_reports ;')
-            rows = tuple(cursor.fetchall())
-            count = rows[0][0]
-        return count > 0
+        try:
+            with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
+                cursor.execute('SELECT COUNT(*) FROM pdf_reports ;')
+                rows = tuple(cursor.fetchall())
+                count = rows[0][0]
+            return count > 0
+        except UndefinedTable:
+            return False
 
     def datestamp_and_retrieve(self) -> bytes:
         data = self._retrieve_pdf_from_database()
