@@ -53,6 +53,7 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{array}
+\usepackage{amsmath}
 \def\arraystretch{1.2}
 
 \newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt} }m { #1 } }
@@ -88,36 +89,42 @@
 
     \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=25pt]{fractions}}\hspace{10pt}\textbf{Cell population fractions}\end{center}
 
-    \begin{tabular}{p{0.2\textwidth} p{0.2\textwidth} p{0.2\textwidth} p{0.1\textwidth} p{0.1\textwidth} p{0.05\textwidth}}
-      Cell type & Elevated in & Compared to & By amount & t-test \\
+    \begin{tabular}{p{0.2\textwidth} p{0.14\textwidth} p{0.14\textwidth} p{0.1\textwidth} p{0.12\textwidth} p{0.08\textwidth} p{0.05\textwidth}}
+      Cell type & Elevated in & Compared to & By amount & t-test & quality & \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_single_fractions %}
-      {{ result.case.phenotype_str }} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {{ result.case.phenotype_str }} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & {{ result.quality | effect_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
 
     \vspace{2pc}
     \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=35pt]{ratios}}\hspace{10pt}\textbf{Cell population pair ratios}\end{center}
 
-    \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth} p{0.05\textwidth}}
-      Cell type & Other cell type & Ratio elevated in & Compared to & By amount & t-test \\
+    \begin{tabular}{p{0.13\textwidth} p{0.13\textwidth} p{0.12\textwidth} p{0.12\textwidth} p{0.08\textwidth} p{0.12\textwidth} p{0.08\textwidth} p{0.05\textwidth}}
+      Cell type & Other cell type & Ratio elevated in & Compared to & By amount & t-test & quality & \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_ratios %}
-      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & {{ result.quality | effect_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
  
     \vspace{2pc}
     \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=35pt]{proximity}}\hspace{10pt}\textbf{Cell population pair proximity}\end{center}
 
-    \begin{tabular}{p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.15\textwidth} p{0.1\textwidth} p{0.1\textwidth} p{0.05\textwidth}}
-      Cell type & Other cell type & Proximity elevated in & Compared to & By amount & t-test \\
+    \begin{tabular}{p{0.13\textwidth} p{0.13\textwidth} p{0.13\textwidth} p{0.13\textwidth} p{0.08\textwidth} p{0.12\textwidth} p{0.08\textwidth} p{0.05\textwidth}}
+      Cell type & Other cell type & Proximity elevated in & Compared to & By amount & t-test & quality & \\
 			\arrayrulecolor{rulecolour}\toprule[0.5pt]
       {% for result in highlights.top10_proximity %}
-      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ &  {{ result.quality | effect_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
       {% endfor %}
 		\end{tabular}
- 
+    \begin{center}
+      \includegraphics[width=15cm]{kde}
+    \end{center}
+    Cohort comparison results are evaluated partly with the quality score $-\operatorname{log}_{10}(p)\times \operatorname{effect}\thinspace\operatorname{multiplier}$. The distribution of these scores over {{ highlights.number_results_considered }} results meeting minimum criteria is shown above for reference, with the scores for the highlighted findings indicated in purple.
+
+  \vspace{1pc}
+
   \mbox{}
   \vfill
   \begin{center}

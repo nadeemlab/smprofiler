@@ -259,6 +259,7 @@ class StatementAugmentor:
             statement,
             metric,
             form_url(result, self.study_name),
+            result.significance.quality(),
         )
 
 
@@ -277,8 +278,11 @@ class HighlightExtractor:
         by_metric = list(map(lambda t: cls.get_top(3, t), by_metric))
         a = StatementAugmentor(metadata.cohorts_by_key, metadata.study_description_phrase)
         f = a.augment
-        reportables = tuple_map(lambda t: tuple_map(lambda r: f(r), t), by_metric)
-        highlights = Highlights(tuple_map(lambda r: f(r), top3), *reportables)
+        reportables = cast(
+            tuple[tuple[ReportableResult, ...], tuple[ReportableResult, ...], tuple[ReportableResult, ...]],
+            tuple_map(lambda t: tuple_map(lambda r: f(r), t), by_metric),
+        )
+        highlights = Highlights(tuple_map(lambda r: f(r), top3), *reportables, results.dataframe.shape[0])
         return highlights
 
     @classmethod

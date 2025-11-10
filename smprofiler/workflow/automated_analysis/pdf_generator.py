@@ -6,6 +6,8 @@ from typing import cast
 
 from cattrs import Converter
 from pandas import DataFrame
+import seaborn as sns
+import matplotlib.pyplot as plt
 from jinja2 import BaseLoader
 from jinja2 import Environment
 from smprofiler.workflow.scripts.configure import _retrieve_from_library
@@ -15,6 +17,7 @@ from smprofiler.standalone_utilities.timestamping import now
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentLogger
 from smprofiler.workflow.automated_analysis.auto_assessor import StudyAutoAssessor
+from smprofiler.workflow.automated_analysis.types import Highlights
 from smprofiler.db.database_connection import DBCursor
 
 def _pydantic_adaptor(value: PhenotypeCriteria) -> dict[str, tuple[str, ...]]:
@@ -51,12 +54,24 @@ class PDFReportGenerator:
             return
         with StudyAutoAssessor(StudyDataAccessor(self.study, host=self.api_host), omitted_cohorts=self.omitted_cohorts) as a:
             summary = a.get_summary()
+        self._generate_kde_plot(summary.results.dataframe, summary.highlights)
         cattrs_converter = Converter()
         cattrs_converter.register_unstructure_hook(PhenotypeCriteria, _pydantic_adaptor)
         cattrs_converter.register_unstructure_hook(DataFrame, _pandas_adaptor)
         self.parameters = cattrs_converter.unstructure(summary) 
         with open(cache_file, 'wt', encoding='utf-8') as file:
             file.write(json_dumps(self.parameters, indent=2))
+
+    def _generate_kde_plot(self, df: DataFrame, highlights: Highlights) -> None:
+        print(df)
+        print(df.columns)
+        label = 'Quality score'
+        df = df.rename(columns={'quality': label})
+        sns.set_theme(rc={'figure.figsize':(8, 3)})
+        sns.histplot(df, x=label, kde=True, bins=15, stat='percent')
+        for i, r in enumerate(highlights.top3):
+            plt.text(r.base.significance.quality(), 20, s=f'{i+1}', color='#a0119e')
+        plt.savefig('kde.pdf', bbox_inches='tight')
 
     def _fill_report_template(self) -> None:
         jinja_environment = Environment(loader=BaseLoader(), comment_start_string='###')

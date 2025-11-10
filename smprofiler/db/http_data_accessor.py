@@ -125,7 +125,7 @@ class StudyDataAccessor(ChainableDestructableResource):
         while True:
             response_obj, _ = self._retrieve(endpoint, query)
             response = UnivariateMetricsComputationResult.model_validate(response_obj)
-            if response.is_pending:
+            if response.is_pending and ('SMPROFILER_NO_WAIT' not in os_environ):
                 sleep_poll()
             else:
                 break

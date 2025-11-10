@@ -120,6 +120,7 @@ class ReportableResult:
     statement: str
     metric_inferred: str
     url: str
+    quality: float
 
 @define
 class FilteredResults:
@@ -134,6 +135,7 @@ class Highlights:
     top10_single_fractions: tuple[ReportableResult, ...]
     top10_ratios: tuple[ReportableResult, ...] 
     top10_proximity: tuple[ReportableResult, ...]
+    number_results_considered: int
 
 @define
 class ReportStudyMetadata:
