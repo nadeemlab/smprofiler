@@ -171,9 +171,16 @@ class StudyAutoAssessor(ChainableDestructableResource):
         return self._assess_case_df(df, case, 'proximity')
 
     def _assess_case_df(self, df: DataFrame, case: Case, feature_name: str) -> Result:
+        null = form_result(case, case.cohorts[0], ResultSignificance(1.0, 0, 0), False)
+        if df.shape[0] == 0 or feature_name not in df.columns:
+            return null
         cohorts = case.cohorts
-        values1 = cast(Series, df[df['cohort'] == cohorts[0]][feature_name])
-        values2 = cast(Series, df[df['cohort'] == cohorts[1]][feature_name])
+        d1 = df[df['cohort'] == cohorts[0]]
+        d2 = df[df['cohort'] == cohorts[1]]
+        if d1.shape[0] == 0 or d2.shape[0] == 0:
+            return null
+        values1 = cast(Series, d1[feature_name])
+        values2 = cast(Series, d2[feature_name])
         compare_result = compare(values1, values2)
         p = compare_result.pvalue
         effect = compare_result.effect

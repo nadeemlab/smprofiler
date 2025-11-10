@@ -1,6 +1,5 @@
 import datetime
 
-from pymupdf import open as pymupdf_open
 from pymupdf import Point as pymupdf_Point
 from pymupdf import Document as pymupdf_Document
 

@@ -133,7 +133,9 @@ class StudyDataAccessor(ChainableDestructableResource):
             {'sample': key, feature_name: value}
             for key, value in response.values.items()
         ]
-        df = DataFrame(rows).set_index('sample')
+        df = DataFrame(rows)
+        if df.shape[0] > 0:
+            df = df.set_index('sample')
         return concat([self.cohorts, self.all_cells, df], axis=1)
 
     def _form_counts_query(self, p: PhenotypeCriteria) -> tuple[str, str]:

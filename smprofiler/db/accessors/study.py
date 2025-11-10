@@ -27,6 +27,7 @@ from smprofiler.db.simple_query_patterns import GetSingleResult
 from smprofiler.db.cohorts import get_sample_cohorts
 from smprofiler.db.database_connection import SimpleReadOnlyProvider
 from smprofiler.db.describe_features import get_feature_description
+from smprofiler.workflow.automated_analysis.pdf_server import PDFReportServer
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
@@ -48,6 +49,7 @@ class StudyAccess(SimpleReadOnlyProvider):
         findings = self.get_study_findings()
         has_umap = self.has_umap()
         has_intensities = self.has_intensities()
+        has_pdf_report = PDFReportServer(None, study).exists()
         curation_notes = self.get_curation_notes()
         return StudySummary(
             context=Context(institution=institution, assay=assay, contact=contact),
@@ -57,6 +59,7 @@ class StudyAccess(SimpleReadOnlyProvider):
             findings=findings,
             has_umap=has_umap,
             has_intensities=has_intensities,
+            has_pdf_report=has_pdf_report,
             curation_notes=curation_notes,
         )
 
