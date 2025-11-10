@@ -33,9 +33,7 @@ class PDFReportServer:
 
     def datestamp_and_retrieve(self) -> bytes:
         data = self._retrieve_pdf_from_database()
-        data = open('analysis_summary.pdf', 'rb').read()
         doc = pymupdf_Document(stream=data)
-        doc = pymupdf_open('analysis_summary.pdf')
         doc[0].insert_text(
             pymupdf_Point(450, 18),
             f'Report generated {form_current_date()}',
