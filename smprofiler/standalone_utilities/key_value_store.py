@@ -51,8 +51,9 @@ class KeyValueStore(ChainableDestructableResource):
         self.cursor().execute('DELETE FROM cache WHERE key=?;', (key,))
 
     def _stop_using_read_only(self) -> None:
-        cast(SQLiteConnectionManager, self.read_only_db).connection.close()
-        self.read_only_db = None
+        if self.read_only_db is not None:
+            cast(SQLiteConnectionManager, self.read_only_db).connection.close()
+            self.read_only_db = None
 
     def lookup(self, key: str):
         if self.read_only_db is None:
