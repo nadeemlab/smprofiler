@@ -3,6 +3,7 @@ from os.path import exists
 from json import loads as json_loads
 from json import dumps as json_dumps
 from typing import cast
+from contextlib import redirect_stdout
 
 from cattrs import Converter
 from pandas import DataFrame
@@ -18,6 +19,7 @@ from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentLogger
 from smprofiler.workflow.automated_analysis.auto_assessor import StudyAutoAssessor
 from smprofiler.workflow.automated_analysis.types import Highlights
+from smprofiler.workflow.automated_analysis.urls import latex_escape_url
 from smprofiler.db.database_connection import DBCursor
 
 def _pydantic_adaptor(value: PhenotypeCriteria) -> dict[str, tuple[str, ...]]:
@@ -52,7 +54,15 @@ class PDFReportGenerator:
         if exists(cache_file):
             self.parameters = json_loads(open(cache_file, 'rt', encoding='utf-8').read())
             return
-        with StudyAutoAssessor(StudyDataAccessor(self.study, host=self.api_host, use_session=True), omitted_cohorts=self.omitted_cohorts) as a:
+        with StudyAutoAssessor(
+            StudyDataAccessor(
+                self.study,
+                host=self.api_host,
+                use_session=True,
+                database_config_file=self.database_config_file,
+            ),
+            omitted_cohorts=self.omitted_cohorts,
+        ) as a:
             summary = a.get_summary()
         self._generate_kde_plot(summary.results.dataframe, summary.highlights)
         cattrs_converter = Converter()
@@ -80,6 +90,7 @@ class PDFReportGenerator:
         jinja_environment.filters['pvalue_filter'] = AssessmentLogger._format_p
         jinja_environment.filters['effect_filter'] = AssessmentLogger._format_effect
         jinja_environment.filters['quality_filter'] = AssessmentLogger._format_quality_score
+        jinja_environment.filters['latex_escape_url'] = latex_escape_url
         contents = cast(str, _retrieve_from_library('assets', 'analysis_summary.tex.jinja'))
         template = jinja_environment.from_string(contents)
         rendered = template.render(**self.parameters)
@@ -89,8 +100,10 @@ class PDFReportGenerator:
             file_contents = cast(bytes, _retrieve_from_library('assets', filename, binary=True))
             with open(filename, 'wb') as file:
                 file.write(file_contents)
-        os_system('pdflatex analysis_summary.tex --interaction=nonstopmode')
-        os_system('pdflatex analysis_summary.tex --interaction=nonstopmode')
+        logfile = 'report_generation.log'
+        os_system(f'pdflatex analysis_summary.tex --interaction=nonstopmode > {logfile}')
+        os_system(f'pdflatex analysis_summary.tex --interaction=nonstopmode > {logfile}')
+        print('report_generation.log written (pdflatex runs)')
         self.pdf = open('analysis_summary.pdf', 'rb').read()
 
     def _save_pdf_to_database(self) -> None:

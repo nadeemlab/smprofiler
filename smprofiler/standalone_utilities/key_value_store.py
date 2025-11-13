@@ -33,8 +33,8 @@ class KeyValueStore(ChainableDestructableResource):
     def __init__(self, handle: str = 'cache.sqlite3'):
         self.connection_manager = SQLiteConnectionManager(handle)
         self.read_only_db = SQLiteConnectionManager(':memory:')
-        self.connection_manager.connection.backup(self.read_only_db.connection)
         self.cursor().execute('CREATE TABLE IF NOT EXISTS cache(key TEXT, contents BLOB);')
+        self.connection_manager.connection.backup(self.read_only_db.connection)
         self.add_subresource(self.connection_manager)
         self.add_subresource(self.read_only_db)
 

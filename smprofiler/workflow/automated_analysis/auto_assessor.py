@@ -1,4 +1,5 @@
 """Data analysis script with automated multi-feature assessments."""
+from os import environ as os_environ
 import re
 from typing import cast
 from typing import TypeVar
@@ -163,10 +164,12 @@ class StudyAutoAssessor(ChainableDestructableResource):
         return self._assess_case_df(df, case, 'fraction')
 
     def _assess_proximity(self, case: Case) -> Result:
+        bypass_api = 'SMPROFILER_BYPASS_API' in os_environ
         df = self.access.two_phenotype_spatial_metric(
             'proximity',
             case.get_phenotypes(),
             'proximity',
+            bypass_api,
         )
         return self._assess_case_df(df, case, 'proximity')
 

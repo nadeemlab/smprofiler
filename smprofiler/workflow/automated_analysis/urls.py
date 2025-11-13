@@ -8,7 +8,7 @@ from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.workflow.automated_analysis.types import ReportableCase
 from smprofiler.workflow.automated_analysis.types import Result
 
-def _latex_escape_url(url: str) -> str:
+def latex_escape_url(url: str) -> str:
     def replacer(m: Match) -> str:
         return '\\' + m.group(1)
     return re.sub(r'([%_#&])', replacer, url)
@@ -37,6 +37,6 @@ def form_url(result: Result, study_name: str) -> str:
         columns = ps
         selected_phenotypes = ps
         path = f'study/{qp(study_sc)}/analysis/detail?cohorts={qp(cohorts)}&phenotypes={qp(phenotypes)}&columns={qp(columns)}&selected_phenotypes={qp(selected_phenotypes)}'
-    return _latex_escape_url(f'{base}/{path}')
+    return latex_escape_url(f'{base}/{path}')
 
 

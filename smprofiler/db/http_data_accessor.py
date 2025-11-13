@@ -9,6 +9,7 @@ from time import time
 from datetime import datetime
 from os import environ as os_environ
 
+from pandas import isna
 from pandas import Series
 from pandas import DataFrame
 from pandas import concat
@@ -19,6 +20,7 @@ from numpy import mean
 from scipy.stats import ttest_ind
 from attrs import define
 
+from smprofiler.db.simple_method_cache import simple_function_cache
 from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.standalone_utilities.key_value_store import KeyValueStore
 from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
@@ -28,6 +30,9 @@ from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCounts
 from smprofiler.db.exchange_data_formats.metrics import UnivariateMetricsComputationResult
 from smprofiler.db.exchange_data_formats.study import StudySummary
+from smprofiler.apiserver.app.main import get_proximity_metrics
+from smprofiler.apiserver.app.main import get_squidpy_metrics
+from smprofiler.db.database_connection import DBConnection
 
 
 def sleep_poll():
@@ -44,9 +49,11 @@ class StudyDataAccessor(ChainableDestructableResource):
     """
     cache: KeyValueStore
     session: RequestsSession
+    database_config_file: str | None
 
-    def __init__(self, study: str, host: str, use_session: bool = False):
+    def __init__(self, study: str, host: str, use_session: bool = False, database_config_file: str | None = None):
         self.cache = KeyValueStore()
+        self.database_config_file = database_config_file
         use_http = False
         if re.search('^http://', host):
             use_http = True
@@ -85,9 +92,31 @@ class StudyDataAccessor(ChainableDestructableResource):
             return append_fractions_feature(df, 'p1', 'p2', 'fraction')
         raise ValueError('Fractions feature supported for one or two phenotypes.')
 
-    def two_phenotype_spatial_metric(self, feature_class: str, criteria: tuple[PhenotypeCriteria, ...], feature_name: str):
+    @simple_function_cache(maxsize=2000, log=True)
+    def two_phenotype_spatial_metric(
+        self,
+        feature_class: str,
+        criteria: tuple[PhenotypeCriteria, ...],
+        feature_name: str,
+        bypass_api: bool,
+    ):
         p1 = criteria[0]
         p2 = criteria[1]
+        if bypass_api:
+            markers = (p1.positive_markers, p1.negative_markers, p2.positive_markers, p2.negative_markers)
+            connection = DBConnection(database_config_file=self.database_config_file, study=self.study)
+            connection.__enter__()
+            radius = 100 if feature_class in ('co-occurrence', 'proximity') else None
+            if feature_class == 'proximity':
+                metrics = get_proximity_metrics(connection, self.study, markers, radius=radius)
+            else:
+                metrics =  get_squidpy_metrics(connection, self.study, list(markers), feature_class, radius=radius)
+            connection.__exit__(None, None, None)
+            simulated_response = UnivariateMetricsComputationResult.model_validate(metrics)
+            number = len(tuple(filter(lambda v: v is not None, metrics.values.values())))
+            total = len(metrics.values)
+            print(f'{number} / {total} values not null: {feature_class} {markers}')
+            return self._form_response_df(feature_name, simulated_response)
         parts1 = self._form_query_parameters_key_values(p1)
         parts2 = self._form_query_parameters_key_values(p2, ordinality=2)
         parts = parts1 + parts2 + [('study', self.study), ('feature_class', feature_class)]
@@ -140,6 +169,9 @@ class StudyDataAccessor(ChainableDestructableResource):
                 sleep_poll()
             else:
                 break
+        return self._form_response_df(feature_name, response)
+
+    def _form_response_df(self, feature_name: str, response: UnivariateMetricsComputationResult) -> DataFrame:
         rows = [
             {'sample': key, feature_name: value}
             for key, value in response.values.items()
@@ -238,7 +270,13 @@ class CompareResult:
 
 def univariate_pair_compare_details(series1: Series, series2: Series) -> CompareResult:
     def finite(value):
-        return not isnan(value) and not value==inf
+        if isna(value):
+            return False
+        if isnan(value):
+            return False
+        if value == inf:
+            return False
+        return True
     list1 = list(filter(finite, series1.values))
     list2 = list(filter(finite, series2.values))
     null = CompareResult(1.0, inf, (len(list1), len(list2)))
