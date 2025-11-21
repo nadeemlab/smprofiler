@@ -113,7 +113,6 @@ class StudyDataAccessor(ChainableDestructableResource):
             self._get_counts_series(pad(p), f'p{i+1}')
             for i, p in enumerate(phenotypes)
         ]
-        p = phenotypes[0]
         df = concat(
             [self.cohorts, self.all_cells, *individual_counts_series],
             axis=1,
@@ -137,8 +136,15 @@ class StudyDataAccessor(ChainableDestructableResource):
         if self.features is not None:
             feature = self._get_feature_id('proximity', (p1, p2))
             if feature is not None:
-                f = self._get_stored_feature(feature)
-                return f
+                f = self._get_stored_feature(feature, feature_name)
+                if f is not None:
+                    f = f.astype(float)
+                    df = concat(
+                        [self.cohorts, self.all_cells, f],
+                        axis=1,
+                    )
+                    df.replace([inf, -inf], nan, inplace=True)
+                    return df
         if self.connection is not None:
             markers = (p1.positive_markers, p1.negative_markers, p2.positive_markers, p2.negative_markers)
             radius = 100 if feature_class in ('co-occurrence', 'proximity') else None
@@ -243,9 +249,8 @@ class StudyDataAccessor(ChainableDestructableResource):
         if self.features is not None:
             feature = self._get_feature_id('population fractions', (p,))
             if feature is not None:
-                f = self._get_stored_feature(feature)
+                f = self._get_stored_feature(feature, column_name)
                 if f is not None:
-                    f.rename(columns={'count': column_name}, inplace=True)
                     f = f.astype(float)
                     return f
         if self.connection is not None:
@@ -268,13 +273,13 @@ class StudyDataAccessor(ChainableDestructableResource):
             return None
         return i.loc[condition, ['feature']]['feature'].to_list()[0]
 
-    def _get_stored_feature(self, id: str) -> Series | None:
+    def _get_stored_feature(self, id: str, new_column_name: str) -> Series | None:
         f = cast(DataFrame, self.features)
         df = f.loc[f['feature'] == id, :]
         if df.shape[0] == 0:
             raise ValueError(f'Feature {id} was in the feature index but no feature values found for it.')
-        df = df.rename(columns={'value': 'count'})
-        return df[['count','sample']].set_index('sample')
+        df = df.rename(columns={'value': new_column_name})
+        return df[[new_column_name,'sample']].set_index('sample')
 
     def _get_counts_direct_from_db(self, p: PhenotypeCriteria) -> PhenotypeCounts:
         counts = OnDemandRequester.get_counts_by_specimen(

@@ -62,7 +62,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
     This uses default limits that trade-off a significance measure and effect size.
     """
     access: StudyDataAccessor
-    limits: Limits
+    limits: dict[str, Limits]
     channels: tuple[str, ...]
     cohorts: tuple[str, ...]
     omitted_cohorts: tuple[str, ...]
@@ -71,7 +71,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
 
     def __init__(self, access: StudyDataAccessor, limits: Limits=DEFAULT_LIMITS, omitted_cohorts: list[str] | None=None):
         self.access = access
-        self.limits = limits
+        self.limits = {'fraction': DEFAULT_LIMITS, 'proximity': LIMITS_SEVERE}
         self.omitted_cohorts = tuple(omitted_cohorts) if omitted_cohorts else ()
         self.logger = AssessmentLogger(interactive=True)
         self.access.set_logger(self.logger.log)
@@ -205,7 +205,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
             case,
             higher_cohort,
             significance,
-            self.limits.acceptable(significance),
+            self.limits[feature_name].acceptable(significance),
         ) 
 
     def _report_cohorts(self) -> dict[str, ReportableCohort]:
@@ -216,7 +216,8 @@ class StudyAutoAssessor(ChainableDestructableResource):
         df1['metric'] = 'fraction'
         df2 = DataFrame([self._form_result_record(r) for r in s2])
         df2['metric'] = 'ratio'
-        df3 = DataFrame([self._form_result_record(r) for r in s3 if LIMITS_SEVERE.acceptable(r.significance)])
+        #df3 = DataFrame([self._form_result_record(r) for r in s3 if LIMITS_SEVERE.acceptable(r.significance)])
+        df3 = DataFrame([self._form_result_record(r) for r in s3])
         df3['metric'] = 'proximity'
         df = concat([df1, df2, df3], axis=0)
         return df
@@ -289,10 +290,10 @@ class HighlightExtractor:
             results25 = cls.get_top(25, results_metric)
             pared = cls.remove_common_patterns(results25)
             extracted.append(pared)
-            by_metric.append(cls.get_top(10, pared))
+            by_metric.append(cls.get_top(25, pared))
         top3 = cls.get_top(3, tuple(chain(*extracted)))
         by_metric = list(map(lambda t: cls.remove_specific_set(top3, t), extracted))
-        by_metric = list(map(lambda t: cls.get_top(3, t), by_metric))
+        by_metric = list(map(lambda t: cls.get_top(5, t), by_metric))
         a = StatementAugmentor(metadata.cohorts_by_key, metadata.study_description_phrase)
         f = a.augment
         reportables = cast(
