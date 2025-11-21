@@ -1,9 +1,9 @@
 from os import system as os_system
 from os.path import exists
+from os import environ as os_environ
 from json import loads as json_loads
 from json import dumps as json_dumps
 from typing import cast
-from contextlib import redirect_stdout
 
 from cattrs import Converter
 from pandas import DataFrame
@@ -21,6 +21,9 @@ from smprofiler.workflow.automated_analysis.auto_assessor import StudyAutoAssess
 from smprofiler.workflow.automated_analysis.types import Highlights
 from smprofiler.workflow.automated_analysis.urls import latex_escape_url
 from smprofiler.db.database_connection import DBCursor
+from smprofiler.standalone_utilities.log_formats import colorized_logger
+
+logger = colorized_logger(__name__)
 
 def _pydantic_adaptor(value: PhenotypeCriteria) -> dict[str, tuple[str, ...]]:
     if isinstance(value, PhenotypeCriteria):
@@ -53,6 +56,7 @@ class PDFReportGenerator:
         cache_file = 'template_parameters.json'
         if exists(cache_file):
             self.parameters = json_loads(open(cache_file, 'rt', encoding='utf-8').read())
+            logger.debug(f'Retrieved {cache_file}')
             return
         with StudyAutoAssessor(
             StudyDataAccessor(
@@ -60,6 +64,8 @@ class PDFReportGenerator:
                 host=self.api_host,
                 use_session=True,
                 database_config_file=self.database_config_file,
+                bypass_api='SMPROFILER_BYPASS_API' in os_environ,
+                use_readonly_bulk_feature_cache=True,
             ),
             omitted_cohorts=self.omitted_cohorts,
         ) as a:
@@ -71,6 +77,7 @@ class PDFReportGenerator:
         self.parameters = cattrs_converter.unstructure(summary) 
         with open(cache_file, 'wt', encoding='utf-8') as file:
             file.write(json_dumps(self.parameters, indent=2))
+        logger.debug(f'Wrote {cache_file}')
 
     def _generate_kde_plot(self, df: DataFrame, highlights: Highlights) -> None:
         print(df)
@@ -94,6 +101,7 @@ class PDFReportGenerator:
         contents = cast(str, _retrieve_from_library('assets', 'analysis_summary.tex.jinja'))
         template = jinja_environment.from_string(contents)
         rendered = template.render(**self.parameters)
+        logger.debug('Finished rendering with Jinja.')
         with open('analysis_summary.tex', 'wt', encoding='utf-8') as file:
             file.write(rendered)
         for filename in ('blue_tile.pdf', 'fractions.pdf', 'ratios.pdf', 'proximity.pdf', 'smprofiler_logo.pdf', 'link-out.pdf'):
@@ -107,6 +115,7 @@ class PDFReportGenerator:
         self.pdf = open('analysis_summary.pdf', 'rb').read()
 
     def _save_pdf_to_database(self) -> None:
+        logger.debug('Writing generated PDF to database.')
         with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
             create = '''
             CREATE TABLE IF NOT EXISTS pdf_reports ( blob bytea, date_generated timestamptz );
@@ -116,4 +125,6 @@ class PDFReportGenerator:
             '''
             cursor.execute(create)
             cursor.execute(insert, (self.pdf, now()))
+        logger.debug('Done writing.')
+
 

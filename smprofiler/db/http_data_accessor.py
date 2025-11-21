@@ -8,6 +8,8 @@ from time import sleep
 from time import time
 from datetime import datetime
 from os import environ as os_environ
+from typing import cast
+from typing import Callable
 
 from pandas import isna
 from pandas import Series
@@ -20,6 +22,8 @@ from numpy import mean
 from scipy.stats import ttest_ind
 from attrs import define
 
+from smprofiler.ondemand.phenotype_str import phenotype_to_phenotype_str
+from smprofiler.db.feature_cache import FeaturesCache
 from smprofiler.db.simple_method_cache import simple_function_cache
 from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.standalone_utilities.key_value_store import KeyValueStore
@@ -32,7 +36,11 @@ from smprofiler.db.exchange_data_formats.metrics import UnivariateMetricsComputa
 from smprofiler.db.exchange_data_formats.study import StudySummary
 from smprofiler.apiserver.app.main import get_proximity_metrics
 from smprofiler.apiserver.app.main import get_squidpy_metrics
+from smprofiler.apiserver.request_scheduling.ondemand_requester import OnDemandRequester
 from smprofiler.db.database_connection import DBConnection
+from smprofiler.standalone_utilities.log_formats import colorized_logger
+
+logger = colorized_logger(__name__)
 
 
 def sleep_poll():
@@ -50,25 +58,44 @@ class StudyDataAccessor(ChainableDestructableResource):
     cache: KeyValueStore
     session: RequestsSession
     database_config_file: str | None
+    connection: DBConnection | None
+    features: DataFrame | None
 
-    def __init__(self, study: str, host: str, use_session: bool = False, database_config_file: str | None = None):
-        self.cache = KeyValueStore()
+    def __init__(self, study: str, host: str, use_session: bool = False, database_config_file: str | None = None, bypass_api: bool=False, use_readonly_bulk_feature_cache: bool=True):
+        self.study = study
         self.database_config_file = database_config_file
+        if use_readonly_bulk_feature_cache:
+            self.features = FeaturesCache(database_config_file, study).retrieve_features_cache()
+            self.features = self.features.loc[~ (self.features['value'] == '')]
+            self.feature_index = self.features.loc[:,['feature','feature_type','specifier1','specifier2','specifier3']].drop_duplicates()
+        else:
+            self.features = None
+        if bypass_api:
+            self.connection = DBConnection(database_config_file=self.database_config_file, study=self.study)
+            self.connection.__enter__()
+        else:
+            self.connection = None
+        self.cache = KeyValueStore()
         use_http = False
         if re.search('^http://', host):
             use_http = True
             host = re.sub(r'^http://', '', host)
         self.host = host
-        self.study = study
         self.use_http = use_http
         if use_session:
             self.session = RequestsSession()
+        self._log = logger.debug
         self.cohorts = self._retrieve_cohorts()
         self.all_cells = self._retrieve_all_cells_counts()
 
     def release(self) -> None:
         if self._using_session():
             self.session.close()
+        if self.connection is not None:
+            self.connection.__exit__(None, None, None)
+
+    def set_logger(self, log: Callable[[str], None]) -> None:
+        self._log = log
 
     def _using_session(self) -> bool:
         return hasattr(self, 'session')
@@ -77,10 +104,16 @@ class StudyDataAccessor(ChainableDestructableResource):
         return (self.cache,)
 
     def fractions(self, phenotypes: tuple[PhenotypeCriteria, ...]):
+        def pad(arg):
+            if self.features is not None:
+                return arg
+            else:
+                return self._pad_channel_lists(arg)
         individual_counts_series = [
-            self._get_counts_series(self._pad_channel_lists(p), f'p{i+1}')
+            self._get_counts_series(pad(p), f'p{i+1}')
             for i, p in enumerate(phenotypes)
         ]
+        p = phenotypes[0]
         df = concat(
             [self.cohorts, self.all_cells, *individual_counts_series],
             axis=1,
@@ -92,26 +125,27 @@ class StudyDataAccessor(ChainableDestructableResource):
             return append_fractions_feature(df, 'p1', 'p2', 'fraction')
         raise ValueError('Fractions feature supported for one or two phenotypes.')
 
-    @simple_function_cache(maxsize=2000, log=True)
+    @simple_function_cache(maxsize=2000)
     def two_phenotype_spatial_metric(
         self,
         feature_class: str,
         criteria: tuple[PhenotypeCriteria, ...],
         feature_name: str,
-        bypass_api: bool,
     ):
         p1 = criteria[0]
         p2 = criteria[1]
-        if bypass_api:
+        if self.features is not None:
+            feature = self._get_feature_id('proximity', (p1, p2))
+            if feature is not None:
+                f = self._get_stored_feature(feature)
+                return f
+        if self.connection is not None:
             markers = (p1.positive_markers, p1.negative_markers, p2.positive_markers, p2.negative_markers)
-            connection = DBConnection(database_config_file=self.database_config_file, study=self.study)
-            connection.__enter__()
             radius = 100 if feature_class in ('co-occurrence', 'proximity') else None
             if feature_class == 'proximity':
-                metrics = get_proximity_metrics(connection, self.study, markers, radius=radius)
+                metrics = get_proximity_metrics(self.connection, self.study, markers, radius=radius)
             else:
-                metrics =  get_squidpy_metrics(connection, self.study, list(markers), feature_class, radius=radius)
-            connection.__exit__(None, None, None)
+                metrics =  get_squidpy_metrics(self.connection, self.study, list(markers), feature_class, radius=radius)
             simulated_response = UnivariateMetricsComputationResult.model_validate(metrics)
             number = len(tuple(filter(lambda v: v is not None, metrics.values.values())))
             total = len(metrics.values)
@@ -206,19 +240,60 @@ class StudyDataAccessor(ChainableDestructableResource):
         return parts
 
     def _get_counts_series(self, p: PhenotypeCriteria, column_name: str) -> Series:
-        endpoint, query = self._form_counts_query(p)
-        counts = PhenotypeCounts.model_validate(self._retrieve(endpoint, query)[0])
+        if self.features is not None:
+            feature = self._get_feature_id('population fractions', (p,))
+            if feature is not None:
+                f = self._get_stored_feature(feature)
+                if f is not None:
+                    f.rename(columns={'count': column_name}, inplace=True)
+                    f = f.astype(float)
+                    return f
+        if self.connection is not None:
+            counts = self._get_counts_direct_from_db(p)
+        else:
+            endpoint, query = self._form_counts_query(p)
+            counts = PhenotypeCounts.model_validate(self._retrieve(endpoint, query)[0])
         df = DataFrame([model.model_dump() for model in counts.counts])
         mapper = {'specimen': 'sample', 'count': column_name}
-        return df.rename(columns=mapper).set_index('sample')[column_name]
+        return cast(Series, df.rename(columns=mapper).set_index('sample')[column_name])
+
+    def _get_feature_id(self, feature_type: str, ps: tuple[PhenotypeCriteria, ...]) -> str | None:
+        i = cast(DataFrame, self.feature_index)
+        form_specifier = phenotype_to_phenotype_str
+        condition = (i['feature_type'] == feature_type) & (i['specifier1'] == form_specifier(ps[0]))
+        if len(ps) > 1:
+            condition = condition & (i['specifier2'] == form_specifier(ps[1]))
+        if sum(condition) == 0:
+            self._log(f'Feature not found in bulk cache: {feature_type} {form_specifier(ps[0])} ... ')
+            return None
+        return i.loc[condition, ['feature']]['feature'].to_list()[0]
+
+    def _get_stored_feature(self, id: str) -> Series | None:
+        f = cast(DataFrame, self.features)
+        df = f.loc[f['feature'] == id, :]
+        if df.shape[0] == 0:
+            raise ValueError(f'Feature {id} was in the feature index but no feature values found for it.')
+        df = df.rename(columns={'value': 'count'})
+        return df[['count','sample']].set_index('sample')
+
+    def _get_counts_direct_from_db(self, p: PhenotypeCriteria) -> PhenotypeCounts:
+        counts = OnDemandRequester.get_counts_by_specimen(
+            cast(DBConnection, self.connection),
+            p.positive_markers,
+            p.negative_markers,
+            self.study,
+            None,
+            blocking = False,
+        )
+        return counts
 
     def _retrieve_all_cells_counts(self):
         all_name = 'all cells'
-        return self._get_counts_series(PhenotypeCriteria(positive_markers=('',), negative_markers=('',)), all_name)
+        return self._get_counts_series(PhenotypeCriteria(positive_markers=(), negative_markers=()), all_name)
 
     def _get_base(self):
         protocol = 'https'
-        if self.host == 'localhost' or re.search('127.0.0.1', self.host) or self.use_http:
+        if re.search('localhost', self.host) or re.search('127.0.0.1', self.host) or self.use_http:
             protocol = 'http'
         return '://'.join((protocol, self.host))
 

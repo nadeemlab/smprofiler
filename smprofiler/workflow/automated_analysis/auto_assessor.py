@@ -1,6 +1,6 @@
 """Data analysis script with automated multi-feature assessments."""
-from os import environ as os_environ
 import re
+from time import time as time
 from typing import cast
 from typing import TypeVar
 from typing import Callable
@@ -74,6 +74,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
         self.limits = limits
         self.omitted_cohorts = tuple(omitted_cohorts) if omitted_cohorts else ()
         self.logger = AssessmentLogger(interactive=True)
+        self.access.set_logger(self.logger.log)
         self.add_subresource(self.access)
         self.add_subresource(self.logger)
 
@@ -105,8 +106,16 @@ class StudyAutoAssessor(ChainableDestructableResource):
     def _get_results_from_phase(self, phase: int, previous_results: tuple[Result, ...]):
         results: list[Result] = []
         log = self.logger.get_logging(phase)
-        for case in self._get_cases(phase=phase):
+        cases = self._get_cases(phase=phase)
+        start = time()
+        for i, case in enumerate(cases):
             result = self._assess_case(case)
+            number_remaining = len(cases) - (i + 1)
+            elapsed_secs = float(time() - start)
+            secs_per_case = elapsed_secs / (i + 1)
+            estimated_remaining_mins = int(10 * secs_per_case * number_remaining / 60) / 10
+            if i % 100 == 99:
+                self.logger.log(f'Completed case {i+1}/{len(cases)}. (Estimated minutes remaining: {estimated_remaining_mins})')
             if not result.significant:
                 continue
             if phase == 1:
@@ -164,12 +173,10 @@ class StudyAutoAssessor(ChainableDestructableResource):
         return self._assess_case_df(df, case, 'fraction')
 
     def _assess_proximity(self, case: Case) -> Result:
-        bypass_api = 'SMPROFILER_BYPASS_API' in os_environ
         df = self.access.two_phenotype_spatial_metric(
             'proximity',
             case.get_phenotypes(),
             'proximity',
-            bypass_api,
         )
         return self._assess_case_df(df, case, 'proximity')
 
