@@ -69,7 +69,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
     number_samples: int
     logger: AssessmentLogger
 
-    def __init__(self, access: StudyDataAccessor, limits: Limits=DEFAULT_LIMITS, omitted_cohorts: list[str] | None=None):
+    def __init__(self, access: StudyDataAccessor, omitted_cohorts: list[str] | None=None):
         self.access = access
         self.limits = {'fraction': DEFAULT_LIMITS, 'proximity': LIMITS_SEVERE}
         self.omitted_cohorts = tuple(omitted_cohorts) if omitted_cohorts else ()
