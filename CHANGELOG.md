@@ -1,6 +1,6 @@
 # v1.0.68
 Adds a single-study multi-feature automated analysis pipeline and report summary function.
-- `StudyAutoAssessor`. Entrypoint into the main enumeration of cases considered, assesment methods, and initial filtering of preliminary results.
+- `StudyAutoAssessor`. Entrypoint into the main enumeration of cases considered, assessment methods, and initial filtering of preliminary results.
 - `PDFReportGenerator`. Requests auto assessment, gathers metadata, saves parameters for a TeX template, and saves a PDF.
 - New API endpoint `/analysis-summary/`.
 - `FeaturesCache`. Local cache of computed features, to reduce download bandwidth usage when dealing with computed features on a remote database.
