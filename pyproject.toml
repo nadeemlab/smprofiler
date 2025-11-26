@@ -27,6 +27,7 @@ dependencies = [
     "jinja2",
     "numba>=0.44.0",
     "psycopg",
+    "psycopg2",
     "pyshp",
     "pytz",
     "requests",
