@@ -1,4 +1,6 @@
-from decimal import Decimal
+"""
+Logging functionality specifically for the automated analysis runs.
+"""
 from typing import Callable
 from math import log10
 
@@ -7,6 +9,7 @@ from smprofiler.standalone_utilities.terminal_scrolling import TerminalScrolling
 from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
 from smprofiler.workflow.automated_analysis.types import Result
 from smprofiler.standalone_utilities.log_formats import colorized_logger
+
 logger = colorized_logger(__name__)
 
 class AssessmentLogger(ChainableDestructableResource):

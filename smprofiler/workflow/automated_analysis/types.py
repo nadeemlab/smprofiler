@@ -35,6 +35,9 @@ class Case:
 
 @define
 class ReportableCase:
+    """
+    This is like a `Case` but includes post-processed material for presentation.
+    """
     metric: Metric
     phenotype_str: str
     other_phenotype_str: str | None
@@ -68,7 +71,7 @@ def form_reportable_case(case: Case) -> ReportableCase:
 
 @define
 class ResultSignificance:
-    """p-value and multiplicative effect size."""
+    """p-value and multiplicative effect size for one result."""
     p: float
     effect: float
     fraction_data_used: float
@@ -81,6 +84,7 @@ class ResultSignificance:
 
 @define
 class ReportableCohort:
+    """Additional presentation-layer information about a cohort."""
     number_samples: int
     name: str
     abbreviation: str
@@ -114,6 +118,7 @@ class ReportableCohorts:
 
 @define
 class ReportableResult:
+    """A result augmented with presentation-layer information, like a sentential statement."""
     base: Result
     case: ReportableCase
     cohorts: ReportableCohorts
@@ -124,6 +129,7 @@ class ReportableResult:
 
 @define
 class FilteredResults:
+    """The main results filtered for significance and organized by metric type."""
     single_fractions: tuple[Result, ...]
     ratios: tuple[Result, ...]
     proximity: tuple[Result, ...]
@@ -131,6 +137,10 @@ class FilteredResults:
 
 @define
 class Highlights:
+    """
+    Even more filtered results, with possible near-duplications removed,
+    intended for rapid review.
+    """
     top3: tuple[ReportableResult, ...]
     top10_single_fractions: tuple[ReportableResult, ...]
     top10_ratios: tuple[ReportableResult, ...] 
@@ -139,6 +149,9 @@ class Highlights:
 
 @define
 class ReportStudyMetadata:
+    """
+    Pre-created snippets of the study metadata intended for reporting/presentation.
+    """
     study_description_phrase: str
     cohorts: tuple[ReportableCohort, ...]
     number_cohorts: int
@@ -153,6 +166,9 @@ class ReportStudyMetadata:
 
 @define
 class AnalysisSummary:
+    """
+    Bundle of all analysis results, extractions/highlights, and metadata for a given study.
+    """
     results: FilteredResults
     highlights: Highlights
     metadata: ReportStudyMetadata

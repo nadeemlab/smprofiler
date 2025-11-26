@@ -2,16 +2,14 @@
 import re
 from time import time as time
 from typing import cast
-from typing import TypeVar
-from typing import Callable
 from itertools import product
 from itertools import combinations
 from itertools import chain
-from typing import Iterable
 
 from pandas import concat
 from pandas import DataFrame
 from pandas import Series
+
 from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource
 
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
@@ -20,6 +18,8 @@ from smprofiler.db.http_data_accessor import univariate_pair_compare_details as 
 from smprofiler.db.exchange_data_formats.study import Cohort
 from smprofiler.db.exchange_data_formats.study import CohortAssignment
 from smprofiler.db.exchange_data_formats.study import Publication
+from smprofiler.standalone_utilities.iteration import tuple_map
+from smprofiler.standalone_utilities.iteration import tuple_filter
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 from smprofiler.workflow.automated_analysis.types import Case
@@ -43,15 +43,6 @@ from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentL
 from smprofiler.workflow.automated_analysis.urls import form_url
 
 logger = colorized_logger(__name__)
-
-T = TypeVar('T')
-S = TypeVar('S')
-
-def tuple_map(func: Callable[[T], S], i: Iterable[T]) -> tuple[S, ...]:
-    return tuple(map(func, i))
-
-def tuple_filter(func: Callable[[T], bool], i: Iterable[T]) -> tuple[T, ...]:
-    return tuple(filter(func, i))
 
 class StudyAutoAssessor(ChainableDestructableResource):
     """
@@ -80,28 +71,53 @@ class StudyAutoAssessor(ChainableDestructableResource):
 
     def get_summary(self) -> AnalysisSummary:
         self._initial_fetch()
+        phased_results = self._get_phased_results()
+        results = FilteredResults(*phased_results, self._form_results_dataframe(*phased_results))
         metadata = StudyMetadataPresenter.form_presentation_extracts(self.access, self.omitted_cohorts)
-        singleton_significants = self._get_results_from_phase(1, ())
-        ratio_significants = self._get_results_from_phase(2, singleton_significants)
-        proximity_significants = self._get_results_from_phase(3, singleton_significants)
-        def remove_nonfull_data_usage(rs: tuple[Result, ...]) -> tuple[Result, ...]:
-            return tuple(filter(lambda r: DEFAULT_USAGE_LIMITS.acceptable(r.significance), rs))
-        args = cast(
-            tuple[tuple[Result, ...], tuple[Result, ...],tuple[Result, ...]],
-            tuple_map(remove_nonfull_data_usage, (singleton_significants, ratio_significants, proximity_significants)),
-        )
-        results = FilteredResults(*args, self._form_results_dataframe(*args))
         highlights = HighlightExtractor.extract_highlights(results, metadata)
         return AnalysisSummary(results, highlights, metadata)
 
     def _initial_fetch(self) -> None:
+        """
+        The initial metadata retrieved in order to form relevant case sets.
+        """
         self.channels = tuple(self.access._retrieve_feature_names())
         cohorts_df = self.access._retrieve_cohorts()
-        self.cohorts = tuple(sorted(list(set(cohorts_df['cohort']).difference(set(self.omitted_cohorts))), key=lambda x: int(x)))
+        self.cohorts = self._get_relevant_cohorts(cast(Series, cohorts_df['cohort']))
         self.number_samples = cohorts_df[cohorts_df['cohort'].apply(lambda x: x not in self.omitted_cohorts)].shape[0]
         self.logger.set_name_width(max(map(len, self.channels)))
         self.logger.log(f'Using channels: {self.channels}')
         self.logger.log(f'Using cohorts: {self.cohorts}')
+
+    def _get_relevant_cohorts(self, cohorts: Series) -> tuple[str, ...]:
+        return tuple(
+            sorted(list(
+                set(cohorts).difference(set(self.omitted_cohorts))),
+                key=lambda x: int(x),
+            ),
+        )
+
+    def _get_phased_results(
+        self,
+    ) -> tuple[tuple[Result, ...], tuple[Result, ...],tuple[Result, ...]]:
+        singleton_significants = self._get_results_from_phase(1, ())
+        ratio_significants = self._get_results_from_phase(2, singleton_significants)
+        proximity_significants = self._get_results_from_phase(3, singleton_significants)
+        return cast(
+            tuple[tuple[Result, ...], tuple[Result, ...],tuple[Result, ...]],
+            tuple_map(
+                self._remove_nonfull_data_usage,
+                (singleton_significants, ratio_significants, proximity_significants),
+            ),
+        )
+
+    def _remove_nonfull_data_usage(self, rs: tuple[Result, ...]) -> tuple[Result, ...]:
+        """
+        Filters out results with suspiciously-high effect size that,
+        for whatever reason (e.g. null values for the given computation),
+        do not use enough of the whole study's sample set.
+        """
+        return tuple_filter(lambda r: DEFAULT_USAGE_LIMITS.acceptable(r.significance), rs)
 
     def _get_results_from_phase(self, phase: int, previous_results: tuple[Result, ...]):
         results: list[Result] = []
@@ -122,10 +138,10 @@ class StudyAutoAssessor(ChainableDestructableResource):
                 results.append(result)
                 log(result, ())
                 continue
-            possible_confounders = tuple(filter(
+            possible_confounders = tuple_filter(
                 lambda r0: SimpleConfounding(r0, result).probable_confounding(),
                 previous_results,
-            ))
+            )
             if len(possible_confounders) == 0:
                 results.append(result)
                 log(result, possible_confounders)
@@ -155,7 +171,8 @@ class StudyAutoAssessor(ChainableDestructableResource):
     def _form_single_phenotype(self, channel: str) -> PhenotypeCriteria:
         """
         Special treatment is given to the "distance dichotomized" virtual
-        features, to emphasize the case of low value (closer distance).
+        features, to emphasize the case of low value (closer distance) rather
+        than high, which would normally be the important state for a marker feature.
         """
         if re.search('distance', channel):
             return PhenotypeCriteria(positive_markers=(), negative_markers=(channel,))
@@ -208,15 +225,11 @@ class StudyAutoAssessor(ChainableDestructableResource):
             self.limits[feature_name].acceptable(significance),
         ) 
 
-    def _report_cohorts(self) -> dict[str, ReportableCohort]:
-        return self.cohorts_by_key
-
     def _form_results_dataframe(self, s1: tuple[Result, ...], s2: tuple[Result, ...], s3: tuple[Result, ...]):
         df1 = DataFrame([self._form_result_record(r) for r in s1])
         df1['metric'] = 'fraction'
         df2 = DataFrame([self._form_result_record(r) for r in s2])
         df2['metric'] = 'ratio'
-        #df3 = DataFrame([self._form_result_record(r) for r in s3 if LIMITS_SEVERE.acceptable(r.significance)])
         df3 = DataFrame([self._form_result_record(r) for r in s3])
         df3['metric'] = 'proximity'
         df = concat([df1, df2, df3], axis=0)
@@ -236,6 +249,10 @@ class StudyAutoAssessor(ChainableDestructableResource):
 
 
 class StatementAugmentor:
+    """
+    Produces a sentential representation of a result in the context
+    of a given study with its selected cohorts.
+    """
     cohort_details: dict[str, ReportableCohort]
     study_name: str
 
@@ -257,7 +274,7 @@ class StatementAugmentor:
             else:
                 return fr'The ratio of {case.phenotype_str} cells to {case.other_phenotype_str} cells is elevated by {effect} times in \textbf{{{cohorts.higher_cohort.abbreviation}}} samples compared with \textbf{{{cohorts.lower_cohort.abbreviation}}} samples, the difference being significant at level ${p}$ by the t-test.'
         if result.case.metric == 'proximity':
-            return fr'The average number of {case.other_phenotype_str} cells within 50px of a given {case.phenotype_str} cell is {effect} times higher in \textbf{{{cohorts.higher_cohort.abbreviation}}} samples compared with \textbf{{{cohorts.lower_cohort.abbreviation}}} samples, the difference being significant at level ${p}$ by the t-test.'
+            return fr'The average number of {case.other_phenotype_str} cells within 100px of a given {case.phenotype_str} cell is {effect} times higher in \textbf{{{cohorts.higher_cohort.abbreviation}}} samples compared with \textbf{{{cohorts.lower_cohort.abbreviation}}} samples, the difference being significant at level ${p}$ by the t-test.'
         raise ValueError('This case is not covered for verbalization.')
 
     def _reportable_cohorts(self, result: Result) -> ReportableCohorts:
@@ -282,18 +299,23 @@ class StatementAugmentor:
 
 
 class HighlightExtractor:
+    """
+    Extracts presentable "top results" by selecting only one from among
+    any group in which a putative pattern appears.
+    """
+
     @classmethod
     def extract_highlights(cls, results: FilteredResults, metadata: ReportStudyMetadata) -> Highlights:
         extracted: list[tuple[Result, ...]] = []
         by_metric: list[tuple[Result, ...]] = []
         for results_metric in (results.single_fractions, results.ratios, results.proximity):
-            results25 = cls.get_top(25, results_metric)
-            pared = cls.remove_common_patterns(results25)
+            results25 = cls._get_top(25, results_metric)
+            pared = cls._remove_common_patterns(results25)
             extracted.append(pared)
-            by_metric.append(cls.get_top(25, pared))
-        top3 = cls.get_top(3, tuple(chain(*extracted)))
-        by_metric = list(map(lambda t: cls.remove_specific_set(top3, t), extracted))
-        by_metric = list(map(lambda t: cls.get_top(5, t), by_metric))
+            by_metric.append(cls._get_top(25, pared))
+        top3 = cls._get_top(3, tuple(chain(*extracted)))
+        by_metric = list(map(lambda t: cls._remove_specific_set(top3, t), extracted))
+        by_metric = list(map(lambda t: cls._get_top(5, t), by_metric))
         a = StatementAugmentor(metadata.cohorts_by_key, metadata.study_description_phrase)
         f = a.augment
         reportables = cast(
@@ -304,18 +326,18 @@ class HighlightExtractor:
         return highlights
 
     @classmethod
-    def remove_specific_set(cls, specific: tuple[Result, ...], t: tuple[Result, ...]) -> tuple[Result, ...]:
+    def _remove_specific_set(cls, specific: tuple[Result, ...], t: tuple[Result, ...]) -> tuple[Result, ...]:
         def compare(r1: Result, r2: Result) -> bool:
             return r1.case == r2.case
-        return tuple(filter(lambda r: not any(map(lambda s: compare(s, r), specific)) , t))
+        return tuple_filter(lambda r: not any(map(lambda s: compare(s, r), specific)) , t)
 
     @classmethod
-    def get_top(cls, number: int, results: tuple[Result, ...]) -> tuple[Result, ...]:
+    def _get_top(cls, number: int, results: tuple[Result, ...]) -> tuple[Result, ...]:
         sorted_results = sorted(list(results), key=lambda r: -1 * r.quality())
         return tuple(sorted_results[0:number])
 
     @classmethod
-    def find_co_occurring(cls, positively: bool, p: PhenotypeCriteria, results: tuple[Result, ...]) -> tuple[bool, ...]:
+    def _find_co_occurring(cls, positively: bool, p: PhenotypeCriteria, results: tuple[Result, ...]) -> tuple[bool, ...]:
         negatively = not positively
         def occurring(r: Result) -> bool:
             if r.case.metric == 'fractions':
@@ -330,22 +352,30 @@ class HighlightExtractor:
         return tuple_map(occurring, results)
 
     @classmethod
-    def remove_common_patterns(cls, results: tuple[Result, ...]) -> tuple[Result, ...]:
-        phenotypes_occurring = cast(list[PhenotypeCriteria], list(set(map(lambda r: r.case.phenotype, results)).union(set(map(lambda r: r.case.other, results))).difference(set([None]))))
+    def _remove_common_patterns(cls, results: tuple[Result, ...]) -> tuple[Result, ...]:
+        """
+        For each phenotype, decide if the phenotype occurs frequently
+        enough in the result set (with the same "sign" of influence) to constitute
+        a pattern. Patterns of results are replaced by one representative, the
+        member with the highest quality score.
+        """
+        phenotypes_occurring = cast(list[PhenotypeCriteria], list(
+            set(map(lambda r: r.case.phenotype, results)).union(set(map(lambda r: r.case.other, results))).difference(set([None])))
+        )
         representatives = []
         pattern_membership = [False for _ in results]
         for p in phenotypes_occurring:
-            positively_occurring = cls.find_co_occurring(True, p, results)
-            negatively_occurring = cls.find_co_occurring(False, p, results)
+            positively_occurring = cls._find_co_occurring(True, p, results)
+            negatively_occurring = cls._find_co_occurring(False, p, results)
             results_p = tuple_map(lambda pair: pair[1], filter(lambda pair: pair[0], zip(positively_occurring, results)))
             results_n = tuple_map(lambda pair: pair[1], filter(lambda pair: pair[0], zip(negatively_occurring, results)))
             if len(results_p) > 2:
-                representative = cls.get_top(1, results_p)[0]
+                representative = cls._get_top(1, results_p)[0]
                 if representative not in representatives:
                     representatives.append(representative)
                 pattern_membership = [m1 or m2 for m1, m2 in zip(pattern_membership, positively_occurring)]
             if len(results_n) > 2:
-                representative = cls.get_top(1, results_n)[0]
+                representative = cls._get_top(1, results_n)[0]
                 if representative not in representatives:
                     representatives.append(representative)
                 pattern_membership = [m1 or m2 for m1, m2 in zip(pattern_membership, negatively_occurring)]
@@ -354,6 +384,10 @@ class HighlightExtractor:
 
 
 class CohortSummarizer:
+    """
+    Text processing to come up with a reasonable abbreviation
+    for each cohort definition.
+    """
     assignments: list[CohortAssignment]
     use_abbreviation: bool
 
@@ -387,6 +421,10 @@ class CohortSummarizer:
 
 
 class StudyMetadataPresenter:
+    """
+    Extracts study metadata for the presentation/report layer.
+    """
+
     @classmethod
     def form_presentation_extracts(cls, access: StudyDataAccessor, omitted_cohorts: tuple[str, ...]) -> ReportStudyMetadata:
         summary = access._retrieve_study_summary()
@@ -396,7 +434,7 @@ class StudyMetadataPresenter:
         )
         cohorts = s.get_cohorts()
         cohorts_by_key = s.get_cohorts_by_key()
-        author = summary.products.publication.first_author_name.split(' ')[-1]
+        author = cls._extract_surname(summary.products.publication.first_author_name)
         versions = access._retrieve_software_versions()
         library_versions = ' '.join(map(lambda v: f'{v.component_name} v{v.version}', versions))
         return ReportStudyMetadata(
@@ -416,4 +454,12 @@ class StudyMetadataPresenter:
     @classmethod
     def _form_reference(cls, p: Publication, author: str) -> str:
         return f'{author} et al. \\href{{{p.url}}}{{{p.title}}} ({p.date})'
+
+    @classmethod
+    def _extract_surname(cls, author: str) -> str:
+        if ',' in author:
+            return author.split(',')[0].rstrip()
+        return author.split(' ')[-1]
+
+
 
