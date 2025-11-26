@@ -1,5 +1,6 @@
 from os import system as os_system
 from os.path import exists
+from os import environ as os_environ
 from json import loads as json_loads
 from json import dumps as json_dumps
 from typing import cast
@@ -65,7 +66,7 @@ class PDFReportGenerator:
             StudyDataAccessor(
                 self.study,
                 host=self.api_host,
-                use_session=True,
+                use_session='SMProfiler_TESTING_MODE' not in os_environ,
                 database_config_file=self.database_config_file,
                 bypass_api=True,
                 use_readonly_bulk_feature_cache=True,
