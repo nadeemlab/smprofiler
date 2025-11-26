@@ -302,7 +302,12 @@ class StudyDataAccessor(ChainableDestructableResource):
         protocol = 'https'
         if re.search('localhost', self.host) or re.search('127.0.0.1', self.host) or self.use_http:
             protocol = 'http'
-        return '://'.join((protocol, self.host))
+        port = None if 'SMProfiler_TESTING_MODE' not in os_environ else 8080
+        if port and not re.search(r':[\d]+$', self.host):
+            host = f'{self.host}:{port}'
+        else:
+            host = self.host
+        return '://'.join((protocol, host))
 
     def _retrieve(self, endpoint: str, query: str, binary: bool=False):
         base = f'{self._get_base()}'
