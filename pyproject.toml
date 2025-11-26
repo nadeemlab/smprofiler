@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smprofiler"
-version = "1.0.68"
+version = "1.0.69"
 authors = [
     { name = "James Mathews", email = "mathewj2@mskcc.org" }
 ]
@@ -27,6 +27,7 @@ dependencies = [
     "jinja2",
     "numba>=0.44.0",
     "psycopg",
+    "psycopg2",
     "pyshp",
     "pytz",
     "requests",
@@ -60,13 +61,15 @@ all = [
     "psycopg",
     "pydantic",
     "PyJWT",
+    "pymupdf",
     "pyshp",
     "pytz",
     "requests",
     "secure",
     "scipy",
     "scikit-learn",
-    "squidpy>=1.6.2", "zarr<3",
+    "squidpy>=1.6.5", "zarr",
+    "sqlalchemy",
     "tables",
     "tabulate",
     "termplotlib",
@@ -87,10 +90,12 @@ apiserver = [
     "psycopg",
     "pydantic",
     "PyJWT",
+    "pymupdf",
     "pytz",
     "requests",
     "scipy",
     "secure",
+    "sqlalchemy",
     "uvicorn",
     "zstandard",
 ]
@@ -115,7 +120,7 @@ ondemand = [
     "pydantic",
     "scipy",
     "scikit-learn",
-    "squidpy>=1.6.2", "zarr<3",
+    "squidpy>=1.6.5", "zarr",
     "tabulate",
     "tqdm",
     "umap-learn",
@@ -155,6 +160,7 @@ packages = [
     "smprofiler.workflow",
     "smprofiler.workflow.scripts",
     "smprofiler.workflow.component_interfaces",
+    "smprofiler.workflow.automated_analysis",
     "smprofiler.workflow.graph_generation",
     "smprofiler.workflow.graph_plugin",
     "smprofiler.workflow.tabular_import",
@@ -178,6 +184,7 @@ packages = [
     "report_run_configuration.py",
     "configure.py",
     "tail_logs.py",
+    "generate_analysis_report.py",
 ]
 "smprofiler.workflow.assets" = [
     ".smprofiler_db.config.template",
@@ -186,6 +193,13 @@ packages = [
     "log_table.html.jinja",
     "main_visitor.nf",
     "nextflow.config.jinja",
+    "blue_tile.pdf",
+    "fractions.pdf",
+    "ratios.pdf",
+    "proximity.pdf",
+    "smprofiler_logo.pdf",
+    "link-out.pdf",
+    "analysis_summary.tex.jinja",
 ]
 "smprofiler.workflow.graph_generation" = [
     "graph_generation.nf",

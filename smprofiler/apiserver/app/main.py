@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt  # type: ignore
 import jwt
 from pydantic import BaseModel
 from pydantic_core import from_json
-from brotli import compress as brotli_compress  # type: ignore
 from brotli import decompress as brotli_decompress  # type: ignore
+from psycopg.errors import UndefinedTable
 
 from smprofiler.db.simple_method_cache import simple_function_cache
 from smprofiler.db.exchange_data_formats.findings import finding_fields
@@ -28,8 +28,10 @@ from smprofiler.db.representative_subsample import SubsampleMetadata
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import DBConnection
 from smprofiler.db.study_tokens import StudyCollectionNaming
+from smprofiler.db.accessors.study import StudyAccess
 from smprofiler.apiserver.request_scheduling.ondemand_requester import OnDemandRequester
 from smprofiler.db.sqlite_builder import SQLiteBuilder
+from smprofiler.workflow.automated_analysis.pdf_server import PDFReportServer
 from smprofiler.db.exchange_data_formats.study import StudyHandle
 from smprofiler.db.exchange_data_formats.study import StudySummary
 from smprofiler.db.exchange_data_formats.study import ChannelAnnotations
@@ -44,9 +46,11 @@ from smprofiler.db.exchange_data_formats.metrics import (
     UnivariateMetricsComputationResult,
     AvailableGNN,
     SoftwareComponentVersion,
+    AnalysisSummaryAvailable,
 )
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
 from smprofiler.db.querying import query
+from smprofiler.db.publish_promote import create_collection_whitelist
 from smprofiler.apiserver.app.validation import (
     normalize_study_name,
     valid_study_name,
@@ -185,6 +189,7 @@ async def add_security_headers(request: Request, call_next):
     await headers.set_headers_async(response)
     return response
 
+
 @app.get("/study-names/")
 async def get_study_names(
     collection: Annotated[str | None, Query(max_length=512, examples=['abcdef'])] = None
@@ -199,28 +204,28 @@ async def get_study_names(
 
     The collection parameter is a token providing access to private datasets, so it is not required.
     """
-    specifiers = query().retrieve_study_specifiers()
-    handles = [query().retrieve_study_handle(study) for study in specifiers]
-
-    def is_public(study_handle: StudyHandle) -> bool:
-        if StudyCollectionNaming.is_untagged(study_handle):
-            return True
-        _, tag = StudyCollectionNaming.strip_extract_token(study_handle)
-        if query().is_public_collection(tag):
-            return True
-        return False
-    if collection is None:
-        handles = list(filter(is_public, map(query().retrieve_study_handle, specifiers)))
-    else:
-        if not StudyCollectionNaming.matches_tag_pattern(collection):
-            raise HTTPException(
-                status_code=404,
-                detail=f'Collection "{collection}" is not a valid collection string.',
-            )
-
-        def tagged(study_handle: StudyHandle) -> bool:
-            return StudyCollectionNaming.tagged_with(study_handle, collection)
-        handles = list(filter(tagged, map(query().retrieve_study_handle, specifiers)))
+    with DBCursor() as cursor:
+        cursor.execute('SELECT study, schema_name FROM default_study_lookup.study_lookup;')
+        studies = tuple(cursor.fetchall())
+        if collection is None:
+            cursor.execute(create_collection_whitelist)
+            cursor.execute('SELECT collection from default_study_lookup.collection_whitelist;')
+            collections = tuple(list(map(lambda row: row[0], tuple(cursor.fetchall()))) + [None])
+        else:
+            if not StudyCollectionNaming.matches_tag_pattern(collection):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f'Collection "{collection}" is not a valid collection string.',
+                )
+            else:
+                collections = (collection,)
+        access = StudyAccess(cursor)
+        handles = []
+        for study, schema_name in studies:
+            cursor.execute(f'SET search_path TO {schema_name} ;')
+            handle = access.get_study_handle(study)
+            if StudyCollectionNaming.strip_token(study)[1] in collections:
+                handles.append(handle)
     return handles
 
 
@@ -963,3 +968,36 @@ def get_sqlite_dump(
             "Content-Disposition": f'attachment; filename="{normalize_study_name(study)}.sqlite"'
         },
     )
+
+
+@app.get("/analysis-summary-available/")
+def analysis_summary_available(
+    study: ValidStudy,
+) -> AnalysisSummaryAvailable:
+    report = PDFReportServer(None, study)
+    return AnalysisSummaryAvailable(available=report.exists())
+
+
+@app.get("/analysis-summary/")
+def get_analysis_summary(
+    study: ValidStudy,
+):
+    """
+    Get a PDF report of most salient statistical results.
+    """
+    report = PDFReportServer(None, study)
+    if report.exists():
+        return Response(
+            report.datestamp_and_retrieve(),
+            headers={
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': f'attachment; filename="{normalize_study_name(study)}.pdf"',
+            },
+        )
+    raise HTTPException(
+        status_code=404,
+        detail=f'No PDF analysis report is available for: {study}',
+    )
+
+
+

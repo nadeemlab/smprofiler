@@ -18,9 +18,6 @@ filterwarnings(action='ignore', category=SyntaxWarning, module=r'.*leidenalg.*')
 filterwarnings(action='ignore', category=FutureWarning, message=r'functools.partial will be a method descriptor in future Python versions; wrap it in enum.member\(\) if you want to preserve the old behavior')
 filterwarnings(action='ignore', category=RuntimeWarning, message=r'nopython is set for njit and is ignored')
 filterwarnings(action='ignore', category=FutureWarning, message=r'Importing read_text from `anndata` is deprecated. Import anndata.io.read_text instead.')
-import dask
-dask.config.set({'dataframe.query-planning': True})
-import dask.dataframe as dd
 from squidpy.gr import (  # type: ignore
     spatial_neighbors,
     nhood_enrichment,

@@ -1,7 +1,9 @@
 
 # Reproducible analyses
 
-The scripts in this directory reproduce the analyses of the curated datasets, in almost exactly the same order that they are mentioned in the article.
+See `smprofiler/workflow/automated_analysis` for the cases considered, filtering methods, etc. for the primary automated analysis.
+
+The scripts in this directory reproduce additional analyses of the curated datasets.
 
 These scripts were written largely as a record of usage of the dashboard web application, which provides the same results.
 

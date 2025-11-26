@@ -3,13 +3,11 @@ from typing import cast
 import re
 from itertools import chain
 from urllib.parse import urlencode
-from requests import get as get_request  # type: ignore
+from requests import get as get_request
 from os.path import exists
 from time import sleep
 from time import time
 from datetime import datetime
-from sqlite3 import connect
-import pickle
 
 from pandas import DataFrame
 from pandas import concat
@@ -18,10 +16,12 @@ from numpy import nan
 from numpy import isnan
 from numpy import mean
 from numpy import log
-from scipy.stats import ttest_ind  # type: ignore
-from sklearn.metrics import auc  # type:ignore
+from scipy.stats import ttest_ind
+from sklearn.metrics import auc
 
 from smprofiler.standalone_utilities.float8 import decode as decode_float8
+from smprofiler.standalone_utilities.simple_file_cache import SimpleFileCache
+from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource 
 
 
 def get_default_host(given: str | None) -> str | None:
@@ -51,16 +51,12 @@ def sleep_poll():
     sleep(seconds)
 
 
-class DataAccessor:
+class DataAccessor(ChainableDestructableResource):
     """Convenience caller of HTTP methods for data access."""
-    caching: bool
+    cache: SimpleFileCache 
 
-    def __init__(self, study, host=None, caching: bool=True):
-        self.caching = caching
-        if self.caching:
-            with connect('cache.sqlite3') as connection:
-                cursor = connection.cursor()
-                cursor.execute('CREATE TABLE IF NOT EXISTS cache(url TEXT, contents BLOB);')
+    def __init__(self, study, host=None):
+        self.cache = SimpleFileCache()
         _host = get_default_host(host)
         if _host is None:
             raise RuntimeError('Expected host name in api_host.txt .')
@@ -75,6 +71,9 @@ class DataAccessor:
         print('\n' + Colors.bold_magenta + study + Colors.reset + '\n')
         self.cohorts = self._retrieve_cohorts()
         self.all_cells = self._retrieve_all_cells_counts()
+
+    def get_subresources(self) -> tuple[SimpleFileCache]:
+        return (self.cache,)
 
     def feature_matrix(self, sample: str) -> DataFrame:
         parts = [
@@ -175,9 +174,12 @@ class DataAccessor:
         df = DataFrame(rows).set_index('sample')
         return concat([self.cohorts, self.all_cells, df], axis=1)
 
-    def _two_phenotype_spatial_metric(self, phenotype_names, feature_class):
-        criteria = [self._phenotype_criteria(p) for p in phenotype_names]
-        names = [self._name_phenotype(p) for p in phenotype_names]
+    def _two_phenotype_spatial_metric(self, phenotype_names, feature_class, criteria: list[dict] | None = None):
+        if not criteria:
+            criteria = [self._phenotype_criteria(p) for p in phenotype_names]
+            names = [self._name_phenotype(p) for p in phenotype_names]
+        else:
+            names = phenotype_names
 
         positives = criteria[0]['positive_markers']
         negatives = criteria[0]['negative_markers']
@@ -260,51 +262,20 @@ class DataAccessor:
             protocol = 'http'
         return '://'.join((protocol, self.host))
 
-    def _add_to_cache(self, url, contents):
-        if not self.caching:
-            return
-        with connect('cache.sqlite3') as connection:
-            cursor = connection.cursor()
-            cursor.execute('INSERT INTO cache(url, contents) VALUES (?, ?);', (url, pickle.dumps(contents)))
-
-    def _drop_from_cache(self, url: str) -> None:
-        with connect('cache.sqlite3') as connection:
-            cursor = connection.cursor()
-            cursor.execute('DELETE FROM cache WHERE url=?;', (url,))
-
-    def _lookup_cache(self, url, binary: bool=False):
-        if not self.caching:
-            return None
-        with connect('cache.sqlite3') as connection:
-            cursor = connection.cursor()
-            cursor.execute('SELECT contents FROM cache WHERE url=?;', (url,))
-            rows = cursor.fetchall()
-            if len(rows) > 0:
-                if binary:
-                    obj = pickle.loads(rows[0][0], encoding='bytes')
-                else:
-                    obj = pickle.loads(rows[0][0], encoding='bytes').json()
-                return obj, url
-        return None
-
-    def _retrieve(self, endpoint, query, binary: bool=False):
+    def _retrieve(self, endpoint: str, query: str, binary: bool=False):
         base = f'{self._get_base()}'
         url = '/'.join([base, endpoint, '?' + query])
-        c = self._lookup_cache(url, binary=binary)
-        if c:
-            if binary:
-                return c[0].content, c[1]
-            if 'is_pending' in c[0]:
-                if not c[0]['is_pending']:
-                    return c
-            else:
-                return c
+        key = url
+        payload = self.cache.lookup(key)
+        if payload:
+            return self._process_payload(payload, key, binary)
         try:
             start = time()
             headers = {} if not binary else {'Accept-Encoding': 'br'}
-            content = get_request(url, headers=headers)
+            payload = get_request(url, headers=headers)
             end = time()
-            self._add_to_cache(url, content)
+            key = url
+            self.cache.add(key, payload)
             delta = str(end - start)
             now = str(datetime.now())
             with open('requests_timing.txt', 'ta', encoding='utf-8') as file:
@@ -312,9 +283,19 @@ class DataAccessor:
         except Exception as exception:
             print(url)
             raise exception
+        return self._process_payload(payload, key, binary)
+
+    def _process_payload(self, payload, key: str, binary: bool) -> tuple[dict | bytes, str]:
         if binary:
-            return content.content, url
-        return content.json(), url
+            return payload.content, key
+        else:
+            parsed_payload = payload.json()
+            if 'is_pending' in parsed_payload:
+                if not parsed_payload['is_pending']:
+                    return parsed_payload, key
+            else:
+                return parsed_payload, key
+        raise ValueError(f'Processing downloaded payload failed: {key}')
 
     def _phenotype_criteria(self, name):
         if isinstance(name, dict):
@@ -463,6 +444,7 @@ def univariate_pair_compare(
     do_log_fold: bool = False,
     show_pvalue=False,
     show_auc=False,
+    verbose: bool=True,
 ):
     list1 = list(filter(lambda element: not isnan(element) and not element==inf, list1.values))
     list2 = list(filter(lambda element: not isnan(element) and not element==inf, list2.values))
@@ -472,7 +454,8 @@ def univariate_pair_compare(
     actual = mean2 / mean1
     if expected_fold is not None:
         handle_expected_actual(expected_fold, actual)
-    print((mean2, mean1, actual), end='')
+    if verbose:
+        print((mean2, mean1, actual), end='')
 
     if do_log_fold:
         _list1 = [log(e) for e in list(filter(lambda element: element != 0, list1))]
@@ -480,23 +463,29 @@ def univariate_pair_compare(
         _mean1 = float(mean(_list1))
         _mean2 = float(mean(_list2))
         log_fold = _mean2 / _mean1
-        print('  log fold: ' + Colors.yellow + str(log_fold) + Colors.reset, end='')
+        if verbose:
+            print('  log fold: ' + Colors.yellow + str(log_fold) + Colors.reset, end='')
 
     if show_pvalue:
         if do_log_fold:
             result = ttest_ind(_list1, _list2, equal_var=False)
-            print(
-                '  p-value (after log): ' + Colors.blue + str(result.pvalue) + Colors.reset, end=''
-            )
+            if verbose:
+                print(
+                    '  p-value (after log): ' + Colors.blue + str(result.pvalue) + Colors.reset, end=''
+                )
         else:
             result = ttest_ind(list1, list2, equal_var=False)
-            print('  p-value: ' + Colors.blue + str(result.pvalue) + Colors.reset, end='')
+            if verbose:
+                print('  p-value: ' + Colors.blue + str(result.pvalue) + Colors.reset, end='')
+            return result.pvalue, actual
 
     if show_auc:
         _auc = compute_auc(list1, list2)
-        print('  AUC: ' + Colors.blue + str(_auc) + Colors.reset, end='')
+        if verbose:
+            print('  AUC: ' + Colors.blue + str(_auc) + Colors.reset, end='')
 
-    print('')
+    if verbose:
+        print('')
 
 
 def get_fractions(df, column_numerator, column_denominator, cohort1, cohort2, omit_zeros=True):
@@ -507,8 +496,8 @@ def get_fractions(df, column_numerator, column_denominator, cohort1, cohort2, om
         omit1 = total1 - sum((df['cohort'] == cohort1) & mask)
         total2 = sum((df['cohort'] == cohort2))
         omit2 = total2 - sum((df['cohort'] == cohort2) & mask)
-        if omit1 !=0 or omit2 !=0:
-            print(f'(Omitting {omit1}/{total1} from {cohort1} and {omit2}/{total2} from {cohort2}.)')
+        # if omit1 !=0 or omit2 !=0:
+        #     print(f'(Omitting {omit1}/{total1} from {cohort1} and {omit2}/{total2} from {cohort2}.)')
     else:
         mask = True
     fractions1 = fractions[(df['cohort'] == cohort1) & mask]

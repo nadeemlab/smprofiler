@@ -1,0 +1,203 @@
+\errorcontextlines=10
+\documentclass[10pt]{article}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  filecolor=magenta,      
+  urlcolor=blue,
+  pdftitle={Analysis report},
+}
+\usepackage{graphicx}
+
+\usepackage[
+	top=2cm, 
+	bottom=2cm, 
+	left=2cm, 
+	right=2cm,
+  includefoot=true
+]{geometry}
+
+\usepackage{lastpage}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyfoot[L]{
+  \makebox[0pt][l]{
+    \raisebox{-37pt}[0pt][0pt]{
+      \hspace{-6pc}
+      \includegraphics[width=3.5cm]{blue_tile}
+    }
+  } 
+  {\color{white} {\sffamily \raisebox{-25pt}{ \hspace{-12pt} \thepage \hspace{1pt} / \pageref*{LastPage}} } }
+}
+
+\setlength\parindent{0pt}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage{tgadventor}
+%\renewcommand*\familydefault{\sfdefault}
+
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\definecolor{highlightcolour}{HTML}{DF0174}
+\definecolor{rulecolour}{HTML}{B2BEB5}
+
+\usepackage{changepage}
+\usepackage{colortbl}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{amsmath}
+\def\arraystretch{1.2}
+
+\newcolumntype{R}[1]{>{\raggedleft\let\newline\\\arraybackslash\hspace{0pt} }m { #1 } }
+
+\newcommand{\reportinformation}{
+	{
+    \fontfamily{\sfdefault}
+
+    \begin{center}
+      \fontfamily{\sfdefault}
+      { \LARGE Top findings }
+    \end{center}
+
+    \begin{tabular}{p{0.09\textwidth} m{0.48\textwidth} m{0.15\textwidth} p{0.15\textwidth} p{0.05\textwidth} }
+      &  &  & \textbf{t-test} \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+      {% for result in highlights.top3 %}
+      {% if result.metric_inferred == 'fractions' %} \includegraphics[width=35pt]{fractions} {% endif %}
+      {% if result.metric_inferred == 'ratios' %} \includegraphics[width=45pt]{ratios} {% endif %}
+      {% if result.metric_inferred == 'proximity' %} \includegraphics[width=35pt]{proximity} {% endif %}
+       & {{ result.statement }} & \Huge \color{highlightcolour} {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=18pt]{link-out}}  \\[2pc]
+      {% endfor %}
+		\end{tabular}
+
+    \vspace{2pc}
+    \newpage
+    \thispagestyle{fancy}
+
+    \begin{center}
+      \fontfamily{\sfdefault}
+      { \LARGE Additional findings }
+    \end{center}
+
+    \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=25pt]{fractions}}\hspace{10pt}\textbf{Cell population fractions}\end{center}
+
+    \begin{tabular}{p{0.2\textwidth} p{0.14\textwidth} p{0.14\textwidth} p{0.1\textwidth} p{0.12\textwidth} p{0.08\textwidth} p{0.05\textwidth}}
+      Cell type & Elevated in & Compared to & By amount & t-test & quality & \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+      {% for result in highlights.top10_single_fractions %}
+      {{ result.case.phenotype_str }} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & {{ result.quality | quality_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {% endfor %}
+		\end{tabular}
+
+    \vspace{2pc}
+    \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=35pt]{ratios}}\hspace{10pt}\textbf{Cell population pair ratios}\end{center}
+
+    \begin{tabular}{p{0.13\textwidth} p{0.13\textwidth} p{0.12\textwidth} p{0.12\textwidth} p{0.08\textwidth} p{0.12\textwidth} p{0.08\textwidth} p{0.05\textwidth}}
+      Cell type & Other cell type & Ratio elevated in & Compared to & By amount & t-test & quality & \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+      {% for result in highlights.top10_ratios %}
+      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ & {{ result.quality | quality_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {% endfor %}
+		\end{tabular}
+ 
+    \vspace{2pc}
+    \begin{center}\hspace{-30pt}\raisebox{-0.3\height}{\includegraphics[width=35pt]{proximity}}\hspace{10pt}\textbf{Cell population pair proximity}\end{center}
+
+    \begin{tabular}{p{0.13\textwidth} p{0.13\textwidth} p{0.13\textwidth} p{0.13\textwidth} p{0.08\textwidth} p{0.12\textwidth} p{0.08\textwidth} p{0.05\textwidth}}
+      Cell type & Other cell type & Proximity elevated in & Compared to & By amount & t-test & quality & \\
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+      {% for result in highlights.top10_proximity %}
+      {{ result.case.phenotype_str }} & {{ result.case.other_phenotype_str}} & {{ result.cohorts.higher_cohort.abbreviation }} & {{ result.cohorts.lower_cohort.abbreviation }} & {{ result.base.significance.effect | effect_filter }}  & $ {{ result.base.significance.p | pvalue_filter }} $ &  {{ result.quality | quality_filter }} & \href{% raw %}{{% endraw %}{{ result.url }}}{\includegraphics[width=12pt]{link-out}} \\
+      {% endfor %}
+		\end{tabular}
+    \begin{center}
+      \includegraphics[width=15cm]{kde}
+    \end{center}
+    Cohort comparison results are evaluated partly with the quality score $-\operatorname{log}_{10}(p)\times \operatorname{effect}\thinspace\operatorname{multiplier}$. The distribution of these scores over {{ highlights.number_results_considered }} results meeting minimum criteria is shown above for reference, with the scores for the highlighted findings indicated in purple.
+
+  \vspace{1pc}
+
+  \mbox{}
+  \vfill
+  \begin{center}
+    \fontfamily{\sfdefault}
+    { \Large Notes}
+  \end{center}
+  \begin{enumerate}[label=\alph*.]
+    \itemsep0em
+    \item{\rmfamily\emph{This report was generated using the \href{https://github.com/nadeemlab/smprofiler}{SMProfiler} system produced by the Nadeem lab at MSKCC.}}
+    \item{\rmfamily\emph{The following software pacakages may have been used during preparation of this report: {{ metadata.software_component_versions }} }}
+    \item{\rmfamily\emph{The findings highlighted are provided for research purposes only. They were determined by automated computational analysis and may not represent the most precise or relevant results available. The clinical and statistical significance should be evaluated by a bioinformatician, statistician, and appropriate medical professionals.}}
+    \item{\rmfamily\emph{The data on which this report is based was published by {{ metadata.main_author }} et al and retrieved by the Nadeem lab from \url{% raw %}{{% endraw %}{{ metadata.data_download_url | latex_escape_url }}} . The study's authors are not responsible for the contents of this report.}}
+  \end{enumerate}
+  }
+}
+
+\usepackage{everypage}
+\def\PageTopMargin{1in}
+\def\PageLeftMargin{1in}
+\newcommand\atxy[3]{
+ \AddThispageHook{\hbox{\smash{\hspace*{\dimexpr-\PageLeftMargin-\hoffset+#1\relax}
+  \raisebox{\dimexpr\PageTopMargin+\voffset-#2\relax}{ #3} }} }}
+
+\definecolor{blue(pigment)}{rgb}{0.07, 0.05, 0.4}
+
+\newenvironment{report}
+{
+  \atxy{-0.35cm}{0.6in}{ \href{https://smprofiler.io}{\includegraphics[width=3.5cm]{smprofiler_logo}} }
+%  \atxy{-0.35cm}{10.8in}{ \includegraphics[width=3.5cm]{blue_tile} }
+
+  \begin{center}
+    \fontfamily{\sfdefault}
+    {
+      {\color{blue(pigment)}\Huge Multiplex imaging dataset} \\
+      \vspace{1pc}
+      {\color{blue(pigment)}\LARGE Histological spatial pattern analysis}
+    }
+	\end{center}
+	
+	\vspace{1cm}
+
+  {
+    \fontfamily{\sfdefault} 
+    \large
+		\begin{tabular}{p{0.3\textwidth} r p{0.4\textwidth} p{0.1\textwidth} }
+			\arrayrulecolor{rulecolour}\toprule[0.5pt]
+      \multirow{ {{ metadata.number_cohorts }} }{*}{ {\color{highlightcolour} \LARGE
+          \parbox[c][2em]{\hsize}{ \raggedright {{ metadata.study_description_phrase }}
+        } } }
+      & & & \\
+      {% for cohort in metadata.cohorts %}
+      &  {{ cohort.number_samples }} samples & {{ cohort.name }} & \textbf{ {{ cohort.abbreviation }} } \\
+      {% endfor %}
+      & & & \\
+			\arrayrulecolor{rulecolour}\bottomrule[0.5pt]
+		\end{tabular}
+	}
+
+  \vspace{2pc}	
+  \begin{adjustwidth}{3.5cm}{3.5cm}
+{{ metadata.number_samples }} samples were collected and analyzed by {{ metadata.main_author }} et al \footnote{ {{ metadata.reference_footnote }} },
+using {{ metadata.data_collection_modality }} to capture abundance of {{ metadata.number_channels }} proteins in single
+cells imaged in histology slides.
+  \end{adjustwidth}
+
+  \vspace{2pc}	
+	\reportinformation
+
+}{ 
+}
+
+\begin{document}
+\begin{report}
+\end{report}
+\end{document}
+

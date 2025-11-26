@@ -15,6 +15,7 @@ RUN apt install curl -y
 RUN curl -s https://get.nextflow.io | bash; mv nextflow /usr/local/bin/;
 RUN bash -c 'if [[ "$(which nextflow)" = "" ]]; then echo "Nextflow not on path."; exit 1; fi;'
 RUN apt install libgdal-dev -y && apt-get clean
+RUN apt install -y texlive-latex-base texlive-fonts-recommended texlive-fonts-extra texlive-latex-extra
 RUN add-apt-repository ppa:deadsnakes/ppa && apt update
 RUN apt install python3.13 -y && apt-get clean
 RUN apt install python3.13-dev -y && apt-get clean

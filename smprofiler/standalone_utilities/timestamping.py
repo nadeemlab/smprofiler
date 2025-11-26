@@ -1,6 +1,5 @@
 
 from datetime import datetime
-from datetime import timezone
 
 from pytz import timezone as pytz_timezone  # type: ignore
 
@@ -12,3 +11,4 @@ except Exception:
 
 def now() -> datetime:
     return datetime.now(tz=GUESSED_LOCAL_TIMEZONE)
+
