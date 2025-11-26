@@ -1,9 +1,12 @@
-# v1.0.68
+# v1.0.69
 Adds a single-study multi-feature automated analysis pipeline and report summary function.
 - `StudyAutoAssessor`. Entrypoint into the main enumeration of cases considered, assessment methods, and initial filtering of preliminary results.
 - `PDFReportGenerator`. Requests auto assessment, gathers metadata, saves parameters for a TeX template, and saves a PDF.
 - New API endpoint `/analysis-summary/`.
 - `FeaturesCache`. Local cache of computed features, to reduce download bandwidth usage when dealing with computed features on a remote database.
+
+# v1.0.68
+- Adds a utility to perform targets synchronization of specific database tables with local files.
 
 # v1.0.67
 - First release of renamed package **smprofiler**.
