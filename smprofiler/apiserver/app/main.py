@@ -50,6 +50,7 @@ from smprofiler.db.exchange_data_formats.metrics import (
 )
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
 from smprofiler.db.querying import query
+from smprofiler.db.publish_promote import create_collection_whitelist
 from smprofiler.apiserver.app.validation import (
     normalize_study_name,
     valid_study_name,
@@ -207,11 +208,9 @@ async def get_study_names(
         cursor.execute('SELECT study, schema_name FROM default_study_lookup.study_lookup;')
         studies = tuple(cursor.fetchall())
         if collection is None:
-            try:
-                cursor.execute('SELECT collection from default_study_lookup.collection_whitelist;')
-                collections = tuple(list(map(lambda row: row[0], tuple(cursor.fetchall()))) + [None])
-            except UndefinedTable:
-                collections = (None,)
+            cursor.execute(create_collection_whitelist)
+            cursor.execute('SELECT collection from default_study_lookup.collection_whitelist;')
+            collections = tuple(list(map(lambda row: row[0], tuple(cursor.fetchall()))) + [None])
         else:
             if not StudyCollectionNaming.matches_tag_pattern(collection):
                 raise HTTPException(

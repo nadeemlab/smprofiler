@@ -10,6 +10,8 @@ from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
 
+create_collection_whitelist = 'CREATE TABLE IF NOT EXISTS collection_whitelist ( collection VARCHAR(512) );'
+
 @define
 class PublisherPromoter:
     database_config_file: str
@@ -42,8 +44,8 @@ class PublisherPromoter:
         file = self.database_config_file
         with DBCursor(database_config_file=file, study=None) as cursor:
             collection = self._get_collection()
-            create = f'CREATE TABLE IF NOT EXISTS collection_whitelist ( collection VARCHAR(512) );'
-            insert = f'INSERT INTO collection_whitelist (collection) VALUES ( %s ) ;'
+            create = create_collection_whitelist
+            insert = 'INSERT INTO collection_whitelist (collection) VALUES ( %s ) ;'
             logger.debug(create)
             cursor.execute(create)
             logger.debug(insert % f"'{collection}'")
