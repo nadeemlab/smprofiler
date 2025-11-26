@@ -1,4 +1,5 @@
 """Data types to support the automated analysis."""
+
 from typing import Literal
 from typing import cast
 from math import log10

@@ -1,3 +1,9 @@
+"""
+Copies all computed features for a study to a local file.
+Useful for performance reasons in low-bandwidth contexts.
+"""
+
+
 from os.path import exists
 from typing import cast
 

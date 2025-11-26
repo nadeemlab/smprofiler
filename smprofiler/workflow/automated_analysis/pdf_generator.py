@@ -1,6 +1,5 @@
 from os import system as os_system
 from os.path import exists
-from os import environ as os_environ
 from json import loads as json_loads
 from json import dumps as json_dumps
 from typing import cast
@@ -11,10 +10,10 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from jinja2 import BaseLoader
 from jinja2 import Environment
+
 from smprofiler.workflow.scripts.configure import _retrieve_from_library
 from smprofiler.db.http_data_accessor import StudyDataAccessor
 from smprofiler.standalone_utilities.timestamping import now
-
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.workflow.automated_analysis.assessment_logger import AssessmentLogger
 from smprofiler.workflow.automated_analysis.auto_assessor import StudyAutoAssessor
@@ -34,6 +33,10 @@ def _pandas_adaptor(_: DataFrame) -> str:
 
 
 class PDFReportGenerator:
+    """
+    Performs automated multi-feature analysis of one study and
+    generates a single document overview report.
+    """
     api_host: str
     database_config_file: str
     study: str
@@ -64,7 +67,7 @@ class PDFReportGenerator:
                 host=self.api_host,
                 use_session=True,
                 database_config_file=self.database_config_file,
-                bypass_api='SMPROFILER_BYPASS_API' in os_environ,
+                bypass_api=True,
                 use_readonly_bulk_feature_cache=True,
             ),
             omitted_cohorts=self.omitted_cohorts,
@@ -80,8 +83,7 @@ class PDFReportGenerator:
         logger.debug(f'Wrote {cache_file}')
 
     def _generate_kde_plot(self, df: DataFrame, highlights: Highlights) -> None:
-        print(df)
-        print(df.columns)
+        logger.debug(df.columns)
         label = 'Quality score'
         df = df.rename(columns={'quality': label})
         sns.set_theme(rc={'figure.figsize':(8, 3)})
@@ -111,7 +113,7 @@ class PDFReportGenerator:
         logfile = 'report_generation.log'
         os_system(f'pdflatex analysis_summary.tex --interaction=nonstopmode > {logfile}')
         os_system(f'pdflatex analysis_summary.tex --interaction=nonstopmode > {logfile}')
-        print('report_generation.log written (pdflatex runs)')
+        logger.debug('report_generation.log written (pdflatex runs)')
         self.pdf = open('analysis_summary.pdf', 'rb').read()
 
     def _save_pdf_to_database(self) -> None:

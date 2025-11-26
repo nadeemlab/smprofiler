@@ -17,6 +17,10 @@ class NoReportFound(ValueError):
 
 
 class PDFReportServer:
+    """
+    Serves a previously-saved analysis report PDF, after stamping
+    it with the current date.
+    """
     database_config_file: str | None
     study: str
 

@@ -54,6 +54,8 @@ def sleep_poll():
 class StudyDataAccessor(ChainableDestructableResource):
     """
     Convenience caller of HTTP methods for data access (study metadata, computed metrics).
+    In some cases the HTTP API is bypassed and the database directly queried, for
+    performance reasons.
     """
     cache: KeyValueStore
     session: RequestsSession
