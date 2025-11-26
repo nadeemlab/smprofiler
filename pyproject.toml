@@ -68,6 +68,7 @@ all = [
     "scipy",
     "scikit-learn",
     "squidpy>=1.6.5", "zarr",
+    "sqlalchemy",
     "tables",
     "tabulate",
     "termplotlib",
@@ -93,6 +94,7 @@ apiserver = [
     "requests",
     "scipy",
     "secure",
+    "sqlalchemy",
     "uvicorn",
     "zstandard",
 ]

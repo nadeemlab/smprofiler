@@ -16,6 +16,7 @@ import jwt
 from pydantic import BaseModel
 from pydantic_core import from_json
 from brotli import decompress as brotli_decompress  # type: ignore
+from psycopg.errors import UndefinedTable
 
 from smprofiler.db.simple_method_cache import simple_function_cache
 from smprofiler.db.exchange_data_formats.findings import finding_fields
@@ -206,8 +207,11 @@ async def get_study_names(
         cursor.execute('SELECT study, schema_name FROM default_study_lookup.study_lookup;')
         studies = tuple(cursor.fetchall())
         if collection is None:
-            cursor.execute('SELECT collection from default_study_lookup.collection_whitelist;')
-            collections = tuple(list(map(lambda row: row[0], tuple(cursor.fetchall()))) + [None])
+            try:
+                cursor.execute('SELECT collection from default_study_lookup.collection_whitelist;')
+                collections = tuple(list(map(lambda row: row[0], tuple(cursor.fetchall()))) + [None])
+            except UndefinedTable:
+                collections = (None,)
         else:
             if not StudyCollectionNaming.matches_tag_pattern(collection):
                 raise HTTPException(
