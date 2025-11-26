@@ -1,31 +1,53 @@
 
 <p align="center">
-<img src="docs/image_assets/SMProfiler_logo_blue_on_transparent.png" width="400"/>
+<img src="docs/image_assets/smprofiler-logo.svg" width="400"/>
 </p>
-<br/>
-<br/>
 
 - [What do cell profiles tell us about biology and disease?](#what-do-cell-profiles-tell-us-about-biology-and-disease)
 - [User tutorial](#user-tutorial)
   - [Example: Exploratory data analysis of immunotherapy response in melanoma](#example-exploratory-data-analysis-of-immunotherapy-response-in-melanoma)
-  - [Spatially-informed metrics](#spatially-informed-metrics)
+    - [1. Select a study](#select-a-study)
+    - [2. Choose cell phenotypes](#choose-cell-phenotypes)
+    - [3. Aggregate cell population fractions and overlaps](#aggregate-cell-population-fractions-and-overlaps)
+    - [4. Check per-sample values](#check-per-sample-values)
+    - [5. Assess phenotype fractions between cohorts](#assess-fractions)
+    - [6. Assess ratios between cohorts](#assess-ratios)
+    - [7. Open slide viewer](#open-slide-viewer)
+    - [8. Region selection and UMAP visualization](#umap-simple)
+  - [Example: Spatially-informed metrics](#spatially-informed-metrics)
+    - [1. Compute a cell-set-to-cell-set proximity metric in realtime](#compute-proximity)
+    - [2. Save and share results](#save-and-share)
+  - [Example: B cell aggregation in colon cancer](#orion-slide-viewer)
+    - [1. Observe tissue geometry patterning](#observe-tissue)
+    - [2. Assess region enrichment with Fisher test](#fisher-test)
+  - [Example: Submit significant results with attribution](#uc-orcid)
+    - [1. Identify a specific result](#identify-result)
+    - [2. Submit for attribution using ORCID](#submit-orcid)
+    - [3. Review contribution on study page](#review-contribution)
+  - [Example: Channel intensity for phenotyping in bone marrow](#channel-intensity)
+  - [Example: Graph Neural Network detects motifs in immunotherapy non-responders](#gnn-non-responders)
+    - [1. Train the GNN](#train-gnn)
+    - [2. Profile of pertinent sub-networks by cohort](#important-cells)
+  - [Whole-database assessments for outcome associations](#whole-database-assessments)
+    - [1. Using all single marker cell phenotypes, frequency](#single-marker)
+    - [2. Using all marker pairs, spatial proximity](#marker-pairs)
 - [Data management](#data-management)
 - [CLI command reference](#cli-command-reference)
   - [Dataset uploader](#dataset-uploader)
 - [API reference](#api-reference)
-- [Development and maintenance](#development-and-maintenance)
+- [Testing, development, and maintenance](#testing-development-maintenance)
 - [Deployment options](#deployment-options)
   - [License](#license)
 
 # What do cell profiles tell us about biology and disease?
 
-By studying microscopic images of specimens of tissue, like skin or organ resections, pathologists and basic scientists can draw inferences about the way that cells coordinate to set biological processes in motion, and how these processes are disrupted in the course of disease.
+By studying microscopic images of specimens of tissue, like skin or organ resections, pathologists and scientists draw inferences about the way that cells coordinate to set biological processes in motion and how these processes are disrupted in the course of disease.
 
-The taxonomy of cell types and their functional states is surprisingly diverse, and modeling biological processes at the cellular level is consequently a rich source of new insights. Imaging methods are needed that capture some of this diversity, by measuring multiple channels of information at the same time for each cell, to provide empirical data that ensures these models make sense in realistic scenarios.
+The taxonomy of cell types and their functional states is surprisingly diverse, and modeling biological processes at the cellular level is consequently a rich source of new insights. Imaging methods are needed that capture some of this diversity, by measuring multiple channels of information at the same time for each cell, to provide empirical data that ensures this modeling makes sense in realistic scenarios.
 
-Multiple-channel imaging technology, capable of measuring several dozen protein targets, is reaching maturity. Multiplexed immunofluoresence, imaging mass cytometry, and their variants measure data similar to what is measured by flow cytometry or single-cell RNA-seq, since this is also at the single-cell level and involves multiple quantitative features, but with the crucial advantage that cell positions are also observed -- spatial context.
+Multiple-channel imaging technology capable of measuring several dozen protein targets is reaching maturity. Multiplexed immunofluoresence, imaging mass cytometry, and their variants measure data similar to what is measured by flow cytometry or single-cell RNA-seq, since this is also at the single-cell level and involves multiple quantitative features, but with the crucial advantage that cell positions are also observed -- spatial context.
 
-The Spatial Multiomics Profiler (SMProfiler) project is about making the most of this informative data source using quality software. The guiding principles are:
+The Spatial Multiomics Profiler (SMProfiler) project is about making the most of this informative data source. The guiding principles are:
 
 |       |                      |         |
 |-------|----------------------|---------|
@@ -37,38 +59,48 @@ The Spatial Multiomics Profiler (SMProfiler) project is about making the most of
 SMProfiler is available to the public at [smprofiler.io](https://smprofiler.io).
 
 <p align="center">
-<a href="docs/image_assets/diagram_medium_res.png">
-<img src="docs/image_assets/diagram_low_res.png"/>
+<a href="docs/image_assets/system_diagram.pdf">
+<img src="docs/image_assets/system_diagram_lores.png"/>
 </a>
 </p>
 
 # User tutorial
 
 ## Example: Exploratory data analysis of immunotherapy response in melanoma
+1. [Select a study](#select-a-study)
+2. [Choose cell phenotypes](#choose-cell-phenotypes)
+3. [Aggregate cell population fractions and overlaps](#aggregate-cell-population-fractions-and-overlaps)
+4. [Check per-sample values](#check-per-sample-values)
+5. [Assess phenotype fractions between cohorts](#assess-fractions)
+6. [Assess ratios between cohorts](#assess-ratios)
+7. [Open slide viewer](#open-slide-viewer)
+8. [Region selection and UMAP visualization](#umap-simple)
 
+### <a id="select-a-study"></a> 1. Select a study
 On the main page, select **Melanoma CyTOF ICI**. This brings up a dataset that was collected and published by Moldoveanu et al.[^1].
 
 You'll see a summary of this dataset, including the numbers of samples, cells, and channels, links to relevant publications, classification of the samples, and highlighted findings that can be observed by using the SMProfiler application. In this case the study collected samples from patients treated with immune-checkpoint inhibitor therapy, and the patients either responded favorably or poorly to this treatment.
 
 ![alt](docs/image_assets/f1.png)
 
+### <a id="choose-cell-phenotypes"></a> 2. Choose cell phenotypes
 On the next page you can choose which cell phenotypes you want to focus on. Click one of the pre-defined phenotypes, or define a custom phenotype by indicating positive and negative markers from among the channels which were imaged.
-
-![alt](docs/image_assets/f2.png)
 
 We select five custom phenotypes. The first phenotype, for example, was defined by clicking the **+** beside **CD3+**, then clicking **Add to selection**. This generally indicates the T cells. The second phenotype is **CD3+ CD4+**, the markers of T helper cells. We also include: **CD3+ CD8A+**, **CD3+ CD4+ FOXP3+**, and **CD20+ CD3-**. We are ascertaining the rough profile of lymphocytes in the dataset.
 
 ![alt](docs/image_assets/f3.png)
 
+### <a id="aggregate-cell-population-fractions-and-overlaps"></a> 3. Aggregate cell population fractions and overlaps
 The next page shows the cell population breakdown with respect to the phenotypes we've just selected. Each phenotype is shown with the fraction of cells expressing that phenotype across all samples, for example 54.02% are indicated as T cells.
 
 In the grid, each *pair* of phenotypes is shown with the fraction of cells expressing *both* phenotypes. For example, the fraction of cells that are both **CD3+ CD4+ FOXP3+** and **CD3+** is 16.53%, the same as the fraction of cells that are **CD3+ CD4+ FOXP3+**, as expected since **CD3+** is part of the signature of this phenotype (the T regulatory cells).
 
 > [!NOTE]
-> :bar_chart: You could use this technique to make a standard heat map for assessment of clusters, by selecting all single-channel phenotypes. Depending on the size of the samples, since these metrics are computed live, this could take up to 1 minute per computed value, and sometimes longer.
+> :bar_chart: You could use this technique to make a standard heat map for assessment of clusters, by selecting all single-channel phenotypes. Since these metrics are computed live, depending on the size of the samples and the number of selected markers, this could take a few minutes.
 
 ![alt](docs/image_assets/f4.png)
 
+### <a id="check-per-sample-values"></a> 4. Check per-sample values
 To continue with a finer analysis, click one of the "tiles", either for one phenotype (the tiles on the left) or two phenotypes (the grid on the right).
 
 We choose the tile at row **CD3+ CD4+ FOXP3+** (Treg) and column **CD3+ CD8A+** (Tc). The table below populates with the size of the population of cells expressing both signatures, broken down by sample. Note that in reality there are generally few cells expressing both of these two specific suites of markers, and the few cells occuring here are probably the result of an imperfect stain intensity dichotomization (thresholding, gating). So this tool can be used to do basic quality control in case some logical or illogical marker combinations are known in advance.
@@ -77,22 +109,24 @@ We also selected the single-phenotype tiles **CD3+ CD4+ FOXP3+** and **CD3+ CD8A
 
 ![alt](docs/image_assets/f5.png)
 
+### <a id="assess-fractions"></a> 5. Assess phenotype fractions between cohorts
 Click on the column header **CD3+ CD8A+** (it becomes underlined to indicate that it is selected). Then select the two cohorts by clicking one of the **1** values and one of the **2** values. A "verbalization" appears which states that the trend, according to a t-test, is that the fraction of Tc cells is increased about 1.5 times in the non-responder cohort compared to the responders, with statistical significance value p=0.1.
 
 ![alt](docs/image_assets/f6.png)
 
+### <a id="assess-ratios"></a> 6. Assess ratios between cohorts
 We click on column **CD3+ CD4+ FOXP3+**, in addition to the prior selection. A similar assessment appears, this time with respect to the ratio of the number of **CD3+ CD8A+** (the first selection) to **CD3+ CD4+ FOXP3+** (the second selection).
 
 ![alt](docs/image_assets/f7.png)
 
+### <a id="open-slide-viewer"></a> 7. Open slide viewer
 Let's focus our attention on one of the samples that exhibited a large fraction of Tc cells. Click **31RD**.
-
-![alt](docs/image_assets/f8.png)
 
 The "virtual slide viewer" opens. Choose a few phenotypes, and the corresponding cells will become highlighted. The fraction and count of the cells for each phenotype are shown.
 
-![alt](docs/image_assets/f9.png)
+![alt](docs/image_assets/f8.png)
 
+### <a id="umap-simple"></a> 8. Region selection and UMAP visualization
 A UMAP dimensional reduction of the cell set across the whole data collection is available in this case. Click **UMAP**.
 
 > [!NOTE]
@@ -100,38 +134,135 @@ A UMAP dimensional reduction of the cell set across the whole data collection is
 
 We spot a region that looks "saturated" with Tc cells. Select it by clicking and dragging the mouse while holding either the **Ctrl** key or (on Mac) **CMD**.
 
-The new cell count for each phenotype is now shown, together with the new percentage, relative to the selection. In this case the Tc fraction approximately doubled, to **6996** cells (shown in green). This increase is assessed using the Fisher test (the entire contingency table is also shown, for reference). The test verifies that the increase is highly statistically significant in this case, as expected.
+The new cell count for each phenotype is now shown, together with the new percentage, relative to the selection. In this case the Tc fraction approximately doubled, to **5659** cells (shown in green). This increase is assessed using the Fisher test (the entire contingency table is also shown, for reference). The test verifies that the increase is highly statistically significant in this case, as expected.
 
 > [!NOTE]
 > By careful use of the selection tool, noting enrichments in each virtual region, you can account for most of the cell types present and hone the focus of study.
 
-![alt](docs/image_assets/f10.png)
+![alt](docs/image_assets/f9.png)
 
-## Spatially-informed metrics
+## <a id="spatially-informed-metrics"></a> Example: Spatially-informed metrics
+1. [Compute a cell-set-to-cell-set proximity metric in realtime](#compute-proximity)
+2. [Save and share results](#save-and-share)
 
+### <a id="compute-proximity"></a> 1. Compute a cell-set-to-cell-set proximity metric in realtime
 Let's see an example of quantification over samples that makes use of the spatial arrangement of cells.
 
-Choose the phenotypes **Naive cytoxic T cell** and **T helper cell antigen-experienced**. Select the tile with row **T helper cell antigen-experienced** and column **Naive cytoxic T cell**, representing the pair of phenotypes.
+Using the same dataset as the previous example, **Melanoma CyTOF ICI**, choose the phenotypes **Naive cytotoxic T cell** and **T helper cell antigen-experienced**. Select the tile with row **T helper cell antigen-experienced** and column **Naive cytotoxic T cell**, representing the pair of phenotypes.
 
 In the column header that appears, click `>`. The **spatial metrics** dropdown appears. Click `v` to show the available metrics. Choose **cell-to-cell proximity**. After the metric is finished computing, click the column header **cell-to-cell proximity** and the two cohorts **1** and **2** to perform a univariate comparison.
 
 This metric is the average number of **Naive cytotoxic T cells** appearing within a specified radius of given **T helper antigen-experienced** cells. It measures generally how common it is to find cells of one phenotype in close proximity to those of another phenotype. There are several other metrics available, of various degrees of statistical sophistication, many computed using the [Squidpy](https://squidpy.readthedocs.io/en/stable/) package. These are explained in more detail in the [API documentation](#api-reference).
 
+![alt](docs/image_assets/f10.png)
+
 ![alt](docs/image_assets/f11.png)
+
+### <a id="save-and-share"></a> 2. Save and share results
+:clipboard: You can **share or save results like this for later** by copying the URL in the address bar. In fact, this result is highlighted on the study summary page. Try reproducing it by following the first link as shown below.
 
 ![alt](docs/image_assets/f12.png)
 
-> [!NOTE]
-> :clipboard: You can **save results like this for later** by copying the URL in the address bar. In fact, this result is highlighted on the study summary page. Try reproducing it by following the first link as shown below.
+## <a id="uc-orcid"></a> Example: Submit significant results with attribution
 
-![alt](docs/image_assets/f13.png)
+1. [Identify a specific result](#identify-result)
+2. [Submit for attribution using ORCID](#submit-orcid)
+3. [Review contribution on study page](#review-contribution)
+
+### <a id="identify-result"></a> 1. Identify a specific result
+The SMProfiler supports extensive secondary analysis with features computed ondemand that you request during exploratory data analysis. So there is a good chance that you will discover a significant new result relating specific cell phenotypes or spatial statistics to treatment response or prognosis.
+
+Most of the time that you are using the application, you can use the URL as described above in [Save and share results](#save-and-share) to share what you have found with others.
+
+> [!NOTE]
+> However for the **precise, quantitative results** found in the analysis tab, with statistical assessment, you can also submit your finding for official recognition on the summary page for the study.
+
+### <a id="submit-orcid"></a> 2. Submit for attribution using ORCID
+You can send your contribution using **Submit significant result**. [ORCID](https://orcid.org/) researcher identifiers are used to attribute the result to you.
+
+![alt](docs/image_assets/u1.png)
+
+### <a id="review-contribution"></a> 3. Review contribution on study page
+Once your contribution has been checked by the SMProfiler team, it is posted on the summary page for the study as in the example below.
+
+![alt](docs/image_assets/u2.png)
+
+## <a id="orion-slide-viewer"></a> Example: B cell aggregation in colon cancer
+1. [Observe tissue geometry patterning](#observe-tissue)
+2. [Assess region enrichment with Fisher test](#fisher-test)
+
+### <a id="choose-cell-phenotypes-orion"></a> 1. Observe tissue geometry patterning
+Select study **HTAN Orion CRC** and phenotypes:
+- **T cytotoxic**
+- **Epithelium**
+- **B cell**
+
+Review slide **C12** and observe the differing tissue localization.
+![alt](docs/image_assets/o1.png)
+
+### <a id="fisher-test"></a> 2. Assess region enrichment with Fisher test
+A cluster of B cells is apparent, which we can assess by selecting this region with the drawing tool.
+
+The assessment shows 25% baseline prevalence of B cells in this slide, elevated to 76% in the selected region. The Fisher test contingency table is shown.
+
+![alt](docs/image_assets/o2.png)
+
+## <a id="channel-intensity"></a> Example: Channel intensity for phenotyping in bone marrow
+
+Select the **Bone marrow aging** study [^2], channel **CD61** with additional phenotype **Megakaryocyte**, and in the Slide Viewer select sample **WCM10**. In this study, a detailed model was trained to detect specific cell types from a number of imaging features. Megakaryocytes were associated with elevated CD61 levels, and in this example we can compare the **Megakaryocyte** assignments with the **CD61** expression levels by using the channel intensity threshold adjustment.
+
+![alt](docs/image_assets/intensity_example_cd61.png)
+
+## <a id="gnn-non-responders"></a> Example: Graph Neural Network detects motifs in immunotherapy non-responders
+
+For this example, select study **Melanoma intralesional IL2**. The study assesses responders and non-responders to interleukin-2 injection immunotherapy.
+
+### <a id="train-gnn"></a> 1. Train the GNN
+
+The information provided by spatial cell position can be used to define graphs or networks of neighboring cells. These cell graphs together with the multiple marker quantification, and response indication per-patient, are used to train a Graph Neural Network to predict this response. For more information on creating these models, see the [documentation](docs/graphs.md).
+
+### <a id="important-cells"></a> 2. Profile of pertinent sub-networks by cohort
+The 100 cells in each slide that are most important to the classification, according to the GNN model, were assessed for phenotype composition. In the plot below, the results of a Fisher test for over-representation are shown, for each phenotype and each slide. The circle size indicates p-value, ranging from p=0 for the largest radius to p=0.05 for the smallest radius 0. The red color indicates the fraction of the 100 most-important cells in the sample which belong to the given phenotype, with 100% corresponding to greatest saturation and 0% corresponding to white.
+
+Some of the most significant patterns are high over-representation of **Adipocytes or Langerhans cells** (defined largely by S100B), among the non-responders.
+
+![alt](docs/image_assets/gnn.png)
+
+## <a id="whole-database-assessments"></a> Whole-database assessments for outcome associations
+1. [Using all single marker cell phenotypes, frequency](#single-marker)
+2. [Using all marker pairs, spatial proximity](#marker-pairs)
+
+The datasets transformed and curated for the SMProfiler database are well-harmonized with each other, so that cross-cutting queries and whole-database surveys are readily performed.
+
+### <a id="single-marker"></a> 1. Using all single marker cell phenotypes, frequency
+
+In total around 50 markers were imaged across the 12 studies currently available. The all-markers overview assesses each marker for its utility in discriminating between key outcome cohorts within each given dataset, using the fractions of the cell set expressing the marker. The t-test provides a sense of the overall strength and statistical significance of any association found. In the plot (previewed below), the colors correspond to one sample cohort and relative size of a circle pair indicates the effective differential between the two cohorts using the given marker.
+
+For example, in the row for antigen-experience-indicating marker **CD45RO** for the **Head and neck mpIF** study column, the circles plot (green and gray) shows that about 50% more experienced lymphocytes are found in the samples from patients who will clear the disease (cancer) compared with patients who will not.
+<p align="center">
+<a href="https://smprofiler.io/channel-overview">
+<img src="docs/image_assets/ccutoff.png" width="400"/>
+</a>
+</p>
+
+### <a id="marker-pairs"></a> 2. Using all marker pairs, spatial proximity
+
+We can involve the spatial context in our whole-database assessment by computing the cell-set-to-cell-set proximity metric for each pair of markers. It is expected that the cohort discriminations provided by such marker pairs augments the results identified using dissociated cell sets defined by single markers (the fractions features), since these are based on an independent source of information.
+
+As an example, in the row for **CD31** (typically indicating endothelium) and column **FOXP3** (indicating T regulatory cells), the circle plot (light and dark red) suggests that T regs are found near endothelial cells about twice as frequently in glioblastomas of patients who will not survive to 1 year post-surgery, compared with those surviving 1-3 years.
+
+<p align="center">
+<a href="https://smprofiler.io/proximity-overview">
+<img src="docs/image_assets/pcutoff_lores.png" width="400"/>
+</a>
+</p>
 
 # Data management
 To support this project's semantic integrity goals, we designed a general data model and ontology for cell-resolved measurement studies, using a schema-authoring system we call the Application Data Interface (ADI) framework.
 
 The schema is called `scstudies` and it is documented in detail [here](https://adiframework.com/docs_site/scstudies_quick_reference.html#).
 
-In our implementation, we sought to strike an effective balance between the completeness of annotation demanded by accurate record-keeping, on the one hand, and practical computational efficiency on the other. Much of the application is organized around a SQL database with a schema that conforms tightly to the formal `scstudies` data model, but we also make liberal use of derivative data artifacts to improve speed and performance. For example, a highly-compressed [binary format](docs/cells.md) is adopted for transmission of a given sample's cell-feature matrix.
+In our implementation, we sought to strike an effective balance between the completeness of annotation demanded by accurate record-keeping, on the one hand, and practicality and computational efficiency on the other. Much of the application is organized around a SQL database with a schema that conforms tightly to the formal `scstudies` data model, but we also make liberal use of derivative data artifacts to improve speed and performance. For example, a highly-compressed [binary format](docs/cells.md) is adopted for transmission of a given sample's cell-feature matrix.
 
 Similarly, datasets that we have curated for uniform data import are stored in a simple tabular file format which does not generally support all the features of the `scstudies` model. This intermediary format is designed for ease of creation and it is not entirely formalized. For an example, see [data_curation/](data_curation/).
 
@@ -146,7 +277,6 @@ Installation makes several commands available in the shell. List them with `smpr
 
 ```sh
 $ smprofiler
-...
 
 smprofiler apiserver dump-schema
 
@@ -160,7 +290,9 @@ smprofiler graphs plot-interactives
 smprofiler graphs prepare-graph-creation
 smprofiler graphs upload-importances
 
+smprofiler db cache-subsample
 smprofiler db collection
+smprofiler db count-cells
 smprofiler db delete-feature
 smprofiler db do-fractions-tests
 smprofiler db drop
@@ -168,12 +300,14 @@ smprofiler db drop-ondemand-computations
 smprofiler db guess-channels-from-object-files
 smprofiler db interactive-uploader
 smprofiler db list-studies
-smprofiler db load-query
+smprofiler db load-testing
 smprofiler db retrieve-feature-matrices
+smprofiler db review-submissions
 smprofiler db status
+smprofiler db sync-annotations
 smprofiler db upload-sync-small
 
-smprofiler ondemand cache-expressions-data-array
+smprofiler ondemand assess-recreate-cache
 smprofiler ondemand start
 
 smprofiler workflow aggregate-core-results
@@ -182,7 +316,6 @@ smprofiler workflow core-job
 smprofiler workflow generate-run-information
 smprofiler workflow initialize
 smprofiler workflow merge-performance-reports
-smprofiler workflow report-on-logs
 smprofiler workflow report-run-configuration
 smprofiler workflow tail-logs
 ```
@@ -194,22 +327,22 @@ Several commands are mainly for use internal to the application components.
 Some others are TUIs (Terminal User Interfaces) meant to make common tasks, like uploading datasets or inspecting cache or metadata, more reliable.
 
 ## Dataset uploader
-`smprofiler db interactive-uploader` is a TUI that automatically determines available data sources and targets after you have created or located source datasets (format: [data_curation/](data_curation/)). It looks for [database configuration files](smprofiler//workflow/assets/.smprofiler_db.config.template) named `~/.smprofiler_db.config.*`, checks the environment variable `SMProfiler_S3_BUCKET`, and searches recursively for datasets in the current working directory named `generated_artifacts`. It presents available options and initiates the upload process.
+`smprofiler db interactive-uploader` is a TUI that automatically determines available data sources and targets after you have created or located source datasets (format: [data_curation/](data_curation/)). It looks for [database configuration files](smprofiler//workflow/assets/.smprofiler_db.config.template) named `~/.smprofiler_db.config.*`, checks the environment variable `SMPROFILER_S3_BUCKET`, and searches recursively for datasets in the current working directory named `generated_artifacts`. It presents available options and initiates the upload process.
 
 Example usage is shown below.
 
-![alt](docs/image_assets/uploader_example.png)
+![alt](docs/image_assets/dataset_upload.png)
 
 The ETL (Extract/Transform/Load) process includes a number of data integrity checks and the creation of several intermediate data artifacts.
 
 # API reference
 The SMProfiler application is supported by a web API, which provides fine-grained access to specific components of a given dataset. The API is documented [here](https://smprofiler.io/api/redoc).
 
-# Development and maintenance
+# <a id="testing-development-maintenance"></a> Testing, development, and maintenance
 See [docs/maintenance.md](docs/maintenance.md).
 
 # Deployment options
-For assistance setting up a deployment of the SMProfiler application for your institution or lab, write to us at [nadeems@mskcc.org](nadeems@mskcc.org).
+For assistance setting up a deployment of the SMProfiler application for your institution or lab, send us an email at [nadeems@mskcc.org](nadeems@mskcc.org).
 
 The application can be deployed in several ways:
 
@@ -217,11 +350,11 @@ The application can be deployed in several ways:
 - Using Docker compose
 - On a Kubernetes cluster using a cloud provider
 
-
 [^1]: Moldoveanu et al. [*Spatially mapping the immune landscape of melanoma using imaging mass cytometry*](https://doi.org/10.1126/sciimmunol.abi5072)
+[^2]: Sarachakov et al. [*Spatial mapping of human hematopoiesis at single-cell resolution reveals aging-associated topographic remodeling*](https://doi.org/10.1182/blood.2023021280)
 
 ## License
-© [Nadeem Lab](https://nadeemlab.org/) - SMProfiler code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes. 
+© [Nadeem Lab](https://nadeemlab.org/) - SMProfiler code is distributed under **Apache 2.0 with Commons Clause** license, and is available for non-commercial academic purposes.
 
 ## Funding
 This work is funded by the 7-year NIH/NCI R37 MERIT Award ([R37CA295658](https://reporter.nih.gov/search/5dgSOlHosEKepkZEAS5_kQ/project-details/11018883#description)).
