@@ -185,7 +185,7 @@ packages = [
     "report_run_configuration.py",
     "configure.py",
     "tail_logs.py",
-    "generate_analysis_report.py",
+    "automated_analysis.py",
 ]
 "smprofiler.workflow.assets" = [
     ".smprofiler_db.config.template",
