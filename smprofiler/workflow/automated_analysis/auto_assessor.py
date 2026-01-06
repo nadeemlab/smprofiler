@@ -62,6 +62,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
     cohorts: tuple[str, ...]
     omitted_cohorts: tuple[str, ...]
     omit_proximity: bool
+    phenotype_orders: tuple[int, ...]
     number_samples: int
     logger: AssessmentLogger
 
@@ -71,12 +72,14 @@ class StudyAutoAssessor(ChainableDestructableResource):
         omitted_cohorts: list[str] | None=None,
         omitted_channels: list[str] | None=None,
         omit_proximity: bool=False,
+        phenotype_orders: tuple[int, ...]=(1,),
     ):
         self.access = access
         self.limits = {'fraction': DEFAULT_LIMITS, 'proximity': LIMITS_SEVERE}
         self.omitted_cohorts = tuple(omitted_cohorts) if omitted_cohorts else ()
         self.omitted_channels = tuple(omitted_channels) if omitted_channels else ()
         self.omit_proximity = omit_proximity
+        self.phenotype_orders = phenotype_orders
         self.logger = AssessmentLogger(interactive=True)
         self.access.set_logger(self.logger.log)
         self.add_subresource(self.access)
@@ -164,7 +167,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
         return tuple(results)
 
     def _get_cases(self, phase: int) -> tuple[Case, ...]:
-        phenotypes = self._enumerate_phenotypes((1, 2))
+        phenotypes = self._enumerate_phenotypes(self.phenotype_orders)
         if phase == 1:
             return tuple_map(
                 lambda c: Case(c[0], None, c[1], 'fractions'),
@@ -189,15 +192,30 @@ class StudyAutoAssessor(ChainableDestructableResource):
         return StudyAutoAssessor._enumerate_phenotypes_from(self.channels, orders)
 
     @classmethod
-    def _enumerate_phenotypes_from(cls, all_channels: tuple[str, ...], orders: tuple[int, ...]) -> tuple[PhenotypeCriteria, ...]:
+    def _enumerate_phenotypes_from(
+        cls,
+        all_channels: tuple[str, ...],
+        orders: tuple[int, ...],
+        positive_markers_only: bool=False,
+    ) -> tuple[PhenotypeCriteria, ...]:
         """
         Lists all combination phenotypes involving known channels in which
         the number of channels/markers involved in a given phenotype (whether
         positively or negatively), i.e. the "order" of the phenotype, is
         constrained to one of the specified orders.
+
+        For example, orders=(1,2) will result in all phenotypes with up to
+        2 different markers involved, whether in in the positive or negative slot.
+
+        If the phenotypes will be used for statistical testing, this may result
+        in too many cases (risking the multiple-testing hazard), so orders=(1,)
+        may be desired for basic analysis.
+
+        For convenience, "positive_markers_only" flag is provided which will
+        cause the result to consist solely of phenotypes with positive markers.
+        This is of course a trivial case of enumerating phenotypes, however.
         """
-        # distribute = cls._distribute_markers_all_positive
-        distribute = cls._distribute_markers_all_ways
+        distribute = cls._distribute_markers_all_ways if not positive_markers_only else cls._distribute_markers_all_positive
         combos = chain(*list(map(
             distribute,
             chain(*map(
@@ -210,8 +228,11 @@ class StudyAutoAssessor(ChainableDestructableResource):
     @classmethod
     def _distribute_markers_all_ways(cls, channels: tuple[str, ...]) -> list[PhenotypeCriteria]:
         """
-        Forms positive/negative criteria phenotypes in all ways using all
-        of the given channels/markers.
+        Forms positive/negative criteria phenotypes in all ways (i.e.
+        segregating them as positive/negative) using all of the given
+        channels/markers.
+
+        Only the distribution with empty positive marker set is omitted.
         """
         phenotypes: list[PhenotypeCriteria] = list()
         for subset in powerset(channels):

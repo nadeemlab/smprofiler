@@ -43,6 +43,7 @@ class PDFReportGenerator:
     omitted_cohorts: list[str] | None
     omitted_channels: list[str] | None
     omit_proximity: bool
+    phenotype_orders: tuple[int, ...]
     parameters: dict
     pdf: bytes
 
@@ -54,6 +55,7 @@ class PDFReportGenerator:
         omitted_cohorts: list[str] | None,
         omitted_channels: list[str] | None,
         omit_proximity: bool,
+        phenotype_orders: tuple[int, ...],
     ):
         self.api_host = api_host
         self.database_config_file = database_config_file
@@ -61,6 +63,7 @@ class PDFReportGenerator:
         self.omitted_cohorts = omitted_cohorts
         self.omitted_channels = omitted_channels
         self.omit_proximity = omit_proximity
+        self.phenotype_orders = phenotype_orders
 
     def generate_and_save(self) -> None:
         self._generate_template_parameters()
@@ -85,6 +88,7 @@ class PDFReportGenerator:
             omitted_cohorts=self.omitted_cohorts,
             omitted_channels=self.omitted_channels,
             omit_proximity=self.omit_proximity,
+            phenotype_orders=self.phenotype_orders,
         ) as a:
             summary = a.get_summary()
         self._generate_kde_plot(summary.results.dataframe, summary.highlights)

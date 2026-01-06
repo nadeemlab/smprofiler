@@ -52,7 +52,14 @@ metric comparisons, for performance).''')
         oc = 'omitted_channels'
         omitted_channels = entry[oc] if oc in entry else None
         omit_proximity = entry['omit_proximity'] if 'omit_proximity' in entry else False
-        generator = PDFReportGenerator(*context, omitted_cohorts=omitted_cohorts, omitted_channels=omitted_channels, omit_proximity=omit_proximity)
+        phenotype_orders = entry['phenotype_orders'] if 'phenotype_orders' in entry else (1,)
+        generator = PDFReportGenerator(
+            *context,
+            omitted_cohorts=omitted_cohorts,
+            omitted_channels=omitted_channels,
+            omit_proximity=omit_proximity,
+            phenotype_orders=phenotype_orders,
+        )
         generator.generate_and_save()
         server = PDFReportServer(*context[1:])
         pdf = server.datestamp_and_retrieve()
