@@ -2,8 +2,9 @@ import re
 import json
 from os import chdir
 from os import mkdir
-from os.path import exists
 from os import environ as os_environ
+from os.path import exists
+from os.path import expanduser
 from argparse import ArgumentParser
 
 from smprofiler.workflow.automated_analysis.types import Result
@@ -23,7 +24,7 @@ if __name__=='__main__':
     parser.add_argument('--database-config-file', required=True)
     parser.add_argument('--api-hostname', required=True)
     parser.add_argument('--analysis-options-json', required=True, help='''
-List of items with study "handle", and optionally "omitted_cohorts",
+List of items with: study "handle", and optionally "omitted_cohorts",
 "omitted_channels", and "omit_proximity" (i.e. skip doing proximity
 metric comparisons, for performance).''')
     args = parser.parse_args()
@@ -32,7 +33,7 @@ metric comparisons, for performance).''')
     api_host = args.api_hostname
     options_file = args.analysis_options_json
 
-    credentials = retrieve_credentials_from_file(dbc)
+    credentials = retrieve_credentials_from_file(expanduser(dbc))
     os_environ['SINGLE_CELL_DATABASE_HOST'] = credentials.endpoint
     os_environ['SINGLE_CELL_DATABASE_USER'] = credentials.user
     os_environ['SINGLE_CELL_DATABASE_PASSWORD'] = credentials.password

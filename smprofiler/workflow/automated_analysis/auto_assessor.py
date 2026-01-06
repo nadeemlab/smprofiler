@@ -5,7 +5,6 @@ from typing import cast
 from itertools import product
 from itertools import combinations
 from itertools import chain
-from os import environ as os_environ
 
 from pandas import concat
 from pandas import DataFrame
@@ -62,14 +61,22 @@ class StudyAutoAssessor(ChainableDestructableResource):
     channels: tuple[str, ...]
     cohorts: tuple[str, ...]
     omitted_cohorts: tuple[str, ...]
+    omit_proximity: bool
     number_samples: int
     logger: AssessmentLogger
 
-    def __init__(self, access: StudyDataAccessor, omitted_cohorts: list[str] | None=None, omitted_channels: list[str] | None=None):
+    def __init__(
+        self,
+        access: StudyDataAccessor,
+        omitted_cohorts: list[str] | None=None,
+        omitted_channels: list[str] | None=None,
+        omit_proximity: bool=False,
+    ):
         self.access = access
         self.limits = {'fraction': DEFAULT_LIMITS, 'proximity': LIMITS_SEVERE}
         self.omitted_cohorts = tuple(omitted_cohorts) if omitted_cohorts else ()
         self.omitted_channels = tuple(omitted_channels) if omitted_channels else ()
+        self.omit_proximity = omit_proximity
         self.logger = AssessmentLogger(interactive=True)
         self.access.set_logger(self.logger.log)
         self.add_subresource(self.access)
@@ -108,7 +115,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
     ) -> tuple[tuple[Result, ...], tuple[Result, ...],tuple[Result, ...]]:
         singleton_significants = self._get_results_from_phase(1, ())
         ratio_significants = self._get_results_from_phase(2, singleton_significants)
-        if 'SMPROFILER_OMIT_PROXIMITY' not in os_environ:
+        if not self.omit_proximity:
             proximity_significants = self._get_results_from_phase(3, singleton_significants)
         else:
             proximity_significants = ()
