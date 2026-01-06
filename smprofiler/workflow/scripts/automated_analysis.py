@@ -29,11 +29,11 @@ List of items with: study "handle", and optionally "omitted_cohorts",
 metric comparisons, for performance).''')
     args = parser.parse_args()
 
-    dbc = args.database_config_file
+    dbc = expanduser(args.database_config_file)
     api_host = args.api_hostname
     options_file = args.analysis_options_json
 
-    credentials = retrieve_credentials_from_file(expanduser(dbc))
+    credentials = retrieve_credentials_from_file(dbc)
     os_environ['SINGLE_CELL_DATABASE_HOST'] = credentials.endpoint
     os_environ['SINGLE_CELL_DATABASE_USER'] = credentials.user
     os_environ['SINGLE_CELL_DATABASE_PASSWORD'] = credentials.password
