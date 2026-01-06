@@ -1,0 +1,10 @@
+[
+    {
+        "handle": "LUAD progression",
+        "omitted_cohorts": null
+    },
+    {
+        "handle": "Melanoma intralesional IL2",
+        "omitted_cohorts": ["2","4"]
+    }
+]
