@@ -5,6 +5,7 @@ from typing import cast
 from itertools import product
 from itertools import combinations
 from itertools import chain
+from os import environ as os_environ
 
 from pandas import concat
 from pandas import DataFrame
@@ -44,6 +45,10 @@ from smprofiler.workflow.automated_analysis.urls import form_url
 
 logger = colorized_logger(__name__)
 
+def powerset(iterable):
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
+
 class StudyAutoAssessor(ChainableDestructableResource):
     """
     Automatically search and filter significant results from among, first, elementary
@@ -60,10 +65,11 @@ class StudyAutoAssessor(ChainableDestructableResource):
     number_samples: int
     logger: AssessmentLogger
 
-    def __init__(self, access: StudyDataAccessor, omitted_cohorts: list[str] | None=None):
+    def __init__(self, access: StudyDataAccessor, omitted_cohorts: list[str] | None=None, omitted_channels: list[str] | None=None):
         self.access = access
         self.limits = {'fraction': DEFAULT_LIMITS, 'proximity': LIMITS_SEVERE}
         self.omitted_cohorts = tuple(omitted_cohorts) if omitted_cohorts else ()
+        self.omitted_channels = tuple(omitted_channels) if omitted_channels else ()
         self.logger = AssessmentLogger(interactive=True)
         self.access.set_logger(self.logger.log)
         self.add_subresource(self.access)
@@ -81,7 +87,7 @@ class StudyAutoAssessor(ChainableDestructableResource):
         """
         The initial metadata retrieved in order to form relevant case sets.
         """
-        self.channels = tuple(self.access._retrieve_feature_names())
+        self.channels = tuple(set(self.access._retrieve_feature_names()).difference(set(self.omitted_channels)))
         cohorts_df = self.access._retrieve_cohorts()
         self.cohorts = self._get_relevant_cohorts(cast(Series, cohorts_df['cohort']))
         self.number_samples = cohorts_df[cohorts_df['cohort'].apply(lambda x: x not in self.omitted_cohorts)].shape[0]
@@ -102,7 +108,10 @@ class StudyAutoAssessor(ChainableDestructableResource):
     ) -> tuple[tuple[Result, ...], tuple[Result, ...],tuple[Result, ...]]:
         singleton_significants = self._get_results_from_phase(1, ())
         ratio_significants = self._get_results_from_phase(2, singleton_significants)
-        proximity_significants = self._get_results_from_phase(3, singleton_significants)
+        if 'SMPROFILER_OMIT_PROXIMITY' not in os_environ:
+            proximity_significants = self._get_results_from_phase(3, singleton_significants)
+        else:
+            proximity_significants = ()
         return cast(
             tuple[tuple[Result, ...], tuple[Result, ...],tuple[Result, ...]],
             tuple_map(
@@ -148,35 +157,83 @@ class StudyAutoAssessor(ChainableDestructableResource):
         return tuple(results)
 
     def _get_cases(self, phase: int) -> tuple[Case, ...]:
+        phenotypes = self._enumerate_phenotypes((1, 2))
         if phase == 1:
             return tuple_map(
-                lambda c: Case(self._form_single_phenotype(c[0]), None, c[1], 'fractions'),
-                product(self.channels, combinations(self.cohorts, 2))
+                lambda c: Case(c[0], None, c[1], 'fractions'),
+                product(phenotypes, combinations(self.cohorts, 2))
             )
         if phase == 2:
             return tuple_map(
-                lambda c: Case(self._form_single_phenotype(c[0]), self._form_single_phenotype(c[1]), c[2], 'fractions'),
+                lambda c: Case(c[0], c[1], c[2], 'fractions'),
                 filter(
                     lambda c: c[0] != c[1],
-                    product(self.channels, self.channels, combinations(self.cohorts, 2))
+                    product(phenotypes, phenotypes, combinations(self.cohorts, 2))
                 )
             )
         if phase == 3:
             return tuple_map(
-                lambda c: Case(self._form_single_phenotype(c[0]), self._form_single_phenotype(c[1]), c[2], 'proximity'),
-                product(self.channels, self.channels, combinations(self.cohorts, 2)),
+                lambda c: Case(c[0], c[1], c[2], 'proximity'),
+                product(phenotypes, phenotypes, combinations(self.cohorts, 2)),
             )
         raise ValueError(f'Phase requested: {phase}')
 
-    def _form_single_phenotype(self, channel: str) -> PhenotypeCriteria:
+    def _enumerate_phenotypes(self, orders: tuple[int, ...]) -> tuple[PhenotypeCriteria, ...]:
+        return StudyAutoAssessor._enumerate_phenotypes_from(self.channels, orders)
+
+    @classmethod
+    def _enumerate_phenotypes_from(cls, all_channels: tuple[str, ...], orders: tuple[int, ...]) -> tuple[PhenotypeCriteria, ...]:
+        """
+        Lists all combination phenotypes involving known channels in which
+        the number of channels/markers involved in a given phenotype (whether
+        positively or negatively), i.e. the "order" of the phenotype, is
+        constrained to one of the specified orders.
+        """
+        # distribute = cls._distribute_markers_all_positive
+        distribute = cls._distribute_markers_all_ways
+        combos = chain(*list(map(
+            distribute,
+            chain(*map(
+                lambda order: combinations(all_channels, order),
+                orders,
+            )),
+        )))
+        return tuple(combos)
+
+    @classmethod
+    def _distribute_markers_all_ways(cls, channels: tuple[str, ...]) -> list[PhenotypeCriteria]:
+        """
+        Forms positive/negative criteria phenotypes in all ways using all
+        of the given channels/markers.
+        """
+        phenotypes: list[PhenotypeCriteria] = list()
+        for subset in powerset(channels):
+            if len(subset) == 0:
+                continue
+            complement = tuple(set(channels).difference(subset))
+            c = PhenotypeCriteria(positive_markers=subset, negative_markers=complement)
+            if len(channels) == 1:
+                c = cls._reverse_polarity_special_cases(c)
+            phenotypes.append(c)
+        return phenotypes
+
+    @classmethod
+    def _distribute_markers_all_positive(cls, channels: tuple[str, ...]) -> list[PhenotypeCriteria]:
+        return [PhenotypeCriteria(positive_markers=channels, negative_markers=())]
+
+    @classmethod
+    def _reverse_polarity_special_cases(cls, c: PhenotypeCriteria) -> PhenotypeCriteria:
         """
         Special treatment is given to the "distance dichotomized" virtual
         features, to emphasize the case of low value (closer distance) rather
         than high, which would normally be the important state for a marker feature.
         """
-        if re.search('distance', channel):
-            return PhenotypeCriteria(positive_markers=(), negative_markers=(channel,))
-        return PhenotypeCriteria(positive_markers=(channel,), negative_markers=())
+        p = list(c.positive_markers)
+        n = list(c.negative_markers)
+        specials = list(filter(lambda m: re.search('distance', m), p))
+        p2 = tuple(set(p).difference(set(specials)))
+        n2 = tuple(set(n).union(set(specials)))
+        return PhenotypeCriteria(positive_markers=p2, negative_markers=n2)
 
     def _assess_case(self, case: Case) -> Result:
         handlers = {

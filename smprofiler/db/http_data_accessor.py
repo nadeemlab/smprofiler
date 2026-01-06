@@ -292,6 +292,7 @@ class StudyDataAccessor(ChainableDestructableResource):
             None,
             blocking = False,
         )
+        self._log(f'Made request for ondemand computation: {p}')
         return counts
 
     def _retrieve_all_cells_counts(self):

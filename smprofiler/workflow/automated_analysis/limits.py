@@ -64,11 +64,17 @@ class FullUsageAssessor:
     The above is achieved by linear interpolation between the initial effect size
     at which the limits begin to be imposed, and the final effect size after which
     100% source data usage is required.
+
+    An independent filter is used with a hard lower limit on the fraction of samples
+    used.
     """
     effect_size_initial_threshold: float
     effect_size_final_threshold: float
+    lower_limit_fraction_samples_used: float
 
     def acceptable(self, r: ResultSignificance) -> bool:
+        if r.fraction_data_used < self.lower_limit_fraction_samples_used:
+            return False
         effect = r.effect
         if effect <= self.effect_size_initial_threshold:
             return True
@@ -81,5 +87,5 @@ class FullUsageAssessor:
     def _marginal_fraction_data_used_per_unit_effect_size(self) -> float:
         return 1.0 / (self.effect_size_final_threshold - self.effect_size_initial_threshold)
 
-DEFAULT_USAGE_LIMITS = FullUsageAssessor(2.0, 3.0)
+DEFAULT_USAGE_LIMITS = FullUsageAssessor(2.0, 3.0, 0.5)
 

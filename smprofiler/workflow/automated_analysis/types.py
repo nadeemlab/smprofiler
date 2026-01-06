@@ -168,7 +168,7 @@ class ReportStudyMetadata:
 @define
 class AnalysisSummary:
     """
-    Bundle of all analysis results, extractions/highlights, and metadata for a given study.
+    Bundle of all (automated) analysis results, extractions/highlights, and metadata for a given study.
     """
     results: FilteredResults
     highlights: Highlights

@@ -34,7 +34,9 @@ if __name__=='__main__':
         if not exists(subdir):
             mkdir(subdir)
         chdir(subdir)
-        generator = PDFReportGenerator(*context, omitted_cohorts=omitted_cohorts)
+        oc = 'omitted_channels'
+        omitted_channels = entry[oc] if oc in entry else None
+        generator = PDFReportGenerator(*context, omitted_cohorts=omitted_cohorts, omitted_channels=omitted_channels)
         generator.generate_and_save()
         server = PDFReportServer(*context[1:])
         pdf = server.datestamp_and_retrieve()
