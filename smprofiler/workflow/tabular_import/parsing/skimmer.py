@@ -142,7 +142,13 @@ class DataSkimmer:
                 _files['phenotypes'],
                 study_name,
             )
-            CellManifestsParser(fields, channels_file=_files['channels']).parse(
+            CellManifestsParser(
+                fields,
+                channels_file=_files['channels'],
+                study_name=study_name,
+                database_config_file=self.database_config_file,
+                build_caches_in_memory=True,
+            ).parse(
                 connection,
                 _files['file manifest'],
                 chemical_species_identifiers_by_symbol,

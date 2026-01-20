@@ -10,6 +10,7 @@ from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import retrieve_study_names
 from smprofiler.db.database_connection import retrieve_primary_study
 from smprofiler.standalone_utilities.log_formats import colorized_logger
+from smprofiler.ondemand.cache_store import get_cache_store
 
 logger = colorized_logger(__name__)
 
@@ -64,17 +65,9 @@ class StructureCentroids:
             raise ValueError(message % specimens)
         specimen = specimens[0]
         study_name = retrieve_primary_study(self.database_config_file, measurement_study_name)
-        with DBCursor(database_config_file=self.database_config_file, study=study_name) as cursor:
-            insert_query = '''
-                INSERT INTO
-                ondemand_studies_index (
-                    specimen,
-                    blob_type,
-                    blob_contents)
-                VALUES (%s, %s, %s) ;
-                '''
-            cursor.execute(insert_query, (specimen, 'centroids', pickle.dumps(data)))
-        message = 'Deleting specimen data "%s" from internal memory, since it is saved to database.'
+        cache_store = get_cache_store(self.database_config_file)
+        cache_store.put_blob(study_name, specimen, 'centroids', pickle.dumps(data), drop_first=True)
+        message = 'Deleting specimen data "%s" from internal memory, since it is saved to cache storage.'
         logger.debug(message, specimen)
         del self._studies[measurement_study_name]
         assert len(self._studies) == 0

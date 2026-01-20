@@ -10,6 +10,7 @@ from smprofiler.db.database_connection import retrieve_primary_study
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
+from smprofiler.ondemand.cache_store import get_cache_store
 
 logger = colorized_logger(__name__)
 
@@ -20,6 +21,7 @@ class CompressedMatrixWriter:
 
     def __init__(self, database_config_file: str | None) -> None:
         self.database_config_file = cast(str, database_config_file)
+        self.cache_store = get_cache_store(database_config_file)
 
     def write_specimen(
         self,
@@ -47,39 +49,11 @@ class CompressedMatrixWriter:
             index_str = json.dumps({'': [index_item]})
             index_str_as_bytes = index_str.encode('utf-8')
             study = retrieve_primary_study(self.database_config_file, measurement_study_name)
-            with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
-                insert_query = '''
-                    INSERT INTO
-                    ondemand_studies_index (
-                        specimen,
-                        blob_type,
-                        blob_contents
-                    )
-                    VALUES (%s, %s, %s) ;
-                '''
-                cursor.execute(insert_query, (None, 'expressions_index', index_str_as_bytes))
-                cursor.close()
-            logger.debug(f'Wrote expression index to database {study} .')
+            self.cache_store.put_blob(study, None, 'expressions_index', index_str_as_bytes, drop_first=True)
+            logger.debug(f'Wrote expression index to cache store for {study} .')
 
     def _insert_blob(self, study: str | None, blob: bytearray, specimen: str, blob_type: str, drop_first: bool=False) -> None:
-        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
-            if drop_first:
-                drop = '''
-                DELETE FROM
-                ondemand_studies_index
-                WHERE specimen=%s AND blob_type=%s ;
-                '''
-                cursor.execute(drop, (specimen, blob_type))
-            insert_query = '''
-                INSERT INTO
-                ondemand_studies_index (
-                    specimen,
-                    blob_type,
-                    blob_contents)
-                VALUES (%s, %s, %s) ;
-            '''
-            cursor.execute(insert_query, (specimen, blob_type, blob))
-            cursor.close()
+        self.cache_store.put_blob(study, specimen, blob_type, blob, drop_first=drop_first)
 
     def blob_exists(self, study: str, specimen: str, blob_type: str) -> bool:
         with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:

@@ -2,11 +2,13 @@
 
 from io import BytesIO as StringIO
 import base64
+import pickle
 from typing import cast
 
 import shapefile  # type: ignore
 import pandas as pd
 from psycopg import Connection as PsycopgConnection
+import brotli  # type: ignore
 
 from smprofiler.workflow.tabular_import.tabular_dataset_design\
     import TabularCellMetadataDesign
@@ -18,6 +20,12 @@ from smprofiler.db.source_file_parser_interface import SourceToADIParser
 from smprofiler.workflow.tabular_import.parsing.range_definition import RangeDefinition
 from smprofiler.workflow.tabular_import.parsing.range_definition import RangeDefinitionFactory
 from smprofiler.standalone_utilities.log_formats import colorized_logger
+from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
+from smprofiler.ondemand.cache_store import get_cache_store
+from smprofiler.db.accessors.cells import CellsAccess
+from smprofiler.workflow.common.umap_creation import UMAPCreator
+from smprofiler.workflow.common.umap_creation import NoContinuousIntensityDataError
+from smprofiler.workflow.common.umap_creation import UMAP_POINT_LIMIT
 
 logger = colorized_logger(__name__)
 
@@ -30,6 +38,9 @@ class CellManifestsParser(SourceToADIParser):
         super().__init__(fields, **kwargs)
         self.dataset_design = TabularCellMetadataDesign(**kwargs)
         self.scope = None
+        self.study_name = cast(str | None, kwargs.get('study_name'))
+        self.database_config_file = cast(str | None, kwargs.get('database_config_file'))
+        self.build_caches_in_memory = bool(kwargs.get('build_caches_in_memory', False))
 
     def parse(self,
         connection: PsycopgConnection,
@@ -42,6 +53,12 @@ class CellManifestsParser(SourceToADIParser):
         - shape file
         - expression quantification
         """
+        if self.build_caches_in_memory:
+            self._parse_and_build_caches(
+                file_manifest_file,
+                chemical_species_identifiers_by_symbol,
+            )
+            return
         timer = PerformanceTimer()
         timer.record_timepoint('Initial')
         cursor = connection.cursor()
@@ -323,3 +340,163 @@ class CellManifestsParser(SourceToADIParser):
     def wrap_up_timer(self, timer):
         df = timer.report(organize_by='fraction')
         df.to_csv('performance_report.csv', index=False)
+
+    def _parse_and_build_caches(
+        self,
+        file_manifest_file,
+        chemical_species_identifiers_by_symbol,
+    ) -> None:
+        if self.study_name is None:
+            raise ValueError('study_name is required to build caches in memory.')
+        measurement_study = SourceToADIParser.get_measurement_study_name(self.study_name)
+        cache_store = get_cache_store(self.database_config_file)
+        writer = CompressedMatrixWriter(self.database_config_file)
+
+        channel_symbols = self.get_channel_symbols(chemical_species_identifiers_by_symbol)
+        specimens_by_measurement_study: dict[str, list[str]] = {measurement_study: []}
+        target_by_symbol = {
+            symbol: chemical_species_identifiers_by_symbol[symbol]
+            for symbol in channel_symbols
+        }
+        symbols_by_target = {
+            target: symbol
+            for symbol, target in target_by_symbol.items()
+        }
+        ordered_targets = sorted(list(symbols_by_target.keys()))
+        ordered_symbols = [symbols_by_target[target] for target in ordered_targets]
+        target_index_lookup = {target: i for i, target in enumerate(ordered_targets)}
+        target_index_lookups = {measurement_study: target_index_lookup}
+        target_by_symbols = {measurement_study: target_by_symbol}
+
+        umap_discrete_rows: list[list[int]] = []
+        umap_continuous_rows: list[list[float]] = []
+        for _, cell_manifest in self.get_cell_manifests(file_manifest_file).iterrows():
+            specimen = cell_manifest['Sample ID']
+            filename = get_input_filename_by_identifier(
+                input_file_identifier=cell_manifest['File ID'],
+                file_manifest_filename=file_manifest_file,
+            )
+            cells = pd.read_csv(filename, sep=',', na_filter=False).drop_duplicates()
+            umap_remaining = UMAP_POINT_LIMIT - len(umap_discrete_rows)
+            umap_sample = self._build_cache_artifacts_for_cells(
+                cells,
+                specimen,
+                ordered_symbols,
+                writer,
+                cache_store,
+                measurement_study,
+                umap_remaining=umap_remaining,
+            )
+            if umap_sample is not None:
+                discrete_sample, continuous_sample = umap_sample
+                umap_discrete_rows.extend(discrete_sample)
+                umap_continuous_rows.extend(continuous_sample)
+            specimens_by_measurement_study[measurement_study].append(specimen)
+
+        writer.write_index(
+            specimens_by_measurement_study,
+            target_index_lookups,
+            target_by_symbols,
+        )
+
+        if len(umap_continuous_rows) > 0:
+            discrete_df = self._build_umap_frame(umap_discrete_rows, ordered_symbols, 'discrete_value')
+            continuous_df = self._build_umap_frame(umap_continuous_rows, ordered_symbols, 'quantity')
+            creator = UMAPCreator(self.database_config_file, self.study_name)
+            try:
+                creator.create_from_dense_frames(continuous_df, discrete_df, ordered_symbols)
+            except NoContinuousIntensityDataError:
+                logger.warning('No continuous intensity data was found for UMAP creation.')
+        else:
+            logger.warning('No continuous intensity data was found for UMAP creation.')
+
+    def _build_cache_artifacts_for_cells(
+        self,
+        cells: pd.DataFrame,
+        specimen: str,
+        ordered_symbols: list[str],
+        writer: CompressedMatrixWriter,
+        cache_store,
+        measurement_study: str,
+        umap_remaining: int,
+    ) -> tuple[list[list[int]], list[list[float]]] | None:
+        feature_names, intensities_available = self.dataset_design.get_exact_column_names(
+            ordered_symbols,
+            cells.columns,
+        )
+        dichotomized_columns = [feature_names[symbol][0] for symbol in ordered_symbols]
+        intensity_columns = [feature_names[symbol][1] for symbol in ordered_symbols] if intensities_available else []
+
+        cell_ids = list(range(1, cells.shape[0] + 1))
+        xmin, xmax, ymin, ymax = self.dataset_design.get_box_limit_column_names()
+        centroid_x = (cells[xmin].astype(float) + cells[xmax].astype(float)) / 2.0
+        centroid_y = (cells[ymin].astype(float) + cells[ymax].astype(float)) / 2.0
+        centroids = {
+            cell_id: (float(x), float(y))
+            for cell_id, x, y in zip(cell_ids, centroid_x, centroid_y)
+        }
+
+        discrete_matrix = cells[dichotomized_columns].astype(int).to_numpy()
+        data_arrays: dict[int, int] = {}
+        phenotype_bytes: dict[int, bytes] = {}
+        for cell_id, row in zip(cell_ids, discrete_matrix):
+            compressed = self._compress_bitmask(row)
+            data_arrays[cell_id] = compressed
+            phenotype_bytes[cell_id] = int(compressed).to_bytes(8, 'little')
+
+        writer.write_specimen(data_arrays, measurement_study, specimen)
+        cache_store.put_blob(
+            self.study_name,
+            specimen,
+            'centroids',
+            pickle.dumps({specimen: centroids}),
+            drop_first=True,
+        )
+
+        raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
+        compressed = brotli.compress(raw, quality=11, lgwin=24)
+        cache_store.put_blob(
+            self.study_name,
+            specimen,
+            'cell_data_brotli',
+            compressed,
+            drop_first=True,
+        )
+
+        umap_sample: tuple[list[list[int]], list[list[float]]] | None = None
+        if intensities_available:
+            intensity_matrix = cells[intensity_columns].astype(float).to_numpy()
+            scale = 1.0 / 10.0
+            intensity_arrays: dict[int, tuple[float, ...]] = {}
+            for cell_id, row in zip(cell_ids, intensity_matrix):
+                intensity_arrays[cell_id] = tuple(float(value) * scale for value in row)
+            writer._write_intensities_data_array_to_db(
+                intensity_arrays,
+                measurement_study,
+                specimen,
+            )
+            if umap_remaining > 0:
+                sample_count = min(len(discrete_matrix), umap_remaining)
+                umap_sample = (
+                    discrete_matrix[:sample_count].astype(int).tolist(),
+                    intensity_matrix[:sample_count].astype(float).tolist(),
+                )
+        return umap_sample
+
+    @staticmethod
+    def _compress_bitmask(values) -> int:
+        compressed = 0
+        for index, value in enumerate(values):
+            if int(value) != 0:
+                compressed |= 1 << index
+        return compressed
+
+    @staticmethod
+    def _build_umap_frame(
+        rows: list[list[float | int]],
+        ordered_symbols: list[str],
+        modifier: str,
+    ) -> pd.DataFrame:
+        columns = pd.MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
+        index = list(range(1, len(rows) + 1))
+        return pd.DataFrame(rows, columns=columns, index=index)

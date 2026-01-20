@@ -6,7 +6,6 @@ import brotli  # type: ignore
 
 from pandas import DataFrame  # type: ignore
 import pandas.errors as pd_errors  # type: ignore
-from psycopg import Cursor as PsycopgCursor
 
 from umap import UMAP  # type: ignore
 from sklearn.impute import SimpleImputer  # type: ignore
@@ -22,6 +21,7 @@ from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping
 from smprofiler.standalone_utilities.log_formats import colorized_logger
+from smprofiler.ondemand.cache_store import get_cache_store
 
 warnings.simplefilter(action='ignore', category=pd_errors.PerformanceWarning)
 warnings.filterwarnings(action='ignore', message='n_jobs value 1 overridden to 1 by setting random_state. Use no seed for parallelism.')
@@ -49,6 +49,17 @@ class UMAPCreator:
 
     def create(self) -> None:
         self._generate_and_write_reductions()
+
+    def create_from_dense_frames(
+        self,
+        continuous: DataFrame,
+        discrete: DataFrame,
+        ordered_symbols: list[str],
+    ) -> None:
+        if all(continuous.isna().all()):
+            raise NoContinuousIntensityDataError
+        reduced = UMAPReducer.create_2d_point_cloud(continuous)
+        self._write_to_database(reduced, discrete, continuous, ordered_symbols=ordered_symbols)
 
     def _generate_and_write_reductions(self) -> None:
         continuous, discrete = self.retrieve_feature_matrix_dense(cell_limit=UMAP_POINT_LIMIT)
@@ -116,8 +127,14 @@ class UMAPCreator:
             raise ValueError(message % self.study)
         return True
 
-    def _write_to_database(self, reduced, discrete: DataFrame, continuous: DataFrame) -> None:
-        data_array = self._create_data_array(discrete)
+    def _write_to_database(
+        self,
+        reduced,
+        discrete: DataFrame,
+        continuous: DataFrame,
+        ordered_symbols: list[str] | None = None,
+    ) -> None:
+        data_array = self._create_data_array(discrete, ordered_symbols=ordered_symbols)
         blob = bytearray()
         for histological_structure_id, entry in data_array.items():
             blob.extend(histological_structure_id.to_bytes(8, 'little'))
@@ -129,48 +146,43 @@ class UMAPCreator:
         }
 
         logger.info('Saving UMAP centroids and feature matrix.')
-        with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
-            self._drop_existing_umap_cache(cursor)
-            insert_query = '''
-                INSERT INTO
-                ondemand_studies_index (
-                    specimen,
-                    blob_type,
-                    blob_contents
-                )
-                VALUES (%s, %s, %s);
-            '''
-            cursor.execute(insert_query, (*VIRTUAL_SAMPLE_SPEC1, blob))
-            cursor.execute(insert_query, (*VIRTUAL_SAMPLE_SPEC2, pickle.dumps(centroid_data)))
+        cache_store = get_cache_store(self.database_config_file)
+        self._drop_existing_umap_cache(cache_store)
+        cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1], blob, drop_first=True)
+        cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1], pickle.dumps(centroid_data), drop_first=True)
         logger.info('Done.')
 
         logger.info('Saving UMAP specialized intensities matrix.')
-        intensities = self._normalize_column_order(continuous, 'quantity')
+        intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=ordered_symbols)
         intensities_dict = {int(i): tuple(float(intensities.loc[i, c]) for c in intensities.columns) for i in intensities.index}
         CompressedMatrixWriter(self.database_config_file)._write_intensities_data_array_to_db(intensities_dict, None, VIRTUAL_SAMPLE, self.study)
         logger.info('Done.')
 
-    def _drop_existing_umap_cache(self, cursor: PsycopgCursor):
+    def _drop_existing_umap_cache(self, cache_store):
         logger.info('  Dropping existing UMAP cache blobs.')
-        delete_directive='''
-        DELETE FROM ondemand_studies_index WHERE specimen=%s AND blob_type=%s;
-        '''
-        cursor.execute(delete_directive, VIRTUAL_SAMPLE_SPEC1)
-        cursor.execute(delete_directive, VIRTUAL_SAMPLE_SPEC2)
-        cursor.execute(delete_directive, (VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED))
-        cursor.execute(delete_directive, (VIRTUAL_SAMPLE, FEATURE_MATRIX_WITH_INTENSITIES))
+        cache_store.delete_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1])
+        cache_store.delete_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1])
+        cache_store.delete_blob(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED)
+        cache_store.delete_blob(self.study, VIRTUAL_SAMPLE, FEATURE_MATRIX_WITH_INTENSITIES)
         logger.info('  Done.')
 
-    def _normalize_column_order(self, df: DataFrame, modifier: str) -> DataFrame:
-        with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
-            ordered = CellsAccess(cursor).get_ordered_feature_names()
-        symbols = [(modifier, n.symbol) for n in ordered.names]
+    def _normalize_column_order(
+        self,
+        df: DataFrame,
+        modifier: str,
+        ordered_symbols: list[str] | None = None,
+    ) -> DataFrame:
+        if ordered_symbols is None:
+            with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
+                ordered = CellsAccess(cursor).get_ordered_feature_names()
+            ordered_symbols = [n.symbol for n in ordered.names]
+        symbols = [(modifier, n) for n in ordered_symbols]
         logger.info(f'Using feature order: {[s[1] for s in symbols]}')
         df_ordered = df[symbols]
         return df_ordered.sort_index()
 
-    def _create_data_array(self, df: DataFrame) -> dict[int, int]:
-        df_ordered = self._normalize_column_order(df, 'discrete_value')
+    def _create_data_array(self, df: DataFrame, ordered_symbols: list[str] | None = None) -> dict[int, int]:
+        df_ordered = self._normalize_column_order(df, 'discrete_value', ordered_symbols=ordered_symbols)
         data_array = {}
         for i, row in df_ordered.iterrows():
             binary = row.astype(int).to_numpy()

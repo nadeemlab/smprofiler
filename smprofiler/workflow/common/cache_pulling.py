@@ -13,6 +13,7 @@ from smprofiler.workflow.common.umap_creation import UMAPCreator
 from smprofiler.workflow.common.umap_creation import NoContinuousIntensityDataError
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
+from smprofiler.ondemand.cache_store import get_cache_store
 
 logger = colorized_logger(__name__)
 
@@ -30,11 +31,12 @@ def compressed_payloads_cache_pull(database_config_file: str | None, study: str)
     with DBCursor(database_config_file=database_config_file, study=study) as cursor:
         access = CellsAccess(cursor)
         specimens = _get_specimens(cursor)
+        cache_store = get_cache_store(database_config_file)
         for specimen in list(specimens) + [VIRTUAL_SAMPLE]:
-            _compress_and_save_combo_feature_matrix(access, specimen, cursor)
+            _compress_and_save_combo_feature_matrix(access, specimen, study, cache_store)
 
 
-def _compress_and_save_combo_feature_matrix(access: CellsAccess, specimen: str, cursor) -> None:
+def _compress_and_save_combo_feature_matrix(access: CellsAccess, specimen: str, study: str, cache_store) -> None:
     try:
         raw = access._zip_location_and_phenotype_data(
             access._get_location_data(specimen, cell_identifiers=()),
@@ -53,15 +55,7 @@ def _compress_and_save_combo_feature_matrix(access: CellsAccess, specimen: str, 
     else:
         blob_type = BROTLI_BLOB_TYPE
     compressed_data = brotli.compress(raw, quality=11, lgwin=24)
-    cursor.execute('''
-        INSERT INTO
-        ondemand_studies_index (
-            specimen,
-            blob_type,
-            blob_contents
-        )
-        VALUES (%s, %s, %s);
-    ''', (specimen, blob_type, compressed_data))
+    cache_store.put_blob(study, specimen, blob_type, compressed_data, drop_first=True)
     logger.info('Created brotli compressed cell data for %s', specimen)
 
 
