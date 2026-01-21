@@ -26,6 +26,7 @@ dependencies = [
     "cattrs",
     "jinja2",
     "numba>=0.44.0",
+    "llvmlite==0.45.1",
     "psycopg",
     "psycopg2",
     "pyshp",
