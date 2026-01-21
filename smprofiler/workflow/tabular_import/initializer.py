@@ -31,15 +31,20 @@ class TabularImportInitializer(Initializer): #pylint: disable=too-few-public-met
         infuser.setup_lightweight_metaschema()
 
         skimmer = DataSkimmer(database_config_file=database_config_file)
-        skimmer.parse(
-            {
-                'file manifest': kwargs['file_manifest_file'],
-                'channels': kwargs['channels_file'],
-                'phenotypes': kwargs['phenotypes_file'],
-                'samples': kwargs['samples_file'],
-                'subjects': kwargs['subjects_file'],
-                'study': kwargs['study_file'],
-                'diagnosis': kwargs['diagnosis_file'],
-                'interventions': kwargs['interventions_file'],
-            },
-        )
+        files = {
+            'file manifest': kwargs['file_manifest_file'],
+            'channels': kwargs['channels_file'],
+            'phenotypes': kwargs['phenotypes_file'],
+            'samples': kwargs['samples_file'],
+            'subjects': kwargs['subjects_file'],
+            'study': kwargs['study_file'],
+            'diagnosis': kwargs['diagnosis_file'],
+            'interventions': kwargs['interventions_file'],
+        }
+        pcd = 'permanent_condition_diagnosis'
+        cl = 'condition_lack'
+        for key in (pcd, cl):
+            if f'{key}_file' in kwargs:
+                files[key] = kwargs[f'{key}_file']
+        skimmer.parse(files)
+
