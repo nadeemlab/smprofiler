@@ -2,7 +2,7 @@
 < server: uvicorn
 < content-type: application/vnd.sqlite3
 < content-disposition: attachment; filename="melanoma-intralesional-il2.sqlite"
-< content-length: 331776
+< content-length: 339968
 < cache-control: no-store
 < cross-origin-opener-policy: same-origin
 < content-security-policy: default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'

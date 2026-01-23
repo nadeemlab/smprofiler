@@ -4,6 +4,7 @@
                        cell_phenotype        4
              cell_phenotype_criterion       27
                      chemical_species       26
+                       condition_lack        1
                   data_analysis_study        2
                             data_file        7
                             diagnosis        2
@@ -15,6 +16,7 @@
 histological_structure_identification      700
          histology_assessment_process        7
                          intervention        2
+        permanent_condition_diagnosis        1
    plane_coordinates_reference_system        0
                           publication        2
            quantitative_feature_value     1400
