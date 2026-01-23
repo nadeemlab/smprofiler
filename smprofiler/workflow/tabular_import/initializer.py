@@ -1,5 +1,5 @@
 """The initializer of the main data import workflow."""
-
+import re
 from json import loads
 
 from smprofiler.workflow.component_interfaces.initializer import Initializer
@@ -41,10 +41,12 @@ class TabularImportInitializer(Initializer): #pylint: disable=too-few-public-met
             'diagnosis': kwargs['diagnosis_file'],
             'interventions': kwargs['interventions_file'],
         }
-        pcd = 'permanent_condition_diagnosis'
-        cl = 'condition_lack'
+        pcd = 'permanent condition diagnosis'
+        cl = 'condition lack'
+        logger.debug(kwargs)
         for key in (pcd, cl):
-            if f'{key}_file' in kwargs:
-                files[key] = kwargs[f'{key}_file']
+            f = re.sub(' ', '_', key)
+            if f'{f}_file' in kwargs:
+                files[key] = kwargs[f'{f}_file']
         skimmer.parse(files)
 

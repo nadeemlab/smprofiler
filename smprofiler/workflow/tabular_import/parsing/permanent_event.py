@@ -7,7 +7,6 @@ from pandas import read_csv
 from pandas import DataFrame
 from psycopg import Connection as PsycopgConnection
 
-from smprofiler.db.database_connection import DBConnection
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 logger = colorized_logger(__name__)
 
@@ -30,6 +29,7 @@ class TableTranscriber:
 
     def _transcribe_table(self, table_file: str) -> None:
         df = read_csv(table_file, sep='\t')
+        logger.info(f'Considering {table_file}: {df}')
         table_name = re.sub(r'\.tsv$', '', table_file)
         df.columns = list(map(_normalize_column, list(df.columns)))
         self._validate_schema(df, table_name)
@@ -37,9 +37,10 @@ class TableTranscriber:
         with self.connection.cursor() as cursor:
             for _, row in df.iterrows():
                 values = tuple(row[c] for c in columns)
-                template = '(' + ', '.join(['?']*len(columns)) + ')'
+                template = '(' + ', '.join(['%s']*len(columns)) + ')'
                 query = f'INSERT INTO {table_name} VALUES {template} ;'
                 cursor.execute(query, values)
+                logger.info(f'Inserted {table_name} record: {values}')
         self.connection.commit()
 
     def _validate_schema(self, df: DataFrame, table_name: str) -> None:

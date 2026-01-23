@@ -45,7 +45,7 @@ MAKEFLAGS += --warn-undefined-variables
 MAKEFLAGS += --no-builtin-rules
 
 PACKAGE_NAME := smprofiler
-export PYTHON := python
+export PYTHON := python3
 export BUILD_SCRIPTS_LOCATION_ABSOLUTE := ${PWD}/build/build_scripts
 SCRIPTS := ${BUILD_SCRIPTS_LOCATION_ABSOLUTE}
 SOURCE_LOCATION := ${PACKAGE_NAME}
