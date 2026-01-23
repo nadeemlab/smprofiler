@@ -36,11 +36,13 @@ class TableTranscriber:
         columns = _get_columns(table_name)
         with self.connection.cursor() as cursor:
             for _, row in df.iterrows():
-                values = tuple(row[c] for c in columns)
-                template = '(' + ', '.join(['%s']*len(columns)) + ')'
-                query = f'INSERT INTO {table_name} VALUES {template} ;'
-                cursor.execute(query, values)
-                logger.info(f'Inserted {table_name} record: {values}')
+                values = tuple(str(row[c]) for c in columns)
+                where = f'WHERE NOT EXISTS ( SELECT * FROM {table_name} t WHERE ' + ' AND '.join(f"t.{c}='{v}'" for c, v in zip(columns, values)) + ' )'
+                fields = ', '.join(columns)
+                vs = ', '.join(f"'{v}'" for v in values)
+                query = f'INSERT INTO {table_name} ({fields}) SELECT {vs} {where} ;'
+                logger.info(f'Inserting {table_name} record: {query}')
+                cursor.execute(query)
         self.connection.commit()
 
     def _validate_schema(self, df: DataFrame, table_name: str) -> None:
@@ -49,7 +51,7 @@ class TableTranscriber:
             raise ValueError(f'Schema for supplied table (columns: {df.columns}) does not match: {columns}')
 
 def get_permanent_events_transcriber(file_path: str, connection: PsycopgConnection) -> TableTranscriber:
-    tables = ('permanent_condition_diagnosis.tsv', 'condition_lack.tsv')
+    tables = ('permanent_condition_diagnosis.tsv', 'condition_lack.tsv', 'diagnosis.tsv')
     table_files = tuple(map(lambda t: join(file_path, t), tables))
     return TableTranscriber(table_files, connection)
 
