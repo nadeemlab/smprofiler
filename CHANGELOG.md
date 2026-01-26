@@ -1,3 +1,58 @@
+# v1.70.0
+Adds support for survival-type data (overall survival, disease progression, etc.). This is achieved by including two new metadata tables, annotating diagnosis condition and result (pairs) representing the types of events recorded. New records in the diagnosis table (referring to the new metadata) can then be added with event time data.
+
+New datasets prepared for the ETL process must now include `permanent_condition_diagnosis.tsv` and `condition_lack.tsv`, as well as any needed `diagnosis.tsv` rows. These additions will be picked up by the normal ETL for the whole dataset, but they can also be uploaded on an isolated one-time basis with:
+
+```sh
+smprofiler workflow upload-permanent-event-data --database-config-file=dbc.config --generated-artifacts-path=generated_artifacts/
+```
+
+Client applications can then read out the survival-type data with the SQL query:
+
+```sql
+SELECT * FROM
+(
+SELECT
+    scp.specimen,
+    d.condition,
+    d.result,
+    CASE
+    WHEN EXISTS ( SELECT * FROM permanent_condition_diagnosis pcd
+                  WHERE pcd.condition=d.condition AND pcd.result=d.result )
+    THEN 1
+    WHEN EXISTS ( SELECT * FROM permanent_condition_diagnosis pcd
+                  JOIN condition_lack cl
+                  ON pcd.condition=cl.condition AND pcd.result=cl.presence_result AND d.result=cl.absence_result )
+    THEN 0
+    ELSE -1
+    END AS code,
+    d.date
+FROM diagnosis d JOIN specimen_collection_process scp ON d.subject=scp.source
+) AS s
+WHERE s.code>-1
+;
+```
+
+The `code` field helps in applying standard plotting and estimator functions, by informing them of the "polarity" of the two event types. Note that:
+- You may want to group the records by `(condition, result)`, in case there are multiple kinds of survival-type data available.
+- The query pre-joins to the specimen level, since this will typically be used, but of course the outcomes assignments belong properly to the subject level. The variant of this query for subject level is easy to obtain.
+
+Here is an example of what is returned:
+
+```txt
+    specimen     |    condition     | result | code |           date            
+-----------------+------------------+--------+------+---------------------------
+ Sorin_LUAD_D001 | Overall survival | Dead   |    1 | 8.386 years post-surgery
+ Sorin_LUAD_D002 | Overall survival | Alive  |    0 | 10.111 years post-surgery
+ Sorin_LUAD_D003 | Overall survival | Dead   |    1 | 2.094 years post-surgery
+ Sorin_LUAD_D004 | Overall survival | Dead   |    1 | 1.755 years post-surgery
+ Sorin_LUAD_D005 | Overall survival | Dead   |    1 | 7.598 years post-surgery
+ Sorin_LUAD_D006 | Overall survival | Dead   |    1 | 5.246 years post-surgery
+ Sorin_LUAD_D007 | Overall survival | Alive  |    0 | 9.829 years post-surgery
+ Sorin_LUAD_D008 | Overall survival | Dead   |    1 | 0.066 years post-surgery
+...
+```
+
 # v1.0.69
 Adds a single-study multi-feature automated analysis pipeline and report summary function.
 - `StudyAutoAssessor`. Entrypoint into the main enumeration of cases considered, assessment methods, and initial filtering of preliminary results.
