@@ -236,7 +236,11 @@ class SampleStratificationCreator:
     @staticmethod
     def get_diagnoses(subject, cursor):
         cursor.execute(
-            'SELECT condition, result, date_of_evidence FROM diagnosis WHERE subject=%s ;',
+            '''
+            SELECT d.condition, d.result, d.date_of_evidence FROM diagnosis d
+            WHERE d.subject=%s AND d.condition NOT IN
+                ( SELECT pcd.condition FROM permanent_condition_diagnosis pcd );
+            ''',
             (subject,),
         )
         rows = cursor.fetchall()

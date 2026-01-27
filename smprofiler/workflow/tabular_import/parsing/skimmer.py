@@ -28,6 +28,7 @@ from smprofiler.db.modify_constraints import toggle_constraints
 from smprofiler.db.schema_infuser import SchemaInfuser
 from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.db.exchange_data_formats.study import StudyHandle
+from smprofiler.workflow.tabular_import.parsing.permanent_event import TableTranscriber
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
@@ -147,6 +148,10 @@ class DataSkimmer:
                 _files['file manifest'],
                 chemical_species_identifiers_by_symbol,
             )
+            pcd = 'permanent condition diagnosis'
+            cl = 'condition lack'
+            if pcd in _files and cl in _files:
+                TableTranscriber((_files[pcd], _files[cl]), connection).transcribe()
             SampleStratificationCreator.create_sample_stratification(connection)
             self._report_record_count_changes(connection, fields)
 

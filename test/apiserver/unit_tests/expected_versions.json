@@ -3,49 +3,49 @@
         "component_name": "Squidpy",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.6.2",
+        "version": "1.7.0",
         "relevant_to_reproducible_computation": true
     },
     {
         "component_name": "Pandas",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "2.3.2",
+        "version": "3.0.0",
         "relevant_to_reproducible_computation": true
     },
     {
         "component_name": "NumPy",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "2.2.6",
+        "version": "2.3.5",
         "relevant_to_reproducible_computation": true
     },
     {
         "component_name": "SciPy",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.16.2",
+        "version": "1.17.0",
         "relevant_to_reproducible_computation": true
     },
     {
         "component_name": "scikit-learn",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.7.2",
+        "version": "1.8.0",
         "relevant_to_reproducible_computation": true
     },
     {
         "component_name": "umap-learn",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "0.5.9.post2",
+        "version": "0.5.11",
         "relevant_to_reproducible_computation": true
     },
     {
         "component_name": "smprofiler",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.0.67",
+        "version": "1.0.69",
         "relevant_to_reproducible_computation": true
     },
     {
