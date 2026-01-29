@@ -10,3 +10,5 @@ Subjects file	Breast cancer IMC	subjects.tsv	None	Manifest of subjects
 Study file	Breast cancer IMC	study.json	None	Project-level data
 Diagnosis file	Breast cancer IMC	diagnosis.tsv	None	List of subject diagnoses
 Interventions file	Breast cancer IMC	interventions.tsv	None	List of subject intervention events
+Permanent condition diagnosis file	Breast cancer IMC	permanent_condition_diagnosis.tsv	None	List of survival-type-data conditions
+Condition lack file	Breast cancer IMC	condition_lack.tsv	None	List of survival-type-data polarities

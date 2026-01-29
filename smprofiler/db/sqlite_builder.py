@@ -49,6 +49,12 @@ class FindInsertOrder:
                 name = edge_data.name,
                 foreign_key = edge_data.foreign_key,
             )
+        for _, row in fields.iterrows():
+            n1 = cls._get_primary_table_handle(row)
+            if n1 in omittable_tables:
+                continue
+            if n1 not in G:
+                G.add_node(n1)
         return G
 
     @classmethod

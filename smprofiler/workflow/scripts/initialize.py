@@ -21,6 +21,8 @@ if __name__ == '__main__':
     add_argument(parser, 'diagnosis file')
     add_argument(parser, 'interventions file')
     add_argument(parser, 'workflow')
+    add_argument(parser, 'permanent condition diagnosis file')
+    add_argument(parser, 'condition lack file')
 
     parameters = vars(parser.parse_args())
 

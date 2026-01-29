@@ -37,6 +37,12 @@ env.channels_file_ = '{{ channels_file }}'{% endif %}
 {%- if phenotypes_file is defined and phenotypes_file|length %}
 env.phenotypes_file_ = '{{ phenotypes_file }}'{% endif %}
 
+{%- if permanent_condition_diagnosis_file is defined and permanent_condition_diagnosis_file|length %}
+env.permanent_condition_diagnosis_file = '{{ permanent_condition_diagnosis_file }}'{% endif %}
+
+{%- if condition_lack_file is defined and condition_lack_file|length %}
+env.condition_lack_file = '{{ condition_lack_file }}'{% endif %}
+
 {%- if workflow in ['graph generation', 'graph plugin'] %}
 env.graph_config_file_ = '{{ graph_config_file }}'
 {%- endif %}

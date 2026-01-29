@@ -1,5 +1,5 @@
 """The initializer of the main data import workflow."""
-
+import re
 from json import loads
 
 from smprofiler.workflow.component_interfaces.initializer import Initializer
@@ -31,15 +31,22 @@ class TabularImportInitializer(Initializer): #pylint: disable=too-few-public-met
         infuser.setup_lightweight_metaschema()
 
         skimmer = DataSkimmer(database_config_file=database_config_file)
-        skimmer.parse(
-            {
-                'file manifest': kwargs['file_manifest_file'],
-                'channels': kwargs['channels_file'],
-                'phenotypes': kwargs['phenotypes_file'],
-                'samples': kwargs['samples_file'],
-                'subjects': kwargs['subjects_file'],
-                'study': kwargs['study_file'],
-                'diagnosis': kwargs['diagnosis_file'],
-                'interventions': kwargs['interventions_file'],
-            },
-        )
+        files = {
+            'file manifest': kwargs['file_manifest_file'],
+            'channels': kwargs['channels_file'],
+            'phenotypes': kwargs['phenotypes_file'],
+            'samples': kwargs['samples_file'],
+            'subjects': kwargs['subjects_file'],
+            'study': kwargs['study_file'],
+            'diagnosis': kwargs['diagnosis_file'],
+            'interventions': kwargs['interventions_file'],
+        }
+        pcd = 'permanent condition diagnosis'
+        cl = 'condition lack'
+        logger.debug(kwargs)
+        for key in (pcd, cl):
+            f = re.sub(' ', '_', key)
+            if f'{f}_file' in kwargs:
+                files[key] = kwargs[f'{f}_file']
+        skimmer.parse(files)
+

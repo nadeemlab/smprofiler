@@ -112,7 +112,8 @@ class StudyAccess(SimpleReadOnlyProvider):
         is_proximity_calculation = bool(re.search('proximity calculation', substudy))
         descriptor = ADIFeatureSpecificationUploader.ondemand_descriptor()
         is_ondemand_calculation = bool(re.search(descriptor, substudy))
-        return is_fractions or is_proximity_calculation or is_ondemand_calculation
+        is_gnn = bool(re.search('cell importance', substudy))
+        return is_fractions or is_proximity_calculation or is_ondemand_calculation or is_gnn
 
     def get_study_specifiers(self) -> tuple[str, ...]:
         self.cursor.execute('SELECT study FROM study_lookup;')
