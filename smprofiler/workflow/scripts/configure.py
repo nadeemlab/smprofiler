@@ -282,6 +282,28 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         options['phenotypes_file'] = phenotypes_file_abs
         options['phenotypes'] = True
 
+    permanent_condition_diagnosis_file = get_input_filename_by_identifier(
+        input_file_identifier='Permanent condition diagnosis file',
+        file_manifest_filename=local_file_manifest,
+    )
+    if not permanent_condition_diagnosis_file is None:
+        permanent_condition_diagnosis_file_abs = join(input_path, permanent_condition_diagnosis_file)
+        if not _exists_s3_or_local(permanent_condition_diagnosis_file_abs):
+            raise FileNotFoundError(f'Did not find permanent condition diagnosis file ({permanent_condition_diagnosis_file}).')
+        options['permanent_condition_diagnosis_file'] = permanent_condition_diagnosis_file_abs
+        options['permanent_condition_diagnosis'] = True
+
+    condition_lack_file = get_input_filename_by_identifier(
+        input_file_identifier='Condition lack file',
+        file_manifest_filename=local_file_manifest,
+    )
+    if not condition_lack_file is None:
+        condition_lack_file_abs = join(input_path, condition_lack_file)
+        if not _exists_s3_or_local(condition_lack_file_abs):
+            raise FileNotFoundError(f'Did not find permanent condition diagnosis file ({condition_lack_file}).')
+        options['condition_lack_file'] = condition_lack_file_abs
+        options['condition_lack'] = True
+
 
 def parse_arguments():
     """Process command line arguments."""

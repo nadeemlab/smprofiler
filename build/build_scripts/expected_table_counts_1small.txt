@@ -4,28 +4,30 @@
                        cell_phenotype        4
              cell_phenotype_criterion       27
                      chemical_species       26
-                  data_analysis_study        2
+                       condition_lack        1
+                  data_analysis_study        1
                             data_file        2
                             diagnosis        2
        diagnostic_selection_criterion        4
-            expression_quantification     5200
-                feature_specification        1
-                    feature_specifier        4
-               histological_structure      200
-histological_structure_identification      200
+            expression_quantification        0
+                feature_specification        0
+                    feature_specifier        0
+               histological_structure        0
+histological_structure_identification        0
          histology_assessment_process        7
                          intervention        2
+        permanent_condition_diagnosis        1
    plane_coordinates_reference_system        0
                           publication        2
-           quantitative_feature_value      200
+           quantitative_feature_value        0
                 research_professional       32
-                           shape_file      200
+                           shape_file        0
           specimen_collection_process        7
             specimen_collection_study        1
     specimen_data_measurement_process        2
            specimen_measurement_study        1
                                 study        1
-                      study_component        4
+                      study_component        3
                  study_contact_person        1
                               subject        2
   two_cohort_feature_association_test        0

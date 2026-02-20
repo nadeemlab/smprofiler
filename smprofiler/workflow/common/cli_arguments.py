@@ -14,7 +14,8 @@ SettingArgumentName = Literal['workflow', 'source file identifier', 'source file
                               'job index']
 FileArgumentName = Literal['phenotypes file', 'channels file', 'study file', 'samples file',
                            'subjects file', 'diagnosis file', 'interventions file',
-                           'performance report file', 'results file']
+                           'performance report file', 'results file', 'permanent condition diagnosis file',
+                           'condition lack file']
 
 
 def add_argument(parser: ArgumentParser, name: Union[SettingArgumentName, FileArgumentName]):
