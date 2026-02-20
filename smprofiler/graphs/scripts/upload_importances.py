@@ -40,12 +40,18 @@ if __name__ == "__main__":
         cohort_stratifier,
     ) = read_upload_config(args.config_path)
     df = read_csv(args.importances_csv_path, index_col=0)
-    transcribe_importance(
-        df,
-        db_config_file_path,
-        study_name,
-        plugin_used,
-        datetime_of_run,
-        plugin_version,
-        cohort_stratifier,
-    )
+    try:
+        transcribe_importance(
+            df,
+            db_config_file_path,
+            study_name,
+            plugin_used,
+            datetime_of_run,
+            plugin_version,
+            cohort_stratifier,
+        )
+    except ValueError as e:
+        print(e)
+        pass
+        #TODO handle
+
