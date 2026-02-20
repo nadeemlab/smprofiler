@@ -27,7 +27,7 @@ histological_structure_identification        0
     specimen_data_measurement_process        2
            specimen_measurement_study        1
                                 study        1
-                      study_component        4
+                      study_component        3
                  study_contact_person        1
                               subject        2
   two_cohort_feature_association_test        0
