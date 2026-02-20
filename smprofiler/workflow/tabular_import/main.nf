@@ -3,17 +3,19 @@ nextflow.enable.dsl = 2
 
 process echo_environment_variables {
     output:
-    path 'workflow',                        emit: workflow
-    path 'file_manifest_filename',          emit: file_manifest_filename
-    path 'input_path',                      emit: input_path
-    path 'study_file',                      emit: study_file
-    path 'diagnosis_file',                  emit: diagnosis_file
-    path 'interventions_file',              emit: interventions_file
-    path 'samples_file',                    emit: samples_file
-    path 'db_config_file',                  emit: db_config_file
-    path 'subjects_file',                   emit: subjects_file
-    path 'channels_file',                   emit: channels_file
-    path 'phenotypes_file',                 emit: phenotypes_file
+    path 'workflow',                            emit: workflow
+    path 'file_manifest_filename',              emit: file_manifest_filename
+    path 'input_path',                          emit: input_path
+    path 'study_file',                          emit: study_file
+    path 'diagnosis_file',                      emit: diagnosis_file
+    path 'interventions_file',                  emit: interventions_file
+    path 'samples_file',                        emit: samples_file
+    path 'db_config_file',                      emit: db_config_file
+    path 'subjects_file',                       emit: subjects_file
+    path 'channels_file',                       emit: channels_file
+    path 'phenotypes_file',                     emit: phenotypes_file
+    path 'permanent_condition_diagnosis_file',  emit: permanent_condition_diagnosis_file
+    path 'condition_lack_file',                 emit: condition_lack_file
 
     script:
     """
@@ -29,6 +31,8 @@ process echo_environment_variables {
     echo -n "${subjects_file_}" > subjects_file
     echo -n "${channels_file_}" > channels_file
     echo -n "${phenotypes_file_}" > phenotypes_file
+    echo -n "${permanent_condition_diagnosis_file}" > permanent_condition_diagnosis_file
+    echo -n "${condition_lack_file}" > condition_lack_file
     """
 }
 
@@ -60,6 +64,8 @@ process workflow_main {
     path file_manifest_file
     path channels_file
     path phenotypes_file
+    path permanent_condition_diagnosis_file
+    path condition_lack_file
     path samples_file
     path db_config_file
     path subjects_file
@@ -80,7 +86,9 @@ process workflow_main {
      --diagnosis-file=${diagnosis} \
      --interventions-file=${interventions} \
      --channels-file=${channels_file} \
-     --phenotypes-file=${phenotypes_file} ;
+     --phenotypes-file=${phenotypes_file} \
+     --permanent-condition-diagnosis-file=${permanent_condition_diagnosis_file} \
+     --condition-lack-file=${condition_lack_file} ;
     smprofiler ondemand assess-recreate-cache \
      --database-config-file=${db_config_file} \
      --study-file=${study} ;
@@ -140,6 +148,12 @@ workflow {
     environment_ch.phenotypes_file.map{ file(it.text) }
         .set{ phenotypes_ch }
 
+    environment_ch.permanent_condition_diagnosis_file.map{ file(it.text) }
+        .set{ permanent_condition_diagnosis_ch }
+
+    environment_ch.condition_lack_file.map{ file(it.text) }
+        .set{ condition_lack_ch }
+
     environment_ch.db_config_file.map{ file(it.text) }
         .set{ db_config_file_ch }
 
@@ -181,6 +195,8 @@ workflow {
         file_manifest_ch,
         channels_ch,
         phenotypes_ch,
+        permanent_condition_diagnosis_ch,
+        condition_lack_ch,
         samples_file_ch,
         db_config_file_ch,
         subjects_file_ch,

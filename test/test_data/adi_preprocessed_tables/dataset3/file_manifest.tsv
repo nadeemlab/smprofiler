@@ -8,3 +8,5 @@ Subjects file	Melanoma intralesional IL2	subjects.tsv	None	Manifest of subjects
 Study file	Melanoma intralesional IL2	study.json	None	Project-level data
 Diagnosis file	Melanoma intralesional IL2	diagnosis.tsv	None	List of subject diagnoses
 Interventions file	Melanoma intralesional IL2	interventions.tsv	None	List of subject intervention events
+Permanent condition diagnosis file	Melanoma intralesional IL2	permanent_condition_diagnosis.tsv	None	List of survival-type-data conditions
+Condition lack file	Melanoma intralesional IL2	condition_lack.tsv	None	List of survival-type-data polarities
