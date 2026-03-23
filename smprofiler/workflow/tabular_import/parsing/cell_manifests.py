@@ -6,14 +6,17 @@ import pickle
 from typing import cast
 
 import shapefile  # type: ignore
-import pandas as pd
+from pandas import read_csv
+from pandas import DataFrame 
+from pandas import MultiIndex
 from psycopg import Connection as PsycopgConnection
 import brotli  # type: ignore
 
+from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.workflow.tabular_import.tabular_dataset_design\
     import TabularCellMetadataDesign
 from smprofiler.workflow.common.file_io import compute_sha256
-from smprofiler.workflow.common.logging.performance_timer import PerformanceTimer
+from smprofiler.workflow.common.logging.performance_timer import PerformanceTimerReporter
 from smprofiler.workflow.common.file_identifier_schema \
     import get_input_filename_by_identifier
 from smprofiler.db.source_file_parser_interface import SourceToADIParser
@@ -22,6 +25,7 @@ from smprofiler.workflow.tabular_import.parsing.range_definition import RangeDef
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
 from smprofiler.ondemand.cache_store import get_cache_store
+from smprofiler.ondemand.cache_store import CacheStore
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.workflow.common.umap_creation import UMAPCreator
 from smprofiler.workflow.common.umap_creation import NoContinuousIntensityDataError
@@ -33,6 +37,7 @@ logger = colorized_logger(__name__)
 class CellManifestsParser(SourceToADIParser):
     """Source file parsing for metadata at the level of the cell manifest set."""
     scope: RangeDefinition | None
+    timer: PerformanceTimerReporter
 
     def __init__(self, fields, **kwargs):
         super().__init__(fields, **kwargs)
@@ -40,7 +45,7 @@ class CellManifestsParser(SourceToADIParser):
         self.scope = None
         self.study_name = cast(str | None, kwargs.get('study_name'))
         self.database_config_file = cast(str | None, kwargs.get('database_config_file'))
-        self.build_caches_in_memory = bool(kwargs.get('build_caches_in_memory', False))
+        self.build_preprocessed_samples_in_memory = bool(kwargs.get('build_preprocessed_samples_in_memory', False))
 
     def parse(self,
         connection: PsycopgConnection,
@@ -53,14 +58,13 @@ class CellManifestsParser(SourceToADIParser):
         - shape file
         - expression quantification
         """
-        if self.build_caches_in_memory:
-            self._parse_and_build_caches(
+        if self.build_preprocessed_samples_in_memory:
+            self._parse_and_build_preprocessed_samples(
                 file_manifest_file,
                 chemical_species_identifiers_by_symbol,
             )
             return
-        timer = PerformanceTimer()
-        timer.record_timepoint('Initial')
+
         cursor = connection.cursor()
         timer.record_timepoint('Cursor opened')
         get_next = SourceToADIParser.get_next_integer_identifier
@@ -102,7 +106,7 @@ class CellManifestsParser(SourceToADIParser):
             file_count += 1
             connection.commit()
         cursor.close()
-        self.wrap_up_timer(timer)
+        self._wrap_up_timer()
 
     def open_expression_quantification_scope(self, scope_identifier: str, initial_index: int) -> None:
         logger.debug('Opening range scope with %s.', initial_index)
@@ -249,7 +253,7 @@ class CellManifestsParser(SourceToADIParser):
         histological_structure_identifier_index = initial_indices['structure']
         shape_file_identifier_index = initial_indices['shape file']
         sha256_hash = compute_sha256(filename)
-        cells = pd.read_csv(filename, sep=',', na_filter=False).drop_duplicates()
+        cells = read_csv(filename, sep=',', na_filter=False).drop_duplicates()
         count = self.get_number_known_cells(sha256_hash, cursor)
         if count > 0 and count != cells.shape[0]:
             logger.warning(
@@ -288,7 +292,7 @@ class CellManifestsParser(SourceToADIParser):
         return None
 
     def get_cell_manifests(self, file_manifest_file):
-        file_metadata = pd.read_csv(file_manifest_file, sep='\t')
+        file_metadata = read_csv(file_manifest_file, sep='\t')
         return file_metadata[
             file_metadata['Data type'] == self.dataset_design.get_cell_manifest_descriptor()
         ]
@@ -337,23 +341,18 @@ class CellManifestsParser(SourceToADIParser):
         ascii_representation = encoded.decode('utf-8')
         return ascii_representation
 
-    def wrap_up_timer(self, timer):
-        df = timer.report(organize_by='fraction')
-        df.to_csv('performance_report.csv', index=False)
+    def _start_timer(self) -> None:
+        self.timer = PerformanceTimerReporter('performance_report.tsv', logger, verbose=True)
 
-    def _parse_and_build_caches(
-        self,
-        file_manifest_file,
-        chemical_species_identifiers_by_symbol,
-    ) -> None:
-        if self.study_name is None:
-            raise ValueError('study_name is required to build caches in memory.')
+    def _record_timepoint(self, name: str) -> None:
+        self.timer.record_timepoint(name)
+
+    def _wrap_up_timer(self) -> None:
+        self.timer.wrap_up_timer()
+
+    def _prepare_channel_metadata(self, chemical_species_identifiers_by_symbol: dict[str, str]):
         measurement_study = SourceToADIParser.get_measurement_study_name(self.study_name)
-        cache_store = get_cache_store(self.database_config_file)
-        writer = CompressedMatrixWriter(self.database_config_file)
-
         channel_symbols = self.get_channel_symbols(chemical_species_identifiers_by_symbol)
-        specimens_by_measurement_study: dict[str, list[str]] = {measurement_study: []}
         target_by_symbol = {
             symbol: chemical_species_identifiers_by_symbol[symbol]
             for symbol in channel_symbols
@@ -367,58 +366,79 @@ class CellManifestsParser(SourceToADIParser):
         target_index_lookup = {target: i for i, target in enumerate(ordered_targets)}
         target_index_lookups = {measurement_study: target_index_lookup}
         target_by_symbols = {measurement_study: target_by_symbol}
+        return measurement_study, ordered_symbols, target_index_lookups, target_by_symbols
 
-        umap_discrete_rows: list[list[int]] = []
-        umap_continuous_rows: list[list[float]] = []
+    def _parse_and_build_preprocessed_samples(
+        self,
+        file_manifest_file,
+        chemical_species_identifiers_by_symbol,
+    ) -> None:
+        if self.study_name is None:
+            raise ValueError('study_name is required to build preprocessed_samples in memory.')
+        cache_store = get_cache_store(self.database_config_file)
+
+        measurement_study, ordered_symbols, target_index_lookups, target_by_symbols = self._prepare_channel_metadata(chemical_species_identifiers_by_symbol)
+
+        specimens_by_measurement_study: dict[str, list[str]] = {measurement_study: []}
+        subsampled_discrete_rows: list[list[int]] = []
+        subsampled_continuous_rows: list[list[float]] = []
         for _, cell_manifest in self.get_cell_manifests(file_manifest_file).iterrows():
-            specimen = cell_manifest['Sample ID']
+            self._start_timer()
+            self._record_timepoint('Starting one cell manifest')
+            specimen = str(cell_manifest['Sample ID'])
             filename = get_input_filename_by_identifier(
-                input_file_identifier=cell_manifest['File ID'],
+                input_file_identifier=str(cell_manifest['File ID']),
                 file_manifest_filename=file_manifest_file,
             )
-            cells = pd.read_csv(filename, sep=',', na_filter=False).drop_duplicates()
-            umap_remaining = UMAP_POINT_LIMIT - len(umap_discrete_rows)
-            umap_sample = self._build_cache_artifacts_for_cells(
+            if filename is None:
+                raise ValueError
+            cells = read_csv(filename, sep=',', na_filter=False).drop_duplicates()
+            self._record_timepoint('Loaded one sample cells file.')
+            subsampled_remaining = UMAP_POINT_LIMIT - len(subsampled_discrete_rows)
+            subsampled = self._build_preprocessed_samples(
                 cells,
                 specimen,
                 ordered_symbols,
-                writer,
                 cache_store,
-                measurement_study,
-                umap_remaining=umap_remaining,
+                subsampled_remaining=subsampled_remaining,
             )
-            if umap_sample is not None:
-                discrete_sample, continuous_sample = umap_sample
-                umap_discrete_rows.extend(discrete_sample)
-                umap_continuous_rows.extend(continuous_sample)
+            if subsampled is not None:
+                discrete_sample, continuous_sample = subsampled
+                subsampled_discrete_rows.extend(discrete_sample)
+                subsampled_continuous_rows.extend(continuous_sample)
             specimens_by_measurement_study[measurement_study].append(specimen)
+            self._record_timepoint(('Finished one cell manifest.'))
+            self._wrap_up_timer()
 
+        writer = CompressedMatrixWriter(self.database_config_file)
         writer.write_index(
             specimens_by_measurement_study,
             target_index_lookups,
             target_by_symbols,
         )
+        logger.info('Done writing channel metadata index to database.')
 
-        if len(umap_continuous_rows) > 0:
-            discrete_df = self._build_umap_frame(umap_discrete_rows, ordered_symbols, 'discrete_value')
-            continuous_df = self._build_umap_frame(umap_continuous_rows, ordered_symbols, 'quantity')
+        if len(subsampled_continuous_rows) > 0:
+            discrete_df = self._build_umap_frame(subsampled_discrete_rows, ordered_symbols, 'discrete_value')
+            logger.info('Done preparing dataframe for discrete UMAP.')
+            continuous_df = self._build_umap_frame(subsampled_continuous_rows, ordered_symbols, 'quantity')
+            logger.info('Done preparing dataframe for continuous UMAP.')
             creator = UMAPCreator(self.database_config_file, self.study_name)
             try:
                 creator.create_from_dense_frames(continuous_df, discrete_df, ordered_symbols)
+                logger.info('Done creating UMAPs.')
             except NoContinuousIntensityDataError:
                 logger.warning('No continuous intensity data was found for UMAP creation.')
         else:
             logger.warning('No continuous intensity data was found for UMAP creation.')
 
-    def _build_cache_artifacts_for_cells(
+    def _build_preprocessed_samples(
         self,
-        cells: pd.DataFrame,
+        cells: DataFrame,
         specimen: str,
         ordered_symbols: list[str],
-        writer: CompressedMatrixWriter,
-        cache_store,
-        measurement_study: str,
-        umap_remaining: int,
+        cache_store: CacheStore,
+        subsampled_remaining: int,
     ) -> tuple[list[list[int]], list[list[float]]] | None:
         feature_names, intensities_available = self.dataset_design.get_exact_column_names(
             ordered_symbols,
@@ -444,17 +464,27 @@ class CellManifestsParser(SourceToADIParser):
             data_arrays[cell_id] = compressed
             phenotype_bytes[cell_id] = int(compressed).to_bytes(8, 'little')
 
-        writer.write_specimen(data_arrays, measurement_study, specimen)
-        cache_store.put_blob(
-            self.study_name,
-            specimen,
-            'centroids',
-            pickle.dumps({specimen: centroids}),
-            drop_first=True,
-        )
+        #writer.write_specimen(data_arrays, measurement_study, specimen)
 
+        #self._record_timepoint('Forming discrete phenotype data and saving it to cache. ')
+        #blob = CompressedMatrixWriter.form_phenotype_data_compressed_blob(data_arrays)
+        #cache_store.put_blob(self.study_name, specimen, 'feature_matrix', blob, drop_first=True)
+        #self._record_timepoint('Done saving discrete phenotype data.')
+
+        #self._record_timepoint('Putting centroids in cache.')
+        #cache_store.put_blob(
+        #    self.study_name,
+        #    specimen,
+        #    'centroids',
+        #    pickle.dumps({specimen: centroids}),
+        #    drop_first=True,
+        #)
+        #self._record_timepoint('Done putting centroids in cache.')
+
+        self._record_timepoint('Aggregating location and phenotype data.')
         raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
         compressed = brotli.compress(raw, quality=11, lgwin=24)
+        self._record_timepoint('Done aggregating location and phenotype data.')
         cache_store.put_blob(
             self.study_name,
             specimen,
@@ -462,6 +492,7 @@ class CellManifestsParser(SourceToADIParser):
             compressed,
             drop_first=True,
         )
+        self._record_timepoint('Done putting compressed/aggregated location and phenotype data in cache.')
 
         umap_sample: tuple[list[list[int]], list[list[float]]] | None = None
         if intensities_available:
@@ -470,17 +501,21 @@ class CellManifestsParser(SourceToADIParser):
             intensity_arrays: dict[int, tuple[float, ...]] = {}
             for cell_id, row in zip(cell_ids, intensity_matrix):
                 intensity_arrays[cell_id] = tuple(float(value) * scale for value in row)
-            writer._write_intensities_data_array_to_db(
-                intensity_arrays,
-                measurement_study,
-                specimen,
-            )
-            if umap_remaining > 0:
-                sample_count = min(len(discrete_matrix), umap_remaining)
+            #writer._write_intensities_data_array_to_db(
+            #    intensity_arrays,
+            #    measurement_study,
+            #    specimen,
+            #)
+
+            #compressed_blob = CompressedMatrixWriter.form_intensities_compressed_blob(intensity_arrays)
+            #cache_store.put_blob(self.study_name, specimen, FEATURE_MATRIX_WITH_INTENSITIES, compressed_blob)
+            if subsampled_remaining > 0:
+                sample_count = min(len(discrete_matrix), subsampled_remaining)
                 umap_sample = (
                     discrete_matrix[:sample_count].astype(int).tolist(),
                     intensity_matrix[:sample_count].astype(float).tolist(),
                 )
+        self._record_timepoint('Done skimming subsample.')
         return umap_sample
 
     @staticmethod
@@ -493,10 +528,10 @@ class CellManifestsParser(SourceToADIParser):
 
     @staticmethod
     def _build_umap_frame(
-        rows: list[list[float | int]],
+        rows: list[list[int]] | list[list[float]],
         ordered_symbols: list[str],
         modifier: str,
-    ) -> pd.DataFrame:
-        columns = pd.MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
+    ) -> DataFrame:
+        columns = MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
         index = list(range(1, len(rows) + 1))
-        return pd.DataFrame(rows, columns=columns, index=index)
+        return DataFrame(rows, columns=columns, index=index)

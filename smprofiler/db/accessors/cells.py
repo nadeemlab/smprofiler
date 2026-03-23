@@ -5,7 +5,7 @@ from typing import cast
 from itertools import islice
 from itertools import product
 
-import zstandard  # type: ignore
+import brotli
 
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC1
@@ -40,7 +40,7 @@ class CellsAccess(SimpleReadOnlyProvider):
         cell_identifiers: tuple[int, ...] = (),
         accept_encoding: tuple[str, ...] = (),
     ) -> tuple[CellsData, str | None]:
-        if "br" in accept_encoding and cell_identifiers == ():
+        if cell_identifiers == ():
             self.cursor.execute(
                 '''
                 SELECT blob_contents
@@ -50,19 +50,24 @@ class CellsAccess(SimpleReadOnlyProvider):
                 (sample, VIRTUAL_SAMPLE_COMPRESSED if sample == VIRTUAL_SAMPLE else 'cell_data_brotli'),
             )
             compressed = self.cursor.fetchone()
-            if compressed is not None:
+            if compressed is None:
+                logger.error(f'Requested "br" (Brotli) compressed blob that does not exist for {sample}.')
+                return bytes(), None
+            if 'br' in accept_encoding:
                 return compressed[0], 'br'
-            logger.error(f'Requested "br" (Brotli) compressed blob that does not exist for {sample}.')
+            else:
+                raw = brotli.decompress(compressed[0])
+                return raw, None
+        raise ValueError('Unhandled case for requested cells data.')
+        #raw = CellsAccess._zip_location_and_phenotype_data(
+        #    self._get_location_data(sample, cell_identifiers),
+        #    self._get_phenotype_data(sample, cell_identifiers),
+        #)
 
-        raw = CellsAccess._zip_location_and_phenotype_data(
-            self._get_location_data(sample, cell_identifiers),
-            self._get_phenotype_data(sample, cell_identifiers),
-        )
+        #if "zstd" in accept_encoding:
+        #    return zstandard.compress(raw), "zstd"
 
-        if "zstd" in accept_encoding:
-            return zstandard.compress(raw), "zstd"
-
-        return raw, None
+        #return raw, None
 
     def get_cells_data_intensity(
         self,

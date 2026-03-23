@@ -153,9 +153,16 @@ class UMAPCreator:
         logger.info('Done.')
 
         logger.info('Saving UMAP specialized intensities matrix.')
-        intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=ordered_symbols)
-        intensities_dict = {int(i): tuple(float(intensities.loc[i, c]) for c in intensities.columns) for i in intensities.index}
-        CompressedMatrixWriter(self.database_config_file)._write_intensities_data_array_to_db(intensities_dict, None, VIRTUAL_SAMPLE, self.study)
+
+        logger.info('SKIPPING.')
+        #intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=ordered_symbols)
+        #intensities_dict = {int(i): tuple(float(intensities.loc[i, c]) for c in intensities.columns) for i in intensities.index}
+        #cache_store.put_blob(
+        #    self.study,
+        #    VIRTUAL_SAMPLE,
+        #    FEATURE_MATRIX_WITH_INTENSITIES,
+        #    CompressedMatrixWriter.form_intensities_compressed_blob(intensities_dict),
+        #)
         logger.info('Done.')
 
     def _drop_existing_umap_cache(self, cache_store):

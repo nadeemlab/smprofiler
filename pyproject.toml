@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=63",
+    "setuptools>=82",
     "wheel"
 ]
 build-backend = "setuptools.build_meta"
@@ -33,6 +33,7 @@ dependencies = [
     "pytz",
     "requests",
     "scanpy==1.11.5",
+    "spatialdata>=0.7.2",
     "termplotlib",
 ]
 
@@ -52,6 +53,7 @@ all = [
     "cryptography",
     "dask[dataframe]",
     "dask-expr",
+    "dask-image>=2025.11.0",
     "fastapi",
     "h5py",
     "jinja2",
