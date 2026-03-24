@@ -26,6 +26,7 @@ from smprofiler.db.exchange_data_formats.metrics import AvailableGNN
 from smprofiler.db.simple_query_patterns import GetSingleResult
 from smprofiler.db.cohorts import get_sample_cohorts
 from smprofiler.db.database_connection import SimpleReadOnlyProvider
+from smprofiler.db.database_connection import DBConnection
 from smprofiler.db.describe_features import get_feature_description
 from smprofiler.workflow.automated_analysis.pdf_server import PDFReportServer
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -46,7 +47,7 @@ class StudyAccess(SimpleReadOnlyProvider):
         publication = self._get_publication(study)
         assay = self._get_assay(components.measurement)
         sample_cohorts = get_sample_cohorts(self.cursor, study)
-        findings = self.get_study_findings()
+        findings = self.get_study_findings(study)
         has_umap = self.has_umap()
         has_intensities = self.has_intensities()
         has_pdf_report = PDFReportServer(None, study).exists()
@@ -96,15 +97,31 @@ class StudyAccess(SimpleReadOnlyProvider):
         rows = tuple(self.cursor.fetchall())
         return AvailableGNN(plugins=tuple(specifier for (specifier, ) in rows))
 
-    def get_study_findings(self) -> list[str]:
-        return self._get_study_small_artifacts('findings')
+    def get_study_findings(self, study: str) -> list[str]:
+        return self._get_study_small_artifacts('findings', study)
 
     def get_study_gnn_plot_configurations(self) -> list[str]:
-        return self._get_study_small_artifacts('gnn_plot_configurations')
+        return self._get_study_small_artifacts('gnn_plot_configurations', None)
 
-    def _get_study_small_artifacts(self, name: str) -> list[str]:
-        self.cursor.execute(f'SELECT txt FROM {name} ORDER BY id;')
-        return [row[0] for row in self.cursor.fetchall()]
+    def _table_exists(self, table: str, study: str) -> bool:
+        schema = DBConnection.retrieve_study_schema(study, self.cursor)
+        query = f'''
+        SELECT EXISTS (
+        SELECT FROM pg_catalog.pg_class c
+        JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+        WHERE  n.nspname = '{schema}'
+        AND    c.relname = '{table}'
+        AND    c.relkind = 'r'    -- only tables
+        );'''
+        self.cursor.execute(query)
+        result = tuple(self.cursor.fetchall())[0][0]
+        return result
+
+    def _get_study_small_artifacts(self, name: str, study: str) -> list[str]:
+        if self._table_exists(name, study):
+            self.cursor.execute(f'SELECT txt FROM {name} ORDER BY id;')
+            return [row[0] for row in self.cursor.fetchall()]
+        return []
 
     @staticmethod
     def _is_secondary_substudy(substudy: str) -> bool:

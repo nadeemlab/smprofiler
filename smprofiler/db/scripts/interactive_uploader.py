@@ -178,6 +178,7 @@ class InteractiveUploader:
                 host=credentials.endpoint,
                 user=credentials.user,
                 password=credentials.password,
+                connect_timeout=5,
             ) as _:
                 return True
         except Exception:

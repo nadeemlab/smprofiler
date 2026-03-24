@@ -12,6 +12,7 @@ from pandas import MultiIndex
 from psycopg import Connection as PsycopgConnection
 import brotli  # type: ignore
 
+from smprofiler.db.scripts.count_cells import insert_count
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.workflow.tabular_import.tabular_dataset_design\
     import TabularCellMetadataDesign
@@ -38,6 +39,7 @@ class CellManifestsParser(SourceToADIParser):
     """Source file parsing for metadata at the level of the cell manifest set."""
     scope: RangeDefinition | None
     timer: PerformanceTimerReporter
+    connection: PsycopgConnection
 
     def __init__(self, fields, **kwargs):
         super().__init__(fields, **kwargs)
@@ -58,6 +60,7 @@ class CellManifestsParser(SourceToADIParser):
         - shape file
         - expression quantification
         """
+        self.connection = connection
         if self.build_preprocessed_samples_in_memory:
             self._parse_and_build_preprocessed_samples(
                 file_manifest_file,
@@ -382,6 +385,7 @@ class CellManifestsParser(SourceToADIParser):
         specimens_by_measurement_study: dict[str, list[str]] = {measurement_study: []}
         subsampled_discrete_rows: list[list[int]] = []
         subsampled_continuous_rows: list[list[float]] = []
+        running_cell_count = 0
         for _, cell_manifest in self.get_cell_manifests(file_manifest_file).iterrows():
             self._start_timer()
             self._record_timepoint('Starting one cell manifest')
@@ -395,7 +399,7 @@ class CellManifestsParser(SourceToADIParser):
             cells = read_csv(filename, sep=',', na_filter=False).drop_duplicates()
             self._record_timepoint('Loaded one sample cells file.')
             subsampled_remaining = UMAP_POINT_LIMIT - len(subsampled_discrete_rows)
-            subsampled = self._build_preprocessed_samples(
+            subsampled, cell_count = self._build_preprocessed_samples(
                 cells,
                 specimen,
                 ordered_symbols,
@@ -406,9 +410,14 @@ class CellManifestsParser(SourceToADIParser):
                 discrete_sample, continuous_sample = subsampled
                 subsampled_discrete_rows.extend(discrete_sample)
                 subsampled_continuous_rows.extend(continuous_sample)
+            running_cell_count += cell_count
             specimens_by_measurement_study[measurement_study].append(specimen)
             self._record_timepoint(('Finished one cell manifest.'))
             self._wrap_up_timer()
+        cursor = self.connection.cursor()
+        insert_count(running_cell_count, cursor)
+        self.connection.commit()
+        cursor.close()
 
         writer = CompressedMatrixWriter(self.database_config_file)
         writer.write_index(
@@ -439,7 +448,7 @@ class CellManifestsParser(SourceToADIParser):
         ordered_symbols: list[str],
         cache_store: CacheStore,
         subsampled_remaining: int,
-    ) -> tuple[list[list[int]], list[list[float]]] | None:
+    ) -> tuple[tuple[list[list[int]], list[list[float]]] | None, int]:
         feature_names, intensities_available = self.dataset_design.get_exact_column_names(
             ordered_symbols,
             cells.columns,
@@ -457,12 +466,12 @@ class CellManifestsParser(SourceToADIParser):
         }
 
         discrete_matrix = cells[dichotomized_columns].astype(int).to_numpy()
-        data_arrays: dict[int, int] = {}
+        #data_arrays: dict[int, int] = {}
         phenotype_bytes: dict[int, bytes] = {}
         for cell_id, row in zip(cell_ids, discrete_matrix):
-            compressed = self._compress_bitmask(row)
-            data_arrays[cell_id] = compressed
-            phenotype_bytes[cell_id] = int(compressed).to_bytes(8, 'little')
+            mask = self._bitmask(row)
+            #data_arrays[cell_id] = mask
+            phenotype_bytes[cell_id] = int(mask).to_bytes(8, 'little')
 
         #writer.write_specimen(data_arrays, measurement_study, specimen)
 
@@ -506,9 +515,9 @@ class CellManifestsParser(SourceToADIParser):
             #    measurement_study,
             #    specimen,
             #)
-
-            #compressed_blob = CompressedMatrixWriter.form_intensities_compressed_blob(intensity_arrays)
-            #cache_store.put_blob(self.study_name, specimen, FEATURE_MATRIX_WITH_INTENSITIES, compressed_blob)
+            compressed_blob = CompressedMatrixWriter.form_intensities_compressed_blob(intensity_arrays)
+            cache_store.put_blob(self.study_name, specimen, FEATURE_MATRIX_WITH_INTENSITIES, compressed_blob)
+            logger.info('Forming and saving intensities sample (FEATURE_MATRIX_WITH_INTENSITIES).')
             if subsampled_remaining > 0:
                 sample_count = min(len(discrete_matrix), subsampled_remaining)
                 umap_sample = (
@@ -516,15 +525,15 @@ class CellManifestsParser(SourceToADIParser):
                     intensity_matrix[:sample_count].astype(float).tolist(),
                 )
         self._record_timepoint('Done skimming subsample.')
-        return umap_sample
+        return (umap_sample, cells.shape[0])
 
     @staticmethod
-    def _compress_bitmask(values) -> int:
-        compressed = 0
+    def _bitmask(values) -> int:
+        mask = 0
         for index, value in enumerate(values):
             if int(value) != 0:
-                compressed |= 1 << index
-        return compressed
+                mask |= 1 << index
+        return mask
 
     @staticmethod
     def _build_umap_frame(

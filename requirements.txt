@@ -8,7 +8,7 @@ anndata==0.12.6
 annotated-doc==0.0.4
 annotated-types==0.7.0
 annsel==0.1.2
-anyio==4.12.1
+anyio==4.13.0
 array-api-compat==1.14.0
 attrs==26.1.0
 blosc2==4.1.2
@@ -66,7 +66,7 @@ msgpack==1.1.2
 multidict==6.7.1
 multipledispatch==1.0.0
 multiscale-spatial-image==2.0.3
-narwhals==2.18.0
+narwhals==2.18.1
 natsort==8.4.0
 ndindex==1.10.1
 networkx==3.6.1
@@ -127,7 +127,7 @@ slicerator==1.1.0
 sortedcontainers==2.4.0
 spatial-image==1.2.3
 spatialdata==0.7.2
-spatialdata-plot==0.2.14
+spatialdata-plot==0.3.0
 sqlalchemy==2.0.48
 squidpy==1.8.1
 starlette==1.0.0

@@ -1,6 +1,7 @@
 """Utility to report study names in database."""
 import argparse
 
+from psycopg import Cursor as PsycopgCursor
 from smprofiler.db.database_connection import get_and_validate_database_config
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.workflow.common.cli_arguments import add_argument
@@ -16,15 +17,18 @@ from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger('smprofiler db count-cells')
 
+def insert_count(count: int, cursor: PsycopgCursor) -> None:
+    table = 'all_samples_count'
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS {table} (count INTEGER);')
+    cursor.execute(f'DELETE FROM {table} ;')
+    cursor.execute(f'INSERT INTO {table} VALUES ({count});')
+
 def _cache_counts(study: str, database_config_file: str) -> None:
     with DBCursor(database_config_file=database_config_file, study=study) as cursor:
-        table = 'all_samples_count'
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS {table} (count INTEGER);')
         access = StudyAccess(cursor)
         count = access.get_number_cells(study, verbose=True)
         logger.info(f'Saving: {count} ({study})')
-        cursor.execute(f'DELETE FROM {table} ;')
-        cursor.execute(f'INSERT INTO {table} VALUES ({count});')
+        insert_count(count, cursor)
 
 def cache_counts(database_config_file) -> None:
     study_names = retrieve_study_names(database_config_file)

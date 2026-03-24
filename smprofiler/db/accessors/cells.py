@@ -41,15 +41,8 @@ class CellsAccess(SimpleReadOnlyProvider):
         accept_encoding: tuple[str, ...] = (),
     ) -> tuple[CellsData, str | None]:
         if cell_identifiers == ():
-            self.cursor.execute(
-                '''
-                SELECT blob_contents
-                FROM ondemand_studies_index
-                WHERE specimen=%s AND blob_type=%s;
-                ''',
-                (sample, VIRTUAL_SAMPLE_COMPRESSED if sample == VIRTUAL_SAMPLE else 'cell_data_brotli'),
-            )
-            compressed = self.cursor.fetchone()
+            blob_type = VIRTUAL_SAMPLE_COMPRESSED if sample == VIRTUAL_SAMPLE else 'cell_data_brotli'
+            compressed = self._retrieve_blob(sample, blob_type)
             if compressed is None:
                 logger.error(f'Requested "br" (Brotli) compressed blob that does not exist for {sample}.')
                 return bytes(), None

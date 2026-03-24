@@ -56,7 +56,7 @@ msgpack==1.1.2
 multidict==6.7.1
 multipledispatch==1.0.0
 multiscale-spatial-image==2.0.3
-narwhals==2.18.0
+narwhals==2.18.1
 natsort==8.4.0
 networkx==3.6.1
 numba==0.62.1
@@ -110,7 +110,7 @@ slicerator==1.1.0
 sortedcontainers==2.4.0
 spatial-image==1.2.3
 spatialdata==0.7.2
-spatialdata-plot==0.2.14
+spatialdata-plot==0.3.0
 squidpy==1.8.1
 statsmodels==0.14.6
 tabulate==0.10.0
