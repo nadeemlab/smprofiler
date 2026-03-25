@@ -33,7 +33,7 @@ from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
 
 logger = colorized_logger(__name__)
 
-UMAP_POINT_LIMIT = 100000
+UMAP_POINT_LIMIT = 40000
 
 class NoContinuousIntensityDataError(ValueError):
     pass
@@ -135,34 +135,44 @@ class UMAPCreator:
         ordered_symbols: list[str] | None = None,
     ) -> None:
         data_array = self._create_data_array(discrete, ordered_symbols=ordered_symbols)
-        blob = bytearray()
-        for histological_structure_id, entry in data_array.items():
-            blob.extend(histological_structure_id.to_bytes(8, 'little'))
-            blob.extend(entry.to_bytes(8, 'little'))
-        centroid_data = {
-            VIRTUAL_SAMPLE_SPEC2[0]: dict(tuple(
-                zip(tuple(discrete.index.astype(int)), tuple(zip(reduced[:,0], reduced[:,1])))
-            ))
-        }
+#        blob = bytearray()
+#        for histological_structure_id, entry in data_array.items():
+#            blob.extend(histological_structure_id.to_bytes(8, 'little'))
+#            blob.extend(entry.to_bytes(8, 'little'))
+        #centroid_data = {
+        #    VIRTUAL_SAMPLE_SPEC2[0]: dict(tuple(
+        #        zip(tuple(discrete.index.astype(int)), tuple(zip(reduced[:,0], reduced[:,1])))
+        #    ))
+        #}
 
-        logger.info('Saving UMAP centroids and feature matrix.')
+        centroids = dict(tuple(
+            zip(tuple(discrete.index.astype(int)), tuple(zip(reduced[:,0], reduced[:,1])))
+        ))
+
+        phenotype_bytes = {cell_id: integer.to_bytes(8, 'little') for cell_id, integer in data_array.items()}
+       
+        raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
+        compressed = brotli.compress(raw, quality=11, lgwin=24)
         cache_store = get_cache_store(self.database_config_file)
         self._drop_existing_umap_cache(cache_store)
-        cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1], blob, drop_first=True)
-        cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1], pickle.dumps(centroid_data), drop_first=True)
-        logger.info('Done.')
+        cache_store.put_blob(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED, compressed)
+        logger.info('Saved UMAP centroids and feature matrix combo.')
+
+
+        #logger.info('Saving UMAP centroids and feature matrix.')
+        #cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1], blob, drop_first=True)
+        #cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1], pickle.dumps(centroid_data), drop_first=True)
+        #logger.info('Done.')
 
         logger.info('Saving UMAP specialized intensities matrix.')
-
-        logger.info('SKIPPING.')
-        #intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=ordered_symbols)
-        #intensities_dict = {int(i): tuple(float(intensities.loc[i, c]) for c in intensities.columns) for i in intensities.index}
-        #cache_store.put_blob(
-        #    self.study,
-        #    VIRTUAL_SAMPLE,
-        #    FEATURE_MATRIX_WITH_INTENSITIES,
-        #    CompressedMatrixWriter.form_intensities_compressed_blob(intensities_dict),
-        #)
+        intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=ordered_symbols)
+        intensities_dict = {int(i): tuple(float(intensities.loc[i, c]) for c in intensities.columns) for i in intensities.index}
+        cache_store.put_blob(
+            self.study,
+            VIRTUAL_SAMPLE,
+            FEATURE_MATRIX_WITH_INTENSITIES,
+            CompressedMatrixWriter.form_intensities_compressed_blob(intensities_dict),
+        )
         logger.info('Done.')
 
     def _drop_existing_umap_cache(self, cache_store):

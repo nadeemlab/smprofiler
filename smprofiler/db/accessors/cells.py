@@ -40,6 +40,13 @@ class CellsAccess(SimpleReadOnlyProvider):
         cell_identifiers: tuple[int, ...] = (),
         accept_encoding: tuple[str, ...] = (),
     ) -> tuple[CellsData, str | None]:
+        """
+        The location and discrete phenotype data for each cell in a given sample.
+        The format is the custom optimized binary format.
+
+        Individual cell identifiers are temporarily not supported and for cases
+        involving such identifiers a different method should be used.
+        """
         if cell_identifiers == ():
             blob_type = VIRTUAL_SAMPLE_COMPRESSED if sample == VIRTUAL_SAMPLE else 'cell_data_brotli'
             compressed = self._retrieve_blob(sample, blob_type)
@@ -52,21 +59,17 @@ class CellsAccess(SimpleReadOnlyProvider):
                 raw = brotli.decompress(compressed[0])
                 return raw, None
         raise ValueError('Unhandled case for requested cells data.')
-        #raw = CellsAccess._zip_location_and_phenotype_data(
-        #    self._get_location_data(sample, cell_identifiers),
-        #    self._get_phenotype_data(sample, cell_identifiers),
-        #)
-
-        #if "zstd" in accept_encoding:
-        #    return zstandard.compress(raw), "zstd"
-
-        #return raw, None
 
     def get_cells_data_intensity(
         self,
         sample: str,
         accept_encoding: tuple[str, ...] = (),
     ) -> CellsData:
+        """
+        The channel intensity values for each cell in a given sample.
+        The format is the custom optimized binary format, the variant with custom
+        8-bit floats.
+        """
         if accept_encoding != ('br',):
             raise ValueError('Only "br" (brotli) encoding is supported.')
         compressed = self._retrieve_blob(sample, FEATURE_MATRIX_WITH_INTENSITIES)
@@ -81,6 +84,11 @@ class CellsAccess(SimpleReadOnlyProvider):
         return cast(bytes, compressed[0])
 
     def _retrieve_blob(self, sample: str, blob_type: str) -> tuple[bytes] | None:
+        """
+        General purpose retrieval of the binary objects stored in the database.
+        These are feature matrices of various types. See `ondemand.defaults.py`
+        for some of the valid blob types.
+        """
         self.cursor.execute(
             '''
             SELECT blob_contents
@@ -96,6 +104,10 @@ class CellsAccess(SimpleReadOnlyProvider):
         study: str,
         accept_encoding: tuple[str, ...] = (),
     ) -> CellsData:
+        """
+        Like get_cells_data but for the specific case of the whole-study
+        subsample.
+        """
         if accept_encoding != ('br',):
             raise ValueError('Only "br" (brotli) encoding is supported.')
         compressed = self._retrieve_blob('', FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY)
@@ -108,6 +120,10 @@ class CellsAccess(SimpleReadOnlyProvider):
         study: str,
         accept_encoding: tuple[str, ...] = (),
     ) -> CellsData:
+        """
+        Like get_cells_data_intensity but for the specific case of the whole-
+        study subsample.
+        """
         if accept_encoding != ('br',):
             raise ValueError('Only "br" (brotli) encoding is supported.')
         compressed = self._retrieve_blob('', WHOLE_STUDY_SUBSAMPLE_BINARY_ONLY)
@@ -188,6 +204,9 @@ class CellsAccess(SimpleReadOnlyProvider):
         location_data: dict[int, tuple[float, float]],
         phenotype_data: dict[int, bytes],
     ) -> CellsData:
+        """
+        Possibly should move to parsing.
+        """
         identifiers = sorted(list(location_data.keys()))
         _identifiers = sorted(list(phenotype_data.keys()))
         if _identifiers != identifiers:

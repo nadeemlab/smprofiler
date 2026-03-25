@@ -466,29 +466,10 @@ class CellManifestsParser(SourceToADIParser):
         }
 
         discrete_matrix = cells[dichotomized_columns].astype(int).to_numpy()
-        #data_arrays: dict[int, int] = {}
         phenotype_bytes: dict[int, bytes] = {}
         for cell_id, row in zip(cell_ids, discrete_matrix):
             mask = self._bitmask(row)
-            #data_arrays[cell_id] = mask
             phenotype_bytes[cell_id] = int(mask).to_bytes(8, 'little')
-
-        #writer.write_specimen(data_arrays, measurement_study, specimen)
-
-        #self._record_timepoint('Forming discrete phenotype data and saving it to cache. ')
-        #blob = CompressedMatrixWriter.form_phenotype_data_compressed_blob(data_arrays)
-        #cache_store.put_blob(self.study_name, specimen, 'feature_matrix', blob, drop_first=True)
-        #self._record_timepoint('Done saving discrete phenotype data.')
-
-        #self._record_timepoint('Putting centroids in cache.')
-        #cache_store.put_blob(
-        #    self.study_name,
-        #    specimen,
-        #    'centroids',
-        #    pickle.dumps({specimen: centroids}),
-        #    drop_first=True,
-        #)
-        #self._record_timepoint('Done putting centroids in cache.')
 
         self._record_timepoint('Aggregating location and phenotype data.')
         raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
@@ -503,29 +484,24 @@ class CellManifestsParser(SourceToADIParser):
         )
         self._record_timepoint('Done putting compressed/aggregated location and phenotype data in cache.')
 
-        umap_sample: tuple[list[list[int]], list[list[float]]] | None = None
+        subsample: tuple[list[list[int]], list[list[float]]] | None = None
         if intensities_available:
             intensity_matrix = cells[intensity_columns].astype(float).to_numpy()
             scale = 1.0 / 10.0
             intensity_arrays: dict[int, tuple[float, ...]] = {}
             for cell_id, row in zip(cell_ids, intensity_matrix):
                 intensity_arrays[cell_id] = tuple(float(value) * scale for value in row)
-            #writer._write_intensities_data_array_to_db(
-            #    intensity_arrays,
-            #    measurement_study,
-            #    specimen,
-            #)
             compressed_blob = CompressedMatrixWriter.form_intensities_compressed_blob(intensity_arrays)
             cache_store.put_blob(self.study_name, specimen, FEATURE_MATRIX_WITH_INTENSITIES, compressed_blob)
             logger.info('Forming and saving intensities sample (FEATURE_MATRIX_WITH_INTENSITIES).')
             if subsampled_remaining > 0:
                 sample_count = min(len(discrete_matrix), subsampled_remaining)
-                umap_sample = (
+                subsample = (
                     discrete_matrix[:sample_count].astype(int).tolist(),
                     intensity_matrix[:sample_count].astype(float).tolist(),
                 )
         self._record_timepoint('Done skimming subsample.')
-        return (umap_sample, cells.shape[0])
+        return (subsample, cells.shape[0])
 
     @staticmethod
     def _bitmask(values) -> int:
