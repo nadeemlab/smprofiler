@@ -23,13 +23,13 @@ from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.ondemand.cache_store import get_cache_store
 
-warnings.simplefilter(action='ignore', category=pd_errors.PerformanceWarning)
-warnings.filterwarnings(action='ignore', message='n_jobs value 1 overridden to 1 by setting random_state. Use no seed for parallelism.')
-
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC1
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC2
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
+
+warnings.simplefilter(action='ignore', category=pd_errors.PerformanceWarning)
+warnings.filterwarnings(action='ignore', message='n_jobs value 1 overridden to 1 by setting random_state. Use no seed for parallelism.')
 
 logger = colorized_logger(__name__)
 
@@ -54,7 +54,7 @@ class UMAPCreator:
         self,
         continuous: DataFrame,
         discrete: DataFrame,
-        ordered_symbols: list[str],
+        ordered_symbols: tuple[str, ...],
     ) -> None:
         if all(continuous.isna().all()):
             raise NoContinuousIntensityDataError
