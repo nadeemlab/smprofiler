@@ -1,28 +1,20 @@
 """Source file parsing for cell-level data."""
-
-from io import BytesIO as StringIO
-import base64
-import pickle
 from typing import cast
 
-import shapefile  # type: ignore
 from pandas import read_csv
 from pandas import DataFrame 
 from pandas import MultiIndex
 from psycopg import Connection as PsycopgConnection
-import brotli  # type: ignore
+import brotli
 
 from smprofiler.db.scripts.count_cells import insert_count
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.workflow.tabular_import.tabular_dataset_design\
     import TabularCellMetadataDesign
-from smprofiler.workflow.common.file_io import compute_sha256
 from smprofiler.workflow.common.logging.performance_timer import PerformanceTimerReporter
 from smprofiler.workflow.common.file_identifier_schema \
     import get_input_filename_by_identifier
 from smprofiler.db.source_file_parser_interface import SourceToADIParser
-from smprofiler.workflow.tabular_import.parsing.range_definition import RangeDefinition
-from smprofiler.workflow.tabular_import.parsing.range_definition import RangeDefinitionFactory
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
 from smprofiler.ondemand.cache_store import get_cache_store
@@ -34,31 +26,43 @@ from smprofiler.workflow.common.umap_creation import UMAP_POINT_LIMIT
 
 logger = colorized_logger(__name__)
 
+class Timing:
+    """Yet another wrapper around the performance timer. To clean up the calling syntax."""
+    timer: PerformanceTimerReporter
+
+    def start(self) -> None:
+        self.timer = PerformanceTimerReporter('performance_report.tsv', logger, verbose=True)
+
+    def timepoint(self, name: str) -> None:
+        self.timer.record_timepoint(name)
+
+    def wrap_up(self) -> None:
+        self.timer.wrap_up_timer()
+
 
 class CellManifestsParser(SourceToADIParser):
-    """Source file parsing for metadata at the level of the cell manifest set."""
-    scope: RangeDefinition | None
-    timer: PerformanceTimerReporter
+    """Source file parsing for cell data."""
+    timer: Timing
     connection: PsycopgConnection
+    cache_store: CacheStore
 
     def __init__(self, fields, **kwargs):
         super().__init__(fields, **kwargs)
         self.dataset_design = TabularCellMetadataDesign(**kwargs)
-        self.scope = None
         self.study_name = cast(str | None, kwargs.get('study_name'))
         self.database_config_file = cast(str | None, kwargs.get('database_config_file'))
-        self.build_preprocessed_samples_in_memory = bool(kwargs.get('build_preprocessed_samples_in_memory', False))
+        self.cache_store = get_cache_store(self.database_config_file)
+        self.build_preprocessed_samples_in_memory = bool(kwargs.get('build_preprocessed_samples_in_memory', False)) # TODO: consider deprecation when refactoring complete
+        self.timer = Timing()
 
     def parse(self,
         connection: PsycopgConnection,
-        file_manifest_file,
-        chemical_species_identifiers_by_symbol,
+        file_manifest_file: str,
+        chemical_species_identifiers_by_symbol: dict[str, str],  # TODO: Finally remove this argument by pulling this from the database (even though it was just written and so is available to the parser).
     ):
-        """Retrieve each cell manifest, and parse records for:
-        - histological structure identification
-        - histological structure
-        - shape file
-        - expression quantification
+        """
+        Parse each sample's cell data file, creating specialized/custom binary
+        feature matrices, with discrete and continuous channels, etc.
         """
         self.connection = connection
         if self.build_preprocessed_samples_in_memory:
@@ -66,296 +70,46 @@ class CellManifestsParser(SourceToADIParser):
                 file_manifest_file,
                 chemical_species_identifiers_by_symbol,
             )
-            return
+        logger.error('Only build_preprocessed_samples_in_memory is supported.')
 
-        cursor = connection.cursor()
-        timer.record_timepoint('Cursor opened')
-        get_next = SourceToADIParser.get_next_integer_identifier
-        histological_structure_identifier_index = get_next('histological_structure', cursor)
-        shape_file_identifier_index = get_next('shape_file', cursor)
-        expression_quantification_index = self.get_expression_quantification_last_index(cursor) + 1
-        timer.record_timepoint('Retrieved next integer identifiers')
-        initial_indices: dict[str, int] = {   # type: ignore
-            'structure': histological_structure_identifier_index,
-            'shape file': shape_file_identifier_index,
-            'expression quantification': expression_quantification_index,
-        }
-        channel_symbols = self.get_channel_symbols(chemical_species_identifiers_by_symbol)
-        final_indices: dict[str, int] = {}
-        file_count = 1
-        for _, cell_manifest in self.get_cell_manifests(file_manifest_file).iterrows():
-            logger.debug(
-                'Considering contents of file "%s".',
-                cell_manifest['File ID'],
-            )
-            filename = get_input_filename_by_identifier(
-                input_file_identifier=cell_manifest['File ID'],
-                file_manifest_filename=file_manifest_file,
-            )
-            self.open_expression_quantification_scope(cell_manifest['Sample ID'], initial_indices['expression quantification'])
-            final_indices: dict[str, int] = self.parse_cell_manifest(  # type: ignore
-                cursor,
-                filename,
-                channel_symbols,
-                initial_indices,
-                timer,
-                chemical_species_identifiers_by_symbol,
-            )
-            self.finalize_expression_quantification_scope(final_indices['expression quantification'] - 1, cursor)
-            initial_indices = final_indices
-            timer.record_timepoint('Completed cell manifest parsing')
-            message = 'Performance report %s:\n%s'
-            logger.debug(message, file_count, timer.report_string(organize_by='total time spent'))
-            file_count += 1
-            connection.commit()
-        cursor.close()
-        self._wrap_up_timer()
+    def _parse_and_build_preprocessed_samples(
+        self,
+        file_manifest_file: str,
+        chemical_species_identifiers_by_symbol: dict[str, str],
+    ) -> None:
+        """
+        Uses direct processing of each sample, only writing final products to the
+        database that are actually used by the application.
 
-    def open_expression_quantification_scope(self, scope_identifier: str, initial_index: int) -> None:
-        logger.debug('Opening range scope with %s.', initial_index)
-        self.scope = RangeDefinitionFactory.create(
-            scope_identifier,
-            initial_index,
-            'expression_quantification',
+        In the future the per-sample portion should be distributed over a multiprocessing
+        pool. This is not the default due to variable per-sample memory requirements, but
+        the balance of requested cores vs. available memory could be managed by the caller.
+        """
+        if self.study_name is None:
+            raise ValueError('study_name is required to build preprocessed_samples in memory.')
+        measurement_study, ordered_symbols, target_index_lookups, target_by_symbols = self._prepare_channel_metadata(
+            chemical_species_identifiers_by_symbol,
         )
-
-    def finalize_expression_quantification_scope(self, last_value: int, cursor):
-        logger.debug('Finalizing range scope with %s.', last_value)
-        RangeDefinitionFactory.finalize(cast(RangeDefinition, self.scope), last_value)
-        scope = cast(RangeDefinition, self.scope)
-        cursor.execute('''
-        INSERT INTO range_definitions(
-            scope_identifier,
-            tablename,
-            lowest_value,
-            highest_value
-        ) VALUES (%s, %s, %s, %s) ;
-        ''', (scope.scope_identifier, scope.tablename, scope.lowest_value, scope.highest_value))
-
-    def get_expression_quantification_last_index(self, cursor) -> int:
-        cursor.execute('SELECT MAX(range_identifier_integer) FROM expression_quantification ;')
-        last = cursor.fetchall()[0][0]
-        if last is None:
-            last = 0
-        return last
-
-    def insert_chunks(self,
-        cursor,
-        cells,
-        timer,
-        sha256_hash,
-        channel_symbols,
-        chemical_species_identifiers_by_symbol,
-        histological_structure_identifier_index,
-        shape_file_identifier_index,
-    ):
-        timer.record_timepoint('Retrieved and hashed a cell manifest')
-        chunk_size = 100000
-        for start in range(0, cells.shape[0], chunk_size):
-            timer.record_timepoint('Starting a chunk')
-            batch_cells_reference = cells.iloc[start:start + chunk_size]
-            batch_cells = batch_cells_reference.reset_index(drop=True)
-            records = {
-                'histological_structure': [],
-                'shape_file': [],
-                'histological_structure_identification': [],
-                'expression_quantification': [],
-            }
-            timer.record_timepoint('Subset cells dataframe on chunk')
-            get_columns = self.dataset_design.get_exact_column_names
-            feature_names, intensities_available = get_columns(channel_symbols, batch_cells.columns)
-            values = {
-                symbol: batch_cells[feature_names[symbol]]
-                for symbol in channel_symbols
-            }
-            timer.record_timepoint('Retrieved feature values on chunk')
-
-            logger.debug('Starting batch of cells that begins at index %s.', start)
-            timer.record_timepoint('Started per-cell iteration')
-            for j, cell in batch_cells.iterrows():
-                histological_structure_identifier = str(histological_structure_identifier_index)
-                histological_structure_identifier_index += 1
-                shape_file_identifier = str(shape_file_identifier_index)
-                shape_file_identifier_index += 1
-                timer.record_timepoint('Beginning of one cell iteration')
-                shape_file_contents = self.create_shape_file(cell, self.dataset_design)
-                timer.record_timepoint('Created shapefile contents')
-                records['histological_structure'].append((
-                    histological_structure_identifier,
-                    'cell',
-                ))
-                records['shape_file'].append((
-                    shape_file_identifier,
-                    'ESRI Shapefile SHP',
-                    shape_file_contents,
-                ))
-                records['histological_structure_identification'].append((
-                    histological_structure_identifier,
-                    sha256_hash,
-                    shape_file_identifier,
-                    '\\N',
-                    '',
-                    '',
-                    '',
-                ))
-                for symbol in channel_symbols:
-                    target = chemical_species_identifiers_by_symbol[symbol]
-                    discrete_value = values[symbol].iloc[j, 0]  # type: ignore
-                    if intensities_available:
-                        quantity = str(float(values[symbol].iloc[j, 1]))
-                    else:
-                        quantity = '\\N'
-                    records['expression_quantification'].append((
-                        histological_structure_identifier,
-                        target,
-                        quantity,
-                        '',
-                        '',
-                        'positive' if discrete_value == 1 else 'negative',
-                        '',
-                    ))
-
-            table_names = [
-                'histological_structure',
-                'shape_file',
-                'histological_structure_identification',
-                'expression_quantification',
-            ]
-            for tablename in table_names:
-                timer.record_timepoint('Started encoding one chunk')
-                values_file_contents = '\n'.join([
-                    '\t'.join(r) for r in records[tablename]
-                ]).encode('utf-8')
-                timer.record_timepoint('Started inserting chunk into local memory')
-                self.copy_from(cursor, values_file_contents, tablename)
-                timer.record_timepoint('Finished inserting one chunk')
-        expression_quantification_index = self.get_expression_quantification_last_index(cursor) + 1
-        return {
-            'structure' : histological_structure_identifier_index,
-            'shape file' : shape_file_identifier_index,
-            'expression quantification' : expression_quantification_index,
-        }
-
-    def copy_from(self, cursor, contents: bytes, tablename: str) -> None:
-        if tablename == 'expression_quantification':
-            columns = ('histological_structure', 'target', 'quantity', 'unit', 'quantification_method', 'discrete_value', 'discretization_method')
-            copy_command = f"COPY {tablename} ({', '.join(columns)}) FROM STDIN"
-        else:
-            copy_command = f'COPY {tablename} FROM STDIN'
-        with cursor.copy(copy_command) as copy:
-            copy.write(contents)
-
-    def parse_cell_manifest(self,
-        cursor,
-        filename,
-        channel_symbols,
-        initial_indices,
-        timer,
-        chemical_species_identifiers_by_symbol,
-    ):
-        histological_structure_identifier_index = initial_indices['structure']
-        shape_file_identifier_index = initial_indices['shape file']
-        sha256_hash = compute_sha256(filename)
-        cells = read_csv(filename, sep=',', na_filter=False).drop_duplicates()
-        count = self.get_number_known_cells(sha256_hash, cursor)
-        if count > 0 and count != cells.shape[0]:
-            logger.warning(
-                ('Found %s cells but %s already known from data source file "%s". '
-                    ' You may need to drop bad cell records from '
-                    'histological_structure_identification table, or check the source '
-                    'data file\'s integrity. For now, skipping this source file.'),
-                cells.shape[0],
-                count,
-                sha256_hash,
-            )
-            return {
-                'structure' : histological_structure_identifier_index,
-                'shape file' : shape_file_identifier_index,
-            }
-        if count == cells.shape[0]:
-            message = 'Found exactly %s cells recorded from data source file "%s". Skipping.'
-            logger.debug(message, count,  sha256_hash)
-            return {
-                'structure' : histological_structure_identifier_index,
-                'shape file' : shape_file_identifier_index,
-            }
-        if count == 0:
-            indices = self.insert_chunks(
-                cursor,
-                cells,
-                timer,
-                sha256_hash,
-                channel_symbols,
-                chemical_species_identifiers_by_symbol,
-                histological_structure_identifier_index,
-                shape_file_identifier_index,
-            )
-            logger.info('Parsed records for %s cells from "%s".', cells.shape[0], sha256_hash)
-            return indices
-        return None
-
-    def get_cell_manifests(self, file_manifest_file):
-        file_metadata = read_csv(file_manifest_file, sep='\t')
-        return file_metadata[
-            file_metadata['Data type'] == self.dataset_design.get_cell_manifest_descriptor()
-        ]
-
-    def get_channel_symbols(self, chemical_species_identifiers_by_symbol):
-        recognized_channel_symbols = self.dataset_design.get_channel_names()
-        symbols = set(chemical_species_identifiers_by_symbol.keys())
-        missing = symbols.difference(recognized_channel_symbols)
-        if len(missing) > 0:
-            logger.warning('Cannot find channel metadata for %s .', str(missing))
-        return symbols.difference(missing)
-
-    def get_number_known_cells(self, sha256_hash, cursor):
-        query = (
-            'SELECT COUNT(*) '
-            'FROM histological_structure_identification '
-            f'WHERE data_source = {self.get_placeholder()} ;'
-        )
-        cursor.execute(query, (sha256_hash,))
-        count = cursor.fetchall()[0][0]
-        return count
-
-    def get_polygon_coordinates(self, cell, dataset_design):
-        columns = dataset_design.get_box_limit_column_names()
-        extrema = [cell[c] for c in columns]
-        xmin, xmax, ymin, ymax = extrema
-        return [
-            [xmin, ymin],
-            [xmin, ymax],
-            [xmax, ymax],
-            [xmax, ymin],
-        ]
-
-    def create_shape_file(self, cell, dataset_design):
-        shp = StringIO()
-        shx = StringIO()
-        dbf = StringIO()
-        points = self.get_polygon_coordinates(cell, dataset_design)
-        points = points + [points[0]]
-        writer = shapefile.Writer(shp=shp, shx=shx, dbf=dbf, shapeType=shapefile.POLYGON)
-        writer.field('name', 'C')
-        writer.poly([points])
-        writer.record()
-        writer.close()
-        encoded = base64.b64encode(shp.getvalue())
-        ascii_representation = encoded.decode('utf-8')
-        return ascii_representation
-
-    def _start_timer(self) -> None:
-        self.timer = PerformanceTimerReporter('performance_report.tsv', logger, verbose=True)
-
-    def _record_timepoint(self, name: str) -> None:
-        self.timer.record_timepoint(name)
-
-    def _wrap_up_timer(self) -> None:
-        self.timer.wrap_up_timer()
+        extracts = self._loop_over_samples(file_manifest_file, ordered_symbols)
+        self._write_channel_metadata(measurement_study, file_manifest_file, target_index_lookups, target_by_symbols)
+        self._handle_umap_generation(extracts[0], extracts[1], ordered_symbols)
 
     def _prepare_channel_metadata(self, chemical_species_identifiers_by_symbol: dict[str, str]):
+        """
+        This gathers the channel metadata specific to our database schema, for:
+        1. The expressions index file, annotating all of our binary per-sample payloads.
+        2. The specific channel order, as needed during creation of these payloads
+           after parsing source files.
+
+        There are 3 aspects to each channel, sorted out here:
+        - `index`. The 0-based integer index of the *normalized sorted* channel in the
+          context of this study.
+        - `chemical_species` or `target`. The database index of a chemical species
+          (e.g. a specific protein).
+        - `symbol`. The string name of the channel/protein/target.
+        """
         measurement_study = SourceToADIParser.get_measurement_study_name(self.study_name)
-        channel_symbols = self.get_channel_symbols(chemical_species_identifiers_by_symbol)
+        channel_symbols = self._get_channel_symbols(chemical_species_identifiers_by_symbol)
         target_by_symbol = {
             symbol: chemical_species_identifiers_by_symbol[symbol]
             for symbol in channel_symbols
@@ -365,30 +119,23 @@ class CellManifestsParser(SourceToADIParser):
             for symbol, target in target_by_symbol.items()
         }
         ordered_targets = sorted(list(symbols_by_target.keys()))
-        ordered_symbols = [symbols_by_target[target] for target in ordered_targets]
+        ordered_symbols = tuple([symbols_by_target[target] for target in ordered_targets])
         target_index_lookup = {target: i for i, target in enumerate(ordered_targets)}
         target_index_lookups = {measurement_study: target_index_lookup}
         target_by_symbols = {measurement_study: target_by_symbol}
         return measurement_study, ordered_symbols, target_index_lookups, target_by_symbols
 
-    def _parse_and_build_preprocessed_samples(
+    def _loop_over_samples(
         self,
-        file_manifest_file,
-        chemical_species_identifiers_by_symbol,
-    ) -> None:
-        if self.study_name is None:
-            raise ValueError('study_name is required to build preprocessed_samples in memory.')
-        cache_store = get_cache_store(self.database_config_file)
-
-        measurement_study, ordered_symbols, target_index_lookups, target_by_symbols = self._prepare_channel_metadata(chemical_species_identifiers_by_symbol)
-
-        specimens_by_measurement_study: dict[str, list[str]] = {measurement_study: []}
+        file_manifest_file: str,
+        ordered_symbols: tuple[str, ...],
+        ) -> tuple[list[list[int]], list[list[float]]]:
         subsampled_discrete_rows: list[list[int]] = []
         subsampled_continuous_rows: list[list[float]] = []
         running_cell_count = 0
-        for _, cell_manifest in self.get_cell_manifests(file_manifest_file).iterrows():
-            self._start_timer()
-            self._record_timepoint('Starting one cell manifest')
+        for _, cell_manifest in self._get_cell_manifests(file_manifest_file).iterrows():
+            self.timer.start()
+            self.timer.timepoint('Starting one cell manifest')
             specimen = str(cell_manifest['Sample ID'])
             filename = get_input_filename_by_identifier(
                 input_file_identifier=str(cell_manifest['File ID']),
@@ -397,13 +144,12 @@ class CellManifestsParser(SourceToADIParser):
             if filename is None:
                 raise ValueError
             cells = read_csv(filename, sep=',', na_filter=False).drop_duplicates()
-            self._record_timepoint('Loaded one sample cells file.')
+            self.timer.timepoint('Loaded one sample cells file.')
             subsampled_remaining = UMAP_POINT_LIMIT - len(subsampled_discrete_rows)
             subsampled, cell_count = self._build_preprocessed_samples(
                 cells,
                 specimen,
                 ordered_symbols,
-                cache_store,
                 subsampled_remaining=subsampled_remaining,
             )
             if subsampled is not None:
@@ -411,22 +157,39 @@ class CellManifestsParser(SourceToADIParser):
                 subsampled_discrete_rows.extend(discrete_sample)
                 subsampled_continuous_rows.extend(continuous_sample)
             running_cell_count += cell_count
-            specimens_by_measurement_study[measurement_study].append(specimen)
-            self._record_timepoint(('Finished one cell manifest.'))
-            self._wrap_up_timer()
+            self.timer.timepoint(('Finished one cell manifest.'))
+            self.timer.wrap_up()
         cursor = self.connection.cursor()
         insert_count(running_cell_count, cursor)
         self.connection.commit()
         cursor.close()
+        return subsampled_discrete_rows, subsampled_continuous_rows
 
+    def _write_channel_metadata(
+        self,
+        measurement_study: str,
+        file_manifest_file: str,
+        target_index_lookups: dict[str, dict[str, int]],
+        target_by_symbols: dict[str, dict[str, str]],
+    ) -> None:
+        specimens_by_measurement_study = { measurement_study: [
+            str(cell_manifest['Sample ID'])
+            for _, cell_manifest in self._get_cell_manifests(file_manifest_file).iterrows()
+        ]}
         writer = CompressedMatrixWriter(self.database_config_file)
         writer.write_index(
             specimens_by_measurement_study,
             target_index_lookups,
             target_by_symbols,
         )
-        logger.info('Done writing channel metadata index to database.')
+        logger.info('Done writing channel metadata index to database.')  # TODO: verify that this is still used.
 
+    def _handle_umap_generation(
+        self,
+        subsampled_discrete_rows: list[list[int]],
+        subsampled_continuous_rows: list[list[float]],
+        ordered_symbols: tuple[str, ...],
+    ) -> None:
         if len(subsampled_continuous_rows) > 0:
             discrete_df = self._build_umap_frame(subsampled_discrete_rows, ordered_symbols, 'discrete_value')
             logger.info('Done preparing dataframe for discrete UMAP.')
@@ -441,12 +204,25 @@ class CellManifestsParser(SourceToADIParser):
         else:
             logger.warning('No continuous intensity data was found for UMAP creation.')
 
+    def _get_cell_manifests(self, file_manifest_file):
+        file_metadata = read_csv(file_manifest_file, sep='\t')
+        return file_metadata[
+            file_metadata['Data type'] == self.dataset_design.get_cell_manifest_descriptor()
+        ]
+
+    def _get_channel_symbols(self, chemical_species_identifiers_by_symbol: dict[str, str]) -> set[str]:
+        recognized_channel_symbols = self.dataset_design.get_channel_names()
+        symbols = set(chemical_species_identifiers_by_symbol.keys())
+        missing = symbols.difference(recognized_channel_symbols)
+        if len(missing) > 0:
+            logger.warning('Cannot find channel metadata for %s .', str(missing))
+        return symbols.difference(missing)
+
     def _build_preprocessed_samples(
         self,
         cells: DataFrame,
         specimen: str,
-        ordered_symbols: list[str],
-        cache_store: CacheStore,
+        ordered_symbols: tuple[str, ...],
         subsampled_remaining: int,
     ) -> tuple[tuple[list[list[int]], list[list[float]]] | None, int]:
         feature_names, intensities_available = self.dataset_design.get_exact_column_names(
@@ -471,18 +247,18 @@ class CellManifestsParser(SourceToADIParser):
             mask = self._bitmask(row)
             phenotype_bytes[cell_id] = int(mask).to_bytes(8, 'little')
 
-        self._record_timepoint('Aggregating location and phenotype data.')
+        self.timer.timepoint('Aggregating location and phenotype data.')
         raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
         compressed = brotli.compress(raw, quality=11, lgwin=24)
-        self._record_timepoint('Done aggregating location and phenotype data.')
-        cache_store.put_blob(
+        self.timer.timepoint('Done aggregating location and phenotype data.')
+        self.cache_store.put_blob(
             self.study_name,
             specimen,
             'cell_data_brotli',
             compressed,
             drop_first=True,
         )
-        self._record_timepoint('Done putting compressed/aggregated location and phenotype data in cache.')
+        self.timer.timepoint('Done putting compressed/aggregated location and phenotype data in cache.')
 
         subsample: tuple[list[list[int]], list[list[float]]] | None = None
         if intensities_available:
@@ -492,7 +268,7 @@ class CellManifestsParser(SourceToADIParser):
             for cell_id, row in zip(cell_ids, intensity_matrix):
                 intensity_arrays[cell_id] = tuple(float(value) * scale for value in row)
             compressed_blob = CompressedMatrixWriter.form_intensities_compressed_blob(intensity_arrays)
-            cache_store.put_blob(self.study_name, specimen, FEATURE_MATRIX_WITH_INTENSITIES, compressed_blob)
+            self.cache_store.put_blob(self.study_name, specimen, FEATURE_MATRIX_WITH_INTENSITIES, compressed_blob)
             logger.info('Forming and saving intensities sample (FEATURE_MATRIX_WITH_INTENSITIES).')
             if subsampled_remaining > 0:
                 sample_count = min(len(discrete_matrix), subsampled_remaining)
@@ -500,7 +276,7 @@ class CellManifestsParser(SourceToADIParser):
                     discrete_matrix[:sample_count].astype(int).tolist(),
                     intensity_matrix[:sample_count].astype(float).tolist(),
                 )
-        self._record_timepoint('Done skimming subsample.')
+        self.timer.timepoint('Done skimming subsample.')
         return (subsample, cells.shape[0])
 
     @staticmethod
@@ -514,7 +290,7 @@ class CellManifestsParser(SourceToADIParser):
     @staticmethod
     def _build_umap_frame(
         rows: list[list[int]] | list[list[float]],
-        ordered_symbols: list[str],
+        ordered_symbols: tuple[str, ...],
         modifier: str,
     ) -> DataFrame:
         columns = MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
