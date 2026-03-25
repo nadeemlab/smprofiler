@@ -9,11 +9,9 @@ import brotli
 
 from smprofiler.db.scripts.count_cells import insert_count
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
-from smprofiler.workflow.tabular_import.tabular_dataset_design\
-    import TabularCellMetadataDesign
+from smprofiler.workflow.tabular_import.tabular_dataset_design import TabularCellMetadataDesign
 from smprofiler.workflow.common.logging.performance_timer import PerformanceTimerReporter
-from smprofiler.workflow.common.file_identifier_schema \
-    import get_input_filename_by_identifier
+from smprofiler.workflow.common.file_identifier_schema import get_input_filename_by_identifier
 from smprofiler.db.source_file_parser_interface import SourceToADIParser
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
@@ -48,7 +46,6 @@ class CellManifestsParser(SourceToADIParser):
     study_name: str
     database_config_file: str | None
     cache_store: CacheStore
-    build_preprocessed_samples_in_memory: bool
     timer: Timing
     connection: PsycopgConnection
     subsampled_discrete_rows: list[list[int]]
@@ -60,7 +57,6 @@ class CellManifestsParser(SourceToADIParser):
         self.study_name = cast(str, kwargs.get('study_name'))
         self.database_config_file = cast(str | None, kwargs.get('database_config_file'))
         self.cache_store = get_cache_store(self.database_config_file)
-        self.build_preprocessed_samples_in_memory = bool(kwargs.get('build_preprocessed_samples_in_memory', False)) # TODO: consider deprecation when refactoring complete
         self.timer = Timing()
 
     def parse(self,
@@ -81,11 +77,10 @@ class CellManifestsParser(SourceToADIParser):
         dataset into its own PostgresQL schema.
         """
         self.connection = connection
-        if self.build_preprocessed_samples_in_memory:
-            self._parse_and_build_preprocessed_samples(
-                file_manifest_file,
-                chemical_species_identifiers_by_symbol,
-            )
+        self._parse_and_build_preprocessed_samples(
+            file_manifest_file,
+            chemical_species_identifiers_by_symbol,
+        )
         logger.error('Only build_preprocessed_samples_in_memory is supported.')
 
     def _parse_and_build_preprocessed_samples(
@@ -145,14 +140,17 @@ class CellManifestsParser(SourceToADIParser):
         self,
         file_manifest_file: str,
         ordered_symbols: tuple[str, ...],
-    ) -> tuple[list[list[int]], list[list[float]]]:
+    ):
         """
         Skeleton of loop over the samples.
         The real parsing is done in `_build_preprocessed_sample`.
         Subsamples are taken (for the purpose of later aggregation, for the UMAP).
+
+        The subsampling is now an instance-level attribute to save on passing, but
+        note that this breaks a potential future multiprocessing pool approach.
         """
-        subsampled_discrete_rows: list[list[int]] = []
-        subsampled_continuous_rows: list[list[float]] = []
+        self.subsampled_discrete_rows: list[list[int]] = []
+        self.subsampled_continuous_rows: list[list[float]] = []
         running_cell_count = 0
         for _, cell_manifest in self._get_cell_manifests(file_manifest_file).iterrows():
             self.timer.start()
@@ -166,7 +164,7 @@ class CellManifestsParser(SourceToADIParser):
                 raise ValueError
             cells = read_csv(filename, sep=',', na_filter=False).drop_duplicates()
             self.timer.timepoint('Loaded one sample cells file.')
-            subsampled_remaining = UMAP_POINT_LIMIT - len(subsampled_discrete_rows)
+            subsampled_remaining = UMAP_POINT_LIMIT - len(self.subsampled_discrete_rows)
             subsampled, cell_count = self._build_preprocessed_sample(
                 cells,
                 specimen,
@@ -175,8 +173,8 @@ class CellManifestsParser(SourceToADIParser):
             )
             if subsampled is not None:
                 discrete_sample, continuous_sample = subsampled
-                subsampled_discrete_rows.extend(discrete_sample)
-                subsampled_continuous_rows.extend(continuous_sample)
+                self.subsampled_discrete_rows.extend(discrete_sample)
+                self.subsampled_continuous_rows.extend(continuous_sample)
             running_cell_count += cell_count
             self.timer.timepoint(('Finished one cell manifest.'))
             self.timer.wrap_up()
@@ -184,58 +182,6 @@ class CellManifestsParser(SourceToADIParser):
         insert_count(running_cell_count, cursor)
         self.connection.commit()
         cursor.close()
-        return subsampled_discrete_rows, subsampled_continuous_rows
-
-    def _write_channel_metadata(
-        self,
-        measurement_study: str,
-        file_manifest_file: str,
-        target_index_lookups: dict[str, dict[str, int]],
-        target_by_symbols: dict[str, dict[str, str]],
-    ) -> None:
-        """
-        Creates a specialized expressions index file, annotating the binary payloads.
-        """
-        specimens_by_measurement_study = { measurement_study: [
-            str(cell_manifest['Sample ID'])
-            for _, cell_manifest in self._get_cell_manifests(file_manifest_file).iterrows()
-        ]}
-        writer = CompressedMatrixWriter(self.database_config_file)
-        writer.write_index(
-            specimens_by_measurement_study,
-            target_index_lookups,
-            target_by_symbols,
-        )
-        logger.info('Done writing channel metadata index to database.')  # TODO: verify that this is still used. If only the feature order is used, replace this with simpler tuple. Previously this was used for creating final product files from intermediate ones, but this is now done in one shot. As part of this consider deprecating CompressedMatrixWriter or renaming it and slimming it down.
-
-    def _handle_umap_generation(self, ordered_symbols: tuple[str, ...]) -> None:
-        if len(self.subsampled_continuous_rows) > 0:
-            discrete_df = self._build_umap_frame(self.subsampled_discrete_rows, ordered_symbols, 'discrete_value')
-            logger.info('Done preparing dataframe for discrete UMAP.')
-            continuous_df = self._build_umap_frame(self.subsampled_continuous_rows, ordered_symbols, 'quantity')
-            logger.info('Done preparing dataframe for continuous UMAP.')
-            creator = UMAPCreator(self.database_config_file, self.study_name)
-            try:
-                creator.create_from_dense_frames(continuous_df, discrete_df, ordered_symbols)
-                logger.info('Done creating UMAPs.')
-            except NoContinuousIntensityDataError:
-                logger.warning('No continuous intensity data was found for UMAP creation.')
-        else:
-            logger.warning('No continuous intensity data was found for UMAP creation.')
-
-    def _get_cell_manifests(self, file_manifest_file):
-        file_metadata = read_csv(file_manifest_file, sep='\t')
-        return file_metadata[
-            file_metadata['Data type'] == self.dataset_design.get_cell_manifest_descriptor()
-        ]
-
-    def _get_channel_symbols(self, chemical_species_identifiers_by_symbol: dict[str, str]) -> set[str]:
-        recognized_channel_symbols = self.dataset_design.get_channel_names()
-        symbols = set(chemical_species_identifiers_by_symbol.keys())
-        missing = symbols.difference(recognized_channel_symbols)
-        if len(missing) > 0:
-            logger.warning('Cannot find channel metadata for %s .', str(missing))
-        return symbols.difference(missing)
 
     def _build_preprocessed_sample(
         self,
@@ -298,6 +244,67 @@ class CellManifestsParser(SourceToADIParser):
         self.timer.timepoint('Done skimming subsample.')
         return (subsample, cells.shape[0])
 
+    def _write_channel_metadata(
+        self,
+        measurement_study: str,
+        file_manifest_file: str,
+        target_index_lookups: dict[str, dict[str, int]],
+        target_by_symbols: dict[str, dict[str, str]],
+    ) -> None:
+        """
+        Creates a specialized expressions index file, annotating the binary payloads.
+        """
+        specimens_by_measurement_study = { measurement_study: [
+            str(cell_manifest['Sample ID'])
+            for _, cell_manifest in self._get_cell_manifests(file_manifest_file).iterrows()
+        ]}
+        writer = CompressedMatrixWriter(self.database_config_file)
+        writer.write_index(
+            specimens_by_measurement_study,
+            target_index_lookups,
+            target_by_symbols,
+        )
+        logger.info('Done writing channel metadata index to database.')  # TODO: verify that this is still used. If only the feature order is used, replace this with simpler tuple. Previously this was used for creating final product files from intermediate ones, but this is now done in one shot. As part of this consider deprecating CompressedMatrixWriter or renaming it and slimming it down.
+
+    def _handle_umap_generation(self, ordered_symbols: tuple[str, ...]) -> None:
+        if len(self.subsampled_continuous_rows) > 0:
+            discrete_df = self._build_umap_frame(self.subsampled_discrete_rows, ordered_symbols, 'discrete_value')
+            logger.info('Done preparing dataframe for discrete UMAP.')
+            continuous_df = self._build_umap_frame(self.subsampled_continuous_rows, ordered_symbols, 'quantity')
+            logger.info('Done preparing dataframe for continuous UMAP.')
+            creator = UMAPCreator(self.database_config_file, self.study_name)
+            try:
+                creator.create_from_dense_frames(continuous_df, discrete_df, ordered_symbols)
+                logger.info('Done creating UMAPs.')
+            except NoContinuousIntensityDataError:
+                logger.warning('No continuous intensity data was found for UMAP creation.')
+        else:
+            logger.warning('No continuous intensity data was found for UMAP creation.')
+
+    def _build_umap_frame(
+        self,
+        rows: list[list[int]] | list[list[float]],
+        ordered_symbols: tuple[str, ...],
+        modifier: str,
+    ) -> DataFrame:
+        columns = MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
+        index = list(range(1, len(rows) + 1))
+        return DataFrame(rows, columns=columns, index=index)
+
+    def _get_cell_manifests(self, file_manifest_file):
+        file_metadata = read_csv(file_manifest_file, sep='\t')
+        return file_metadata[
+            file_metadata['Data type'] == self.dataset_design.get_cell_manifest_descriptor()
+        ]
+
+    def _get_channel_symbols(self, chemical_species_identifiers_by_symbol: dict[str, str]) -> set[str]:
+        recognized_channel_symbols = self.dataset_design.get_channel_names()
+        symbols = set(chemical_species_identifiers_by_symbol.keys())
+        missing = symbols.difference(recognized_channel_symbols)
+        if len(missing) > 0:
+            logger.warning('Cannot find channel metadata for %s .', str(missing))
+        return symbols.difference(missing)
+
     @staticmethod
     def _bitmask(values) -> int:
         mask = 0
@@ -306,12 +313,4 @@ class CellManifestsParser(SourceToADIParser):
                 mask |= 1 << index
         return mask
 
-    @staticmethod
-    def _build_umap_frame(
-        rows: list[list[int]] | list[list[float]],
-        ordered_symbols: tuple[str, ...],
-        modifier: str,
-    ) -> DataFrame:
-        columns = MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
-        index = list(range(1, len(rows) + 1))
-        return DataFrame(rows, columns=columns, index=index)
+

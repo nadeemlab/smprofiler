@@ -148,7 +148,6 @@ class DataSkimmer:
                 channels_file=_files['channels'],
                 study_name=study_name,
                 database_config_file=self.database_config_file,
-                build_preprocessed_samples_in_memory=True,
             ).parse(
                 connection,
                 _files['file manifest'],
