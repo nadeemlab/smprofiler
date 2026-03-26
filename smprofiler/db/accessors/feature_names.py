@@ -1,5 +1,7 @@
 from json import loads as json_loads
 
+from psycopg import Cursor as PsycopgCursor
+
 from smprofiler.db.accessors.primary_study import get_primary_study
 from smprofiler.ondemand.defaults import ORDERED_FEATURE_NAMES
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames

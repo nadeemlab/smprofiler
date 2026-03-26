@@ -9,7 +9,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import QuantileTransformer
 
-from smprofiler.workflow.common.sparse_matrix_puller import SparseMatrixPuller
+from smprofiler.compressed_matrix_handling import compress_bitwise_to_int
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.db.accessors.cells import CellsAccess
@@ -144,7 +144,7 @@ class UMAPCreator:
         data_array = {}
         for i, row in df_ordered.iterrows():
             binary = row.astype(int).to_numpy()
-            data_array[int(i)] = SparseMatrixPuller._compress_bitwise_to_int(binary)
+            data_array[int(i)] = compress_bitwise_to_int(binary)
         return data_array
 
 

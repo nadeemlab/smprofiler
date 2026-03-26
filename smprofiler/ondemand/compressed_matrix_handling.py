@@ -4,6 +4,7 @@ from typing import cast
 import json
 import brotli
 from numpy.typing import NDArray
+from numpy import arange
 
 from smprofiler.ondemand.defaults import ORDERED_FEATURE_NAMES
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -12,6 +13,10 @@ from smprofiler.standalone_utilities.float8 import decode as decode_float8
 from smprofiler.ondemand.cache_store import get_cache_store
 
 logger = colorized_logger(__name__)
+
+
+def compress_bitwise_to_int(feature_vector: NDArray) -> int:
+    return int(feature_vector.dot(1 << arange(feature_vector.size)))
 
 
 class CompressedMatrixHandling:
