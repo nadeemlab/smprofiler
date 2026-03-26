@@ -194,7 +194,7 @@ class CellManifestsParser(SourceToADIParser):
         dichotomized_columns = [feature_names[symbol][0] for symbol in ordered_symbols]
         intensity_columns = [feature_names[symbol][1] for symbol in ordered_symbols] if intensities_available else []
 
-        cell_ids = list(range(1, cells.shape[0] + 1))
+        cell_ids = list(range(cells.shape[0]))
         xmin, xmax, ymin, ymax = self.dataset_design.get_box_limit_column_names()
         centroid_x = (cells[xmin].astype(float) + cells[xmax].astype(float)) / 2.0
         centroid_y = (cells[ymin].astype(float) + cells[ymax].astype(float)) / 2.0
@@ -204,10 +204,7 @@ class CellManifestsParser(SourceToADIParser):
         }
 
         discrete_matrix = cells[dichotomized_columns].astype(int).to_numpy()
-        phenotype_bytes: dict[int, bytes] = {}
-        for cell_id, row in zip(cell_ids, discrete_matrix):
-            mask = self._bitmask(row)
-            phenotype_bytes[cell_id] = int(mask).to_bytes(8, 'little')
+        phenotype_bytes = CompressedMatrixWriter.form_phenotype_bytes(cell_ids, discrete_matrix)
 
         self.timer.timepoint('Aggregating location and phenotype data.')
         raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
@@ -302,13 +299,5 @@ class CellManifestsParser(SourceToADIParser):
         if len(missing) > 0:
             logger.warning('Cannot find channel metadata for %s .', str(missing))
         return symbols.difference(missing)
-
-    @staticmethod
-    def _bitmask(values) -> int:
-        mask = 0
-        for index, value in enumerate(values):
-            if int(value) != 0:
-                mask |= 1 << index
-        return mask
 
 

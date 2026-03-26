@@ -2,11 +2,13 @@
 
 from typing import cast
 import json
-import brotli  # type: ignore
+import brotli
+from numpy.typing import NDArray
 
 from smprofiler.ondemand.defaults import ORDERED_FEATURE_NAMES
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping
+from smprofiler.standalone_utilities.float8 import decode as decode_float8
 from smprofiler.ondemand.cache_store import get_cache_store
 
 logger = colorized_logger(__name__)
@@ -41,7 +43,7 @@ class CompressedMatrixWriter:
         return compressed_blob
 
     @staticmethod
-    def form_phenotype_data_compressed_blob(
+    def form_phenotype_data_compressed_blob( #TODO fix terminology # ALSO: NOT USED
         data_array: dict[int, int],
     ) -> bytearray:
         blob = bytearray()
@@ -49,4 +51,55 @@ class CompressedMatrixWriter:
             blob.extend(histological_structure_id.to_bytes(8, 'little'))
             blob.extend(entry.to_bytes(8, 'little'))
         return blob
+
+    @classmethod
+    def form_phenotype_bytes(cls, cell_ids: list[int], discrete_matrix: NDArray) -> dict[int, bytes]:
+        phenotype_bytes: dict[int, bytes] = {}
+        for cell_id, row in zip(cell_ids, discrete_matrix):
+            mask = cls._bitmask(row)
+            phenotype_bytes[cell_id] = int(mask).to_bytes(8, 'little')
+        return phenotype_bytes
+
+    @staticmethod
+    def _bitmask(values: NDArray) -> int:
+        mask = 0
+        for index, value in enumerate(values):
+            if int(value) != 0:
+                mask |= 1 << index
+        return mask
+
+    @staticmethod
+    def parse_rows_location_phenotype(blob: bytearray | bytes) -> tuple[tuple[float | int, ...], ...]:
+        width = 20
+        if len(blob) % width != 0:
+            raise ValueError('Locations/phenotype payload should have 20 bytes per row, including the header.')
+        number_rows = int(len(blob) / width)
+        rows = []
+        for i in range(1, number_rows):
+            row_i = width * i
+            id_sector = blob[row_i: row_i + 4]
+            id = int.from_bytes(id_sector)
+            x_sector = blob[row_i + 4: row_i + 8]
+            x = int.from_bytes(x_sector)
+            y_sector = blob[row_i + 8: row_i + 12]
+            y = int.from_bytes(y_sector)
+            p_int = int.from_bytes(blob[row_i + 12: row_i + 20])
+            phenotype_bits = [(p_int >> j) % 2 for j in range(64)]
+            rows.append(tuple([id, x, y] + phenotype_bits))
+        return tuple(rows)
+
+    @staticmethod
+    def parse_rows_intensity(blob: bytearray | bytes, number_features: int) -> tuple[tuple[float | int, ...], ...]:
+        width = 4 + number_features
+        if len(blob) % width != 0:
+            raise ValueError('Intensity payload should have 16 bytes per row.')
+        number_rows = int(len(blob) / width)
+        rows = []
+        for i in range(number_rows):
+            row_i = width * i
+            id_sector = blob[row_i: row_i + 4]
+            id = int.from_bytes(id_sector)
+            values = tuple([id] + [decode_float8(cast(bytes, blob[row_i + 4 + j])) for j in range(number_features)])
+            rows.append(values)
+        return tuple(rows)
 

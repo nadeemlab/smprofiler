@@ -5,8 +5,10 @@ from dataclasses import dataclass
 
 from pandas import DataFrame
 
+from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.accessors.cells import CellsData
+from smprofiler.db.accessors.feature_names import get_ordered_feature_names_abstract
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import retrieve_study_from_specimen
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
@@ -44,7 +46,6 @@ class FeatureMatrixExtractor:
         study: str | None = None,
         histological_structures: set[int] | None = None,
         continuous_also: bool = False,
-        retain_structure_id: bool = False,
     ) -> dict[str, MatrixBundle]:
         """Extract feature matrices for a specimen.
 
@@ -64,8 +65,6 @@ class FeatureMatrixExtractor:
             Whether to also calculate and return a DataFrame for each specimen with continuous
             channel information in addition to the default DataFrame which provides binary cast
             channel information.
-        retain_structure_id: bool = False
-            Whether to index cells by their histological structure ID rather than arbitrary indices.
 
         Returns
         -------
@@ -77,21 +76,19 @@ class FeatureMatrixExtractor:
                 3. `continuous_dataframe`, a DataFrame with continuous channel information if
                    continuous_also is true, otherwise this property is None.
         """
-        return self._extract(
+        return {specimen: self._extract(
             specimen=specimen,
             study=study,
             histological_structures=histological_structures,
             continuous_also=continuous_also,
-            retain_structure_id=retain_structure_id,
-        )
+        )}
 
     def _extract(self,
         specimen: str,
         study: str | None = None,
         histological_structures: set[int] | None = None,
         continuous_also: bool = False,
-        retain_structure_id: bool = False,
-    ) -> dict[str, MatrixBundle]:
+    ) -> MatrixBundle:
         if study is None:
             study = retrieve_study_from_specimen(self.database_config_file, specimen)
         if histological_structures is None:
@@ -105,12 +102,13 @@ class FeatureMatrixExtractor:
                 intensities = a.get_cells_data_intensity(specimen)
             else:
                 intensities = None
+        o = get_ordered_feature_names_abstract(study, self.cache_store)
+        feature_names = tuple(map(lambda e: e.symbol, o.names))
         return self._create_feature_matrices(
             location_phenotype,
             intensities,
             self._retrieve_phenotypes(study),
-            self._create_channel_information(data_arrays),
-            retain_structure_id,
+            feature_names,
         )
 
     def _retrieve_phenotypes(self, study_name: str) -> dict[str, PhenotypeCriteria]:
@@ -124,100 +122,31 @@ class FeatureMatrixExtractor:
         logger.info('Done retrieving phenotypes.')
         return phenotypes
 
-    def _create_feature_matrices(self,
-        bmatrix: CellsData,
+    def _create_feature_matrices(
+        self,
+        location_phenotype: CellsData,
+        intensities: CellsData | None,
         phenotypes: dict[str, PhenotypeCriteria],
-        channel_information: list[str],
-        retain_structure_id: bool,
-    ) -> dict[str, MatrixBundle]:
-        logger.info('Creating feature matrices from binary data arrays and centroids.')
-        matrices: dict[str, MatrixBundle] = {}
-        data_arrays_by_specimen = cast(
-            dict[str, dict[int, int]],
-            data_arrays['data arrays by specimen'],
-        )
-        for j, specimen in enumerate(sorted(list(data_arrays_by_specimen.keys()))):
-            logger.debug('Specimen %s .', specimen)
-            expressions = data_arrays_by_specimen[specimen]
-            coordinates = centroid_coordinates[specimen]
-            assert expressions.keys() == coordinates.keys(), \
-                f'Mismatched cells in expressions and coordinates ({len(expressions)} long vs. '\
-                f'({len(coordinates)}).'
-            rows = [
-                self._create_feature_matrix_row(
-                    coordinates[hs_id],
-                    expression,
-                    len(data_arrays['target index lookup']),
-                ) for hs_id, expression in expressions.items()
-            ]
-
-            expected_length = len(rows[0])
-            for row in rows:
-                if expected_length != len(row):
-                    lengths = (expected_length, len(row))
-                    message = 'Expression vectors not all the same lengths (%s, %s).'
-                    raise ValueError(message % lengths)
-
-            dataframe = DataFrame(
-                rows,
-                columns=['pixel x', 'pixel y'] + [f'C {cs}' for cs in channel_information],
-                index=tuple(expressions.keys()) if retain_structure_id else None,
-            )
-            for symbol, criteria in phenotypes.items():
-                dataframe[f'P {symbol}'] = (
-                    dataframe[[f'C {m}' for m in criteria.positive_markers]].all(axis=1) &
-                    ~dataframe[[f'C {m}' for m in criteria.negative_markers]].any(axis=1)
-                ).astype(int)
-            matrices[specimen] = MatrixBundle(dataframe, f'{j}.tsv')
-
-        if 'continuous data arrays by specimen' in data_arrays:
-            continuous_data_arrays_by_specimen = cast(
-                dict[str, dict[int, list[float]]],
-                data_arrays['continuous data arrays by specimen'],
-            )
-            specimens = list(continuous_data_arrays_by_specimen.keys())
-            for specimen in sorted(specimens):
-                logger.debug('Specimen %s .', specimen)
-                expression_vectors = continuous_data_arrays_by_specimen[specimen]
-                dataframe = DataFrame(
-                    expression_vectors.values(),
-                    columns=[f'C {cs}' for cs in channel_information],
-                    index=tuple(expression_vectors.keys()) if retain_structure_id else None,
-                )
-                matrices[specimen].continuous_dataframe = dataframe
-
-        logger.info('Done creating feature matrices.')
-        return matrices
-
-    @staticmethod
-    def _create_feature_matrix_row(
-        centroid: tuple[float, float],
-        binary: int,
-        number_channels: int,
-    ) -> list[float | int]:
-        template = '{0:0%sb}' % number_channels   # pylint: disable=consider-using-f-string
-        feature_vector = cast(list[float | int], [int(value) for value in list(template.format(binary)[::-1])])
-        if number_channels != len(feature_vector):
-            message = f'Expected binary-encoded integer {binary} to represent {number_channels} channels.'
-            raise ValueError(message)
-        return cast(list[float | int], list(centroid)) + feature_vector
-
-    def _create_channel_information(self,
-        study_information: dict[str, dict[str, Any]]
-    ) -> list[str]:
-        logger.info('Aggregating channel information for one study.')
-        targets = {
-            int(index): target
-            for target, index in study_information['target index lookup'].items()
-        }
-        symbols = {
-            target: symbol
-            for symbol, target in study_information['target by symbol'].items()
-        }
-        logger.info('Done aggregating channel information.')
-        return [
-            symbols[targets[i]] for i in sorted([int(index) for index in targets.keys()])
-        ]
+        channel_information: tuple[str, ...],
+    ) -> MatrixBundle:
+        logger.info('Creating feature matrices from location/phenotype payload and intensities payload if available.')
+        rows = CompressedMatrixWriter.parse_rows_location_phenotype(location_phenotype)
+        channels = [f'C {cs}' for cs in channel_information]
+        dataframe = DataFrame(rows, columns=['id', 'pixel x', 'pixel y'] + channels)
+        if intensities is not None:
+            rows = CompressedMatrixWriter.parse_rows_intensity(intensities, len(channel_information))
+            i = DataFrame(rows, columns=['id'] + channels)
+        else:
+            i = None
+        for symbol, criteria in phenotypes.items():
+            dataframe[f'P {symbol}'] = (
+                dataframe[[f'C {m}' for m in criteria.positive_markers]].all(axis=1) &
+                ~dataframe[[f'C {m}' for m in criteria.negative_markers]].any(axis=1)
+            ).astype(int)
+        bundle = MatrixBundle(dataframe, '0.tsv')
+        if i is not None:
+            bundle.continuous_dataframe = i
+        return bundle
 
     def extract_cohorts(self, study: str) -> dict[str, DataFrame]:
         """Extract specimen cohort information for every specimen in a study."""
@@ -252,3 +181,5 @@ class FeatureMatrixExtractor:
         for row in rows:
             lookup.add(row[0])
         return lookup
+
+

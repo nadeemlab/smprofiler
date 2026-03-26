@@ -194,3 +194,5 @@ def encode_float8_with_clipping(value) -> bytes:
         else:
             encoded = encode(1.0)
     return encoded
+
+
