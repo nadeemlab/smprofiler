@@ -13,9 +13,6 @@ from smprofiler.db.stratification_puller import (
     StratificationPuller,
     Stratification,
 )
-from smprofiler.workflow.common.structure_centroids import StudyStructureCentroids
-from smprofiler.workflow.common.structure_centroids_puller import \
-    StructureCentroidsPuller
 from smprofiler.workflow.common.sparse_matrix_puller import (
     SparseMatrixPuller,
     StudyDataArrays,

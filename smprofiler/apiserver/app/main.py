@@ -651,7 +651,7 @@ async def get_cell_data_binary(
     _accept_encoding = tuple(enc.strip() for enc in accept_encoding.split(','))
 
     has_umap = query().has_umap(study)
-    if not sample in query().get_sample_names(study) and not (has_umap and sample == VIRTUAL_SAMPLE):
+    if sample not in query().get_sample_names(study) and not (has_umap and sample == VIRTUAL_SAMPLE):
         raise HTTPException(status_code=404, detail=f'Sample "{sample}" does not exist.')
 
     data, content_encoding = query().get_cells_data(study, sample, accept_encoding=_accept_encoding)

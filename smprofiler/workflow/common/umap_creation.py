@@ -1,25 +1,20 @@
 """The core calculator for the UMAP dimensional reduction."""
 import warnings
-import pickle
+import brotli
 
-import brotli  # type: ignore
-
-from pandas import DataFrame  # type: ignore
-import pandas.errors as pd_errors  # type: ignore
-
-from umap import UMAP  # type: ignore
-from sklearn.impute import SimpleImputer  # type: ignore
-from sklearn.pipeline import make_pipeline  # type: ignore
-from sklearn.preprocessing import QuantileTransformer  # type: ignore
+from pandas import DataFrame
+import pandas.errors as pd_errors
+from umap import UMAP
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import QuantileTransformer
 
 from smprofiler.workflow.common.sparse_matrix_puller import SparseMatrixPuller
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
-
-
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.database_connection import DBCursor
-from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping
+from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping # Why not used? Maybe this is why the UMAP intensities are wrong
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.ondemand.cache_store import get_cache_store
 

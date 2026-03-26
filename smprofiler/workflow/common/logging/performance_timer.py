@@ -1,4 +1,5 @@
-"""A convenience reporter of time performance. Keeps track of time used by specific named processes
+"""
+A convenience reporter of time performance. Keeps track of time used by specific named processes
 and reports an aggregation as a text table.
 """
 
@@ -42,7 +43,7 @@ class PerformanceTimer:
             self.times[(message, self.previous_message)].append(diff)
         self.previous_time = now
         self.previous_message = message
-        if not message in self.message_order:
+        if message not in self.message_order:
             number = len(self.message_order)
             self.message_order[message] = number
 

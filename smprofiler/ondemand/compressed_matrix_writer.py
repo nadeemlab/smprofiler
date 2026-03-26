@@ -23,18 +23,6 @@ class CompressedMatrixWriter:
         self.database_config_file = cast(str, database_config_file)
         self.cache_store = get_cache_store(database_config_file)
 
-    def write_specimen(
-        self,
-        data: dict[int, int] | dict[int, tuple[float, ...]],
-        study_name: str,
-        specimen: str,
-        continuous: bool=False,
-    ) -> None:
-        if continuous:
-            self._write_intensities_data_array_to_db(cast(dict[int, tuple[float, ...]], data), study_name, specimen)
-        else:
-            self._write_data_array_to_db(cast(dict[int, int], data), study_name, specimen)
-
     def write_index(self,
         specimens_by_measurement_study: dict[str, list[str]],
         target_index_lookups: dict,

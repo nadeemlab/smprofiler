@@ -216,7 +216,6 @@ packages = [
 ]
 "smprofiler.ondemand.scripts" = [
     "read_expression_dump_file.py",
-    "assess_recreate_cache.py",
     "start.py",
 ]
 "smprofiler.db.scripts" = [
