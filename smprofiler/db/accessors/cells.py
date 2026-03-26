@@ -131,7 +131,7 @@ class CellsAccess(SimpleReadOnlyProvider):
     def get_ordered_feature_names(self) -> BitMaskFeatureNames:
         return get_ordered_feature_names(self.cursor)
 
-    @classmethod
+    @classmethod  # TODO: Move to parsing related in compressed matrix handling
     def _zip_location_and_phenotype_data(
         cls,
         location_data: dict[int, tuple[float, float]],

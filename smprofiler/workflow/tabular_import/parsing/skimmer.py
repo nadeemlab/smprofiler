@@ -6,18 +6,13 @@ import re
 from psycopg import sql
 from pandas import read_csv as pandas_read_csv
 
-from smprofiler.workflow.tabular_import.parsing.cell_manifests import \
-    CellManifestsParser
-from smprofiler.workflow.tabular_import.parsing.channels import \
-    ChannelsPhenotypesParser
-from smprofiler.workflow.tabular_import.parsing.cell_manifest_set import \
-    CellManifestSetParser
+from smprofiler.workflow.tabular_import.parsing.cell_manifests import CellManifestsParser
+from smprofiler.workflow.tabular_import.parsing.channels import ChannelsPhenotypesParser
+from smprofiler.workflow.tabular_import.parsing.cell_manifest_set import CellManifestSetParser
 from smprofiler.workflow.tabular_import.parsing.samples import SamplesParser
 from smprofiler.workflow.tabular_import.parsing.subjects import SubjectsParser
-from smprofiler.workflow.tabular_import.parsing.sample_stratification import \
-    SampleStratificationCreator
-from smprofiler.workflow.tabular_import.parsing.interventions import \
-    InterventionsParser
+from smprofiler.workflow.tabular_import.parsing.sample_stratification import SampleStratificationCreator
+from smprofiler.workflow.tabular_import.parsing.interventions import InterventionsParser
 from smprofiler.workflow.tabular_import.parsing.diagnosis import DiagnosisParser
 from smprofiler.workflow.tabular_import.parsing.study import StudyParser
 from smprofiler.db.database_connection import DBConnection
