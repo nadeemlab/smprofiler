@@ -9,7 +9,7 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import QuantileTransformer
 
-from smprofiler.compressed_matrix_handling import compress_bitwise_to_int
+from smprofiler.ondemand.compressed_matrix_handling import compress_bitwise_to_int
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.db.accessors.cells import CellsAccess

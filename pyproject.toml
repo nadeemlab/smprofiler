@@ -231,7 +231,6 @@ packages = [
     "interactive_uploader.py",
     "load_testing.py",
     "sync_annotations.py",
-    "count_cells.py",
     "cache_subsample.py",
 ]
 "smprofiler.db.data_model" = [

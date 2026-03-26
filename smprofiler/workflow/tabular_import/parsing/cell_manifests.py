@@ -8,6 +8,7 @@ from psycopg import Connection as PsycopgConnection
 from psycopg import Cursor as PsycopgCursor
 import brotli
 
+from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.workflow.tabular_import.tabular_dataset_design import TabularCellMetadataDesign
 from smprofiler.workflow.common.logging.performance_timer import PerformanceTimerReporter
@@ -210,7 +211,7 @@ class CellManifestsParser(SourceToADIParser):
         }
 
         discrete_matrix = cells[dichotomized_columns].astype(int).to_numpy()
-        phenotype_bytes = CompressMatrixHandling.form_phenotype_bytes(cell_ids, discrete_matrix)
+        phenotype_bytes = CompressedMatrixHandling.form_phenotype_bytes(cell_ids, discrete_matrix)
 
         self.timer.timepoint('Aggregating location and phenotype data.')
         raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
@@ -232,7 +233,7 @@ class CellManifestsParser(SourceToADIParser):
             intensity_arrays: dict[int, tuple[float, ...]] = {}
             for cell_id, row in zip(cell_ids, intensity_matrix):
                 intensity_arrays[cell_id] = tuple(float(value) * scale for value in row)
-            compressed_blob = CompressMatrixHandling.form_intensities_compressed_blob(intensity_arrays)
+            compressed_blob = CompressedMatrixHandling.form_intensities_compressed_blob(intensity_arrays)
             self.cache_store.put_blob(self.study_name, specimen, FEATURE_MATRIX_WITH_INTENSITIES, compressed_blob)
             logger.info('Forming and saving intensities sample (FEATURE_MATRIX_WITH_INTENSITIES).')
             if subsampled_remaining > 0:
@@ -252,7 +253,7 @@ class CellManifestsParser(SourceToADIParser):
         """
         Creates the feature order once and for all for the dataset, and saves it to the database.
         """
-        writer = CompressMatrixHandling(self.database_config_file)
+        writer = CompressedMatrixHandling(self.database_config_file)
         targets = {
             int(index): target
             for target, index in target_index_lookup.items()

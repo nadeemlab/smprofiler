@@ -42,7 +42,6 @@ dataframe and column/channel names lookup from any database that conforms to
 working directory, with filenames listed alongside specimen and channel name
 information in: features.json
 ''',
-
     )
     add_argument(parser, 'database config')
     add_argument(parser, 'study name')
