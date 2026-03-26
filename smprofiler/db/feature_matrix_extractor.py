@@ -1,6 +1,5 @@
 """Convenience provision of a feature matrix for each study, retrieved from the SMProfiler database."""
 
-from typing import cast, Any
 from dataclasses import dataclass
 
 from pandas import DataFrame
@@ -8,6 +7,7 @@ from pandas import DataFrame
 from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.accessors.cells import CellsData
+from smprofiler.db.accessors.study import StudyAccess
 from smprofiler.db.accessors.feature_names import get_ordered_feature_names_abstract
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import retrieve_study_from_specimen
@@ -42,7 +42,7 @@ class FeatureMatrixExtractor:
         self.cache_store = get_cache_store(database_config_file)
 
     def extract(self,
-        specimen: str,
+        specimen: str | None,
         study: str | None = None,
         histological_structures: set[int] | None = None,
         continuous_also: bool = False,
@@ -51,8 +51,8 @@ class FeatureMatrixExtractor:
 
         Parameters
         ----------
-        specimen: str
-            Which specimen to extract features for. 
+        specimen: str | None
+            Which specimen to extract features for. If None, all specimens for the study will be retrieved.
         study: str | None = None
             The study may be inferrable.
         histological_structures: set[int] | None = None
@@ -76,12 +76,18 @@ class FeatureMatrixExtractor:
                 3. `continuous_dataframe`, a DataFrame with continuous channel information if
                    continuous_also is true, otherwise this property is None.
         """
-        return {specimen: self._extract(
-            specimen=specimen,
+        if specimen is None and study is None:
+            raise ValueError
+        specimens = (specimen,) if specimen else ()
+        if specimens == () and study is not None:
+            with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+                specimens = StudyAccess(cursor).get_specimen_names(study)
+        return {s: self._extract(
+            specimen=s,
             study=study,
             histological_structures=histological_structures,
             continuous_also=continuous_also,
-        )}
+        ) for s in specimens}
 
     def _extract(self,
         specimen: str,

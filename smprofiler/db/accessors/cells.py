@@ -137,70 +137,6 @@ class CellsAccess(SimpleReadOnlyProvider):
     def get_ordered_feature_names(self) -> BitMaskFeatureNames:
         return get_ordered_feature_names(self.cursor)
 
-    def _get_location_data(
-        self,
-        sample: str,
-        cell_identifiers: tuple[int, ...],
-    ) -> dict[int, tuple[float, float]]:
-        if sample == VIRTUAL_SAMPLE:
-            blob_type = VIRTUAL_SAMPLE_SPEC2[1]
-        else:
-            blob_type = 'centroids'
-        locations: dict[int, tuple[float, float]] = pickle_loads(
-            fetch_one_or_else(
-                '''
-                SELECT blob_contents
-                FROM ondemand_studies_index
-                WHERE specimen=%s AND blob_type=%s;
-                ''',
-                (sample, blob_type),
-                self.cursor,
-                f'Requested centroids data for "{sample}" not found in database.'
-            )
-        )[sample]
-        if cell_identifiers == ():
-            return locations
-        return {key: locations[key] for key in set(cell_identifiers).intersection(locations.keys())}
-
-    def _get_phenotype_data(
-        self,
-        sample: str,
-        cell_identifiers: tuple[int, ...],
-    ) -> dict[int, bytes]:
-        if sample == VIRTUAL_SAMPLE:
-            blob_type = VIRTUAL_SAMPLE_SPEC1[1]
-        else:
-            blob_type = 'feature_matrix'
-        index_and_expressions = bytearray(fetch_one_or_else(
-            '''
-            SELECT blob_contents
-            FROM ondemand_studies_index
-            WHERE specimen=%s AND blob_type=%s;
-            ''',
-            (sample, blob_type),
-            self.cursor,
-            f'Requested phenotype data for "{sample}" not found in database.',
-        ))
-        byte_count = len(index_and_expressions)
-        if byte_count % 16 != 0:
-            message = f'Expected 16 bytes per cell in binary representation of phenotype data, got {byte_count}.'  # pylint: disable=line-too-long
-            logger.error(message)
-            raise ValueError(message)
-        bytes_iterator = index_and_expressions.__iter__()
-        masks = dict(
-            (int.from_bytes(batch[0:8], byteorder='little'), bytes(batch[8:16]))
-            for batch in self._batched(bytes_iterator, 16)
-        )
-        if cell_identifiers == ():
-            return masks
-        return {key: masks[key] for key in set(cell_identifiers).intersection(masks.keys())}
-
-    @staticmethod
-    def _batched(iterable: Iterable, batch_size: int):
-        iterator = iter(iterable)
-        while batch := tuple(islice(iterator, batch_size)):
-            yield batch
-
     @classmethod
     def _zip_location_and_phenotype_data(
         cls,
@@ -208,6 +144,8 @@ class CellsAccess(SimpleReadOnlyProvider):
         phenotype_data: dict[int, bytes],
     ) -> CellsData:
         """
+        Combines location and phenotype data row by row. Also includes a header.
+
         Possibly should move to parsing.
         """
         identifiers = sorted(list(location_data.keys()))
