@@ -93,7 +93,7 @@ python-dateutil==2.9.0.post0
 pytz==2026.1.post1
 pyyaml==6.0.3
 rangehttpserver==1.4.0
-requests==2.32.5
+requests==2.33.0
 rich==14.3.3
 s3fs==2026.2.0
 s3transfer==0.16.0
