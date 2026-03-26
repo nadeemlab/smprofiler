@@ -5,6 +5,7 @@ from pandas import read_csv
 from pandas import DataFrame 
 from pandas import MultiIndex
 from psycopg import Connection as PsycopgConnection
+from psycopg import Cursor as PsycopgCursor
 import brotli
 
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
