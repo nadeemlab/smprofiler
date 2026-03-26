@@ -7,7 +7,6 @@ from pandas import MultiIndex
 from psycopg import Connection as PsycopgConnection
 import brotli
 
-from smprofiler.db.scripts.count_cells import insert_count
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.workflow.tabular_import.tabular_dataset_design import TabularCellMetadataDesign
 from smprofiler.workflow.common.logging.performance_timer import PerformanceTimerReporter
@@ -37,6 +36,13 @@ class Timing:
 
     def wrap_up(self) -> None:
         self.timer.wrap_up_timer()
+
+
+def insert_count(count: int, cursor: PsycopgCursor) -> None:
+    table = 'all_samples_count'
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS {table} (count INTEGER);')
+    cursor.execute(f'DELETE FROM {table} ;')
+    cursor.execute(f'INSERT INTO {table} VALUES ({count});')
 
 
 class CellManifestsParser(SourceToADIParser):
