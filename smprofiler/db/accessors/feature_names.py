@@ -25,21 +25,4 @@ def get_ordered_feature_names(cursor: PsycopgCursor) -> BitMaskFeatureNames:
     return get_ordered_feature_names_abstract(study, cache_store)
 
 
-class RecordNotFoundInDatabaseError(ValueError):
-    pass
-
-
-# TODO: consider deprecation, check usage first
-def fetch_one_or_else(
-    query: str,
-    args: tuple,
-    cursor: PsycopgCursor,
-    error_message: str,
-) -> Any:
-    cursor.execute(query, args)
-    fetched = cursor.fetchone()
-    if fetched is None:
-        logger.error(error_message)
-        raise RecordNotFoundInDatabaseError(error_message)
-    return fetched[0]
 

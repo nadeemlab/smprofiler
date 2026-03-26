@@ -1,15 +1,10 @@
 """Convenience accessor of all cell data for a given sample."""
-from pickle import loads as pickle_loads
-from typing import Iterable
 from typing import cast
-from itertools import islice
 from itertools import product
 
 import brotli
 
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
-from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC1
-from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC2
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
@@ -17,7 +12,6 @@ from smprofiler.ondemand.defaults import WHOLE_STUDY_SUBSAMPLE_BINARY_ONLY
 from smprofiler.db.exchange_data_formats.cells import CellsData
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
 from smprofiler.db.database_connection import SimpleReadOnlyProvider
-from smprofiler.db.accessors.feature_names import fetch_one_or_else
 from smprofiler.db.accessors.feature_names import get_ordered_feature_names
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
