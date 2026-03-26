@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from pandas import DataFrame
 
-from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
+from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.accessors.cells import CellsData
 from smprofiler.db.accessors.study import StudyAccess
@@ -136,11 +136,11 @@ class FeatureMatrixExtractor:
         channel_information: tuple[str, ...],
     ) -> MatrixBundle:
         logger.info('Creating feature matrices from location/phenotype payload and intensities payload if available.')
-        rows = CompressedMatrixWriter.parse_rows_location_phenotype(location_phenotype)
+        rows = CompressedMatrixHandling.parse_rows_location_phenotype(location_phenotype)
         channels = [f'C {cs}' for cs in channel_information]
         dataframe = DataFrame(rows, columns=['id', 'pixel x', 'pixel y'] + channels)
         if intensities is not None:
-            rows = CompressedMatrixWriter.parse_rows_intensity(intensities, len(channel_information))
+            rows = CompressedMatrixHandling.parse_rows_intensity(intensities, len(channel_information))
             i = DataFrame(rows, columns=['id'] + channels)
         else:
             i = None

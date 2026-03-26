@@ -14,7 +14,7 @@ from smprofiler.db.accessors.study import StudyAccess
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.accessors.cells import NoContinuousIntensitiesError
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
-from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
+from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
 from smprofiler.ondemand.defaults import WHOLE_STUDY_SUBSAMPLE_BINARY_ONLY
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -49,7 +49,7 @@ class Subsampler:
     @classmethod
     def cache_exists(cls, study: str, database_config_file: str | None) -> bool:
         blob_type = FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
-        return CompressedMatrixWriter(database_config_file).blob_exists(study, '', blob_type)
+        return CompressedMatrixHandling(database_config_file).blob_exists(study, '', blob_type)
 
     def _continuous_intensity_example_available(self) -> bool:
         with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor:
@@ -90,7 +90,7 @@ class Subsampler:
         if self.verbose:
             logger.info('Writing blob to database.')
         blob_type = FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
-        CompressedMatrixWriter(self.database_config_file)._insert_blob(
+        CompressedMatrixHandling(self.database_config_file)._insert_blob(
             self.study, compressed_blob, '', blob_type, drop_first=True,
         )
 
@@ -98,7 +98,7 @@ class Subsampler:
             logger.info('Compressing binary portion separately, and writing to database.')
         blob_type = WHOLE_STUDY_SUBSAMPLE_BINARY_ONLY
         compressed_blob = brotli.compress(blob[offset:], quality=11, lgwin=24)
-        CompressedMatrixWriter(self.database_config_file)._insert_blob(
+        CompressedMatrixHandling(self.database_config_file)._insert_blob(
             self.study, compressed_blob, '', blob_type, drop_first=True,
         )
 

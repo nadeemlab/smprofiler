@@ -21,6 +21,7 @@ from smprofiler.db.exchange_data_formats.study import (
     Products,
 )
 from smprofiler.db.accessors.cells import CellsAccess
+from smprofiler.db.accessors.primary_study import get_primary_study
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.db.exchange_data_formats.metrics import AvailableGNN
 from smprofiler.db.simple_query_patterns import GetSingleResult
@@ -66,7 +67,7 @@ class StudyAccess(SimpleReadOnlyProvider):
 
     def get_study_components(self, study: str | None) -> StudyComponents:
         if study is None:
-            study = self.get_primary_study()
+            study = get_primary_study(self.cursor)
         substudy_tables = {
             'collection': 'specimen_collection_study',
             'measurement': 'specimen_measurement_study',
@@ -86,13 +87,6 @@ class StudyAccess(SimpleReadOnlyProvider):
             ][0]
             substudies[key] = name
         return StudyComponents(**substudies)
-
-    def get_primary_study(self) -> str:
-        self.cursor.execute('SELECT primary_study FROM study_component;')
-        studies = tuple(map(lambda row: row[0], tuple(self.cursor.fetchall())))
-        if len(studies) > 1:
-            logger.warning(f'Multiple primary studies found in schema: {studies}')
-        return studies[0]
 
     def get_available_gnn(self, study: str) -> AvailableGNN:
         feature_class = get_feature_description("gnn importance score")

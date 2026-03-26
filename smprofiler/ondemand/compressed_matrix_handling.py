@@ -14,7 +14,7 @@ from smprofiler.ondemand.cache_store import get_cache_store
 logger = colorized_logger(__name__)
 
 
-class CompressedMatrixWriter:
+class CompressedMatrixHandling:
     """Write the compressed in-memory binary format matrices to file."""
     database_config_file: str
 

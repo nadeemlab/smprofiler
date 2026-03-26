@@ -11,7 +11,7 @@ from sklearn.preprocessing import QuantileTransformer
 
 from smprofiler.workflow.common.sparse_matrix_puller import SparseMatrixPuller
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
-from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
+from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping # Why not used? Maybe this is why the UMAP intensities are wrong
@@ -42,9 +42,6 @@ class UMAPCreator:
         self.database_config_file = database_config_file
         self.study = study
 
-    def create(self) -> None:
-        self._generate_and_write_reductions()
-
     def create_from_dense_frames(
         self,
         continuous: DataFrame,
@@ -55,56 +52,6 @@ class UMAPCreator:
             raise NoContinuousIntensityDataError
         reduced = UMAPReducer.create_2d_point_cloud(continuous)
         self._write_to_database(reduced, discrete, continuous, ordered_symbols=ordered_symbols)
-
-    def _generate_and_write_reductions(self) -> None:
-        continuous, discrete = self.retrieve_feature_matrix_dense(cell_limit=UMAP_POINT_LIMIT)
-        reduced = UMAPReducer.create_2d_point_cloud(continuous)
-        self._write_to_database(reduced, discrete, continuous)
-
-    def retrieve_feature_matrix_dense(self, cell_limit=None):
-        sparse_df = self.retrieve_feature_matrix_sparse(cell_limit=cell_limit)
-        continuous = UMAPCreator.sparse_to_dense(sparse_df, 'quantity')
-        if all(continuous.isna().all()):
-            raise NoContinuousIntensityDataError
-        discrete = UMAPCreator.sparse_to_dense(sparse_df, 'discrete_value')
-        continuous.sort_index(inplace=True)
-        discrete.sort_index(inplace=True)
-        return (continuous, discrete)
-
-    def retrieve_feature_matrix_sparse(self, cell_limit=None):
-        if cell_limit is None:
-            raise ValueError('Need to choose a cell_limit.')
-        logger.info(f'Retrieving cell data for "{self.study}".')
-        with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
-            cursor.execute('SELECT COUNT(*) FROM histological_structure;')
-            total = tuple(cursor.fetchall())[0][0]
-            cursor.execute(f'''
-            SELECT
-                eq.histological_structure,
-                cs.symbol,
-                eq.quantity,
-                CASE WHEN eq.discrete_value='positive' THEN 1 ELSE 0 END discrete_value
-            FROM expression_quantification eq
-            JOIN chemical_species cs ON cs.identifier=eq.target
-            JOIN histological_structure_identification hsi ON eq.histological_structure=hsi.histological_structure
-            JOIN data_file df ON df.sha256_hash=hsi.data_source            
-            JOIN specimen_data_measurement_process sdmp ON df.source_generation_process=sdmp.identifier
-            JOIN specimen_collection_process scp ON scp.specimen=sdmp.specimen
-            JOIN study_component sc ON scp.study=sc.component_study
-            WHERE sc.primary_study=%s AND eq.histological_structure IN (
-                SELECT temp.random_id FROM (
-                        SELECT generate_series (1, {UMAP_POINT_LIMIT}), (random() * {total})::int::VARCHAR(512) AS random_id
-                        FROM (SELECT 1 AS n) AS temp1
-                    ) AS temp
-                )
-            ;
-            ''', (self.study,))
-            rows = cursor.fetchall()
-        sparse_df = DataFrame(rows, columns=['structure', 'channel', 'quantity', 'discrete_value'])
-        sparse_df = sparse_df.astype({'structure': str, 'channel': str, 'quantity': float, 'discrete_value': int})
-        self.validate_all_structures_have_same_channels(sparse_df)
-        logger.info('Dataframe pulled: %s', sparse_df.columns.values.tolist())
-        return sparse_df
 
     @staticmethod
     def sparse_to_dense(sparse_df: DataFrame, values_column: str) -> DataFrame:
@@ -127,7 +74,7 @@ class UMAPCreator:
         reduced,
         discrete: DataFrame,
         continuous: DataFrame,
-        ordered_symbols: list[str] | None = None,
+        ordered_symbols: tuple[str, ...],
     ) -> None:
         data_array = self._create_data_array(discrete, ordered_symbols=ordered_symbols)
 #        blob = bytearray()
@@ -153,7 +100,6 @@ class UMAPCreator:
         cache_store.put_blob(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED, compressed)
         logger.info('Saved UMAP centroids and feature matrix combo.')
 
-
         #logger.info('Saving UMAP centroids and feature matrix.')
         #cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1], blob, drop_first=True)
         #cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1], pickle.dumps(centroid_data), drop_first=True)
@@ -166,7 +112,7 @@ class UMAPCreator:
             self.study,
             VIRTUAL_SAMPLE,
             FEATURE_MATRIX_WITH_INTENSITIES,
-            CompressedMatrixWriter.form_intensities_compressed_blob(intensities_dict),
+            CompressedMatrixHandling.form_intensities_compressed_blob(intensities_dict),
         )
         logger.info('Done.')
 
@@ -193,7 +139,7 @@ class UMAPCreator:
         df_ordered = df[symbols]
         return df_ordered.sort_index()
 
-    def _create_data_array(self, df: DataFrame, ordered_symbols: list[str] | None = None) -> dict[int, int]:
+    def _create_data_array(self, df: DataFrame, ordered_symbols: tuple[str, ...]) -> dict[int, int]:
         df_ordered = self._normalize_column_order(df, 'discrete_value', ordered_symbols=ordered_symbols)
         data_array = {}
         for i, row in df_ordered.iterrows():
