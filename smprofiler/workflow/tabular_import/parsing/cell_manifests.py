@@ -98,11 +98,11 @@ class CellManifestsParser(SourceToADIParser):
         """
         if self.study_name is None:
             raise ValueError('study_name is required to build preprocessed_samples in memory.')
-        measurement_study, ordered_symbols, target_index_lookups, target_by_symbols = self._prepare_channel_metadata(
+        ordered_symbols, target_index_lookup, target_by_symbol = self._prepare_channel_metadata(
             chemical_species_identifiers_by_symbol,
         )
         self._loop_over_samples(file_manifest_file, ordered_symbols)
-        self._write_channel_metadata(measurement_study, file_manifest_file, target_index_lookups, target_by_symbols)
+        self._write_channel_metadata(target_index_lookup, target_by_symbol)
         self._handle_umap_generation(ordered_symbols)
 
     def _prepare_channel_metadata(self, chemical_species_identifiers_by_symbol: dict[str, str]):
@@ -119,7 +119,6 @@ class CellManifestsParser(SourceToADIParser):
           (e.g. a specific protein).
         - `symbol`. The string name of the channel/protein/target.
         """
-        measurement_study = SourceToADIParser.get_measurement_study_name(self.study_name)
         channel_symbols = self._get_channel_symbols(chemical_species_identifiers_by_symbol)
         target_by_symbol = {
             symbol: chemical_species_identifiers_by_symbol[symbol]
@@ -132,9 +131,7 @@ class CellManifestsParser(SourceToADIParser):
         ordered_targets = sorted(list(symbols_by_target.keys()))
         ordered_symbols = tuple([symbols_by_target[target] for target in ordered_targets])
         target_index_lookup = {target: i for i, target in enumerate(ordered_targets)}
-        target_index_lookups = {measurement_study: target_index_lookup}
-        target_by_symbols = {measurement_study: target_by_symbol}
-        return measurement_study, ordered_symbols, target_index_lookups, target_by_symbols
+        return ordered_symbols, target_index_lookup, target_by_symbol
 
     def _loop_over_samples(
         self,
@@ -246,25 +243,26 @@ class CellManifestsParser(SourceToADIParser):
 
     def _write_channel_metadata(
         self,
-        measurement_study: str,
-        file_manifest_file: str,
-        target_index_lookups: dict[str, dict[str, int]],
-        target_by_symbols: dict[str, dict[str, str]],
+        target_index_lookup: dict[str, int],
+        target_by_symbol: dict[str, str],
     ) -> None:
         """
-        Creates a specialized expressions index file, annotating the binary payloads.
+        Creates the feature order once and for all for the dataset, and saves it to the database.
         """
-        specimens_by_measurement_study = { measurement_study: [
-            str(cell_manifest['Sample ID'])
-            for _, cell_manifest in self._get_cell_manifests(file_manifest_file).iterrows()
-        ]}
         writer = CompressedMatrixWriter(self.database_config_file)
-        writer.write_index(
-            specimens_by_measurement_study,
-            target_index_lookups,
-            target_by_symbols,
+        targets = {
+            int(index): target
+            for target, index in target_index_lookup.items()
+        }
+        symbols = {
+            target: symbol
+            for symbol, target in target_by_symbol.items()
+        }
+        feature_names_ordered = tuple(
+            symbols[targets[i]] for i in sorted([int(index) for index in targets.keys()])
         )
-        logger.info('Done writing channel metadata index to database.')  # TODO: verify that this is still used. If only the feature order is used, replace this with simpler tuple. Previously this was used for creating final product files from intermediate ones, but this is now done in one shot. As part of this consider deprecating CompressedMatrixWriter or renaming it and slimming it down.
+        writer.write_feature_order(self.study_name, feature_names_ordered)
+        logger.info('Done writing feature order to database.')
 
     def _handle_umap_generation(self, ordered_symbols: tuple[str, ...]) -> None:
         if len(self.subsampled_continuous_rows) > 0:

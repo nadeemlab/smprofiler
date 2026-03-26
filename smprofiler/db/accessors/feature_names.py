@@ -3,33 +3,29 @@ from typing import Any
 
 from psycopg import Cursor as PsycopgCursor
 
+from smprofiler.ondemand.defaults import ORDERED_FEATURE_NAMES
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
 from smprofiler.db.exchange_data_formats.metrics import Channel
+from smprofiler.ondemand.cache_store import CacheStore
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
 
+def get_ordered_feature_names_abstract(cache_store: CacheStore) -> BitMaskFeatureNames:
+    cache_store.get
 
-def get_ordered_feature_names(cursor) -> BitMaskFeatureNames:
-    expressions_index = json_loads(bytearray(fetch_one_or_else(
-        '''
-        SELECT blob_contents
-        FROM ondemand_studies_index osi
-        WHERE blob_type='expressions_index';
+def get_ordered_feature_names(cursor: PsycopgCursor) -> BitMaskFeatureNames:
+
+    names = json_loads(bytearray(fetch_one_or_else(
+        f'''
+            SELECT blob_contents
+            FROM ondemand_studies_index osi
+            WHERE blob_type='{ORDERED_FEATURE_NAMES}';
         ''',
         (),
         cursor,
         'No feature metadata for the given study.',
-    )).decode('utf-8'))[''][0]
-    lookup1: dict[str, int] = expressions_index['target index lookup']
-    lookup2: dict[str, str] = expressions_index['target by symbol']
-    target_from_index = {value: key for key, value in lookup1.items()}
-    symbol_from_target = {value: key for key, value in lookup2.items()}
-    indices = sorted(list(target_from_index.keys()))
-    names = tuple(map(
-        lambda i: symbol_from_target[target_from_index[i]],
-        indices,
-    ))
+    )).decode('utf-8'))
     return BitMaskFeatureNames(
         names=tuple(Channel(symbol=n, full_name='') for n in names)
     )
@@ -51,3 +47,4 @@ def fetch_one_or_else(
         logger.error(error_message)
         raise RecordNotFoundInDatabaseError(error_message)
     return fetched[0]
+

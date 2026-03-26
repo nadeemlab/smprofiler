@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 from pandas import DataFrame
 
+from smprofiler.db.accessors.cells import CellsAccess
+from smprofiler.db.accessors.cells import CellsData
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import retrieve_study_from_specimen
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
@@ -13,10 +15,8 @@ from smprofiler.db.stratification_puller import (
     StratificationPuller,
     Stratification,
 )
-from smprofiler.workflow.common.sparse_matrix_puller import (
-    SparseMatrixPuller,
-    StudyDataArrays,
-)
+from smprofiler.ondemand.cache_store import get_cache_store
+from smprofiler.ondemand.cache_store import CacheStore
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
@@ -33,29 +33,32 @@ class MatrixBundle:
 class FeatureMatrixExtractor:
     """Pull from the database and create convenience bundle of feature matrices and metadata."""
     database_config_file: str | None
+    cache_store: CacheStore
 
     def __init__(self, database_config_file: str | None) -> None:
         self.database_config_file = database_config_file
+        self.cache_store = get_cache_store(database_config_file)
 
     def extract(self,
-        specimen: str | None = None,
+        specimen: str,
         study: str | None = None,
         histological_structures: set[int] | None = None,
         continuous_also: bool = False,
         retain_structure_id: bool = False,
     ) -> dict[str, MatrixBundle]:
-        """Extract feature matrices for a specimen or every specimen in a study.
+        """Extract feature matrices for a specimen.
 
         Parameters
         ----------
-        specimen: str | None = None
+        specimen: str
+            Which specimen to extract features for. 
         study: str | None = None
-            Which specimen to extract features for or study to extract features for all specimens
-            for. Exactly one of specimen or study must be provided.
+            The study may be inferrable.
         histological_structures: set[int] | None = None
             Which histological structures to extract features for from the given study or specimen,
             by their histological structure ID. Structures not found in either the provided
             specimen or study are ignored.
+            The system for specifying these IDs should be 0-indexed scoped to the single specimen.
             If None, all structures are fetched.
         continuous_also: bool = False
             Whether to also calculate and return a DataFrame for each specimen with continuous
@@ -74,80 +77,41 @@ class FeatureMatrixExtractor:
                 3. `continuous_dataframe`, a DataFrame with continuous channel information if
                    continuous_also is true, otherwise this property is None.
         """
-        extraction = self._extract(
+        return self._extract(
             specimen=specimen,
             study=study,
             histological_structures=histological_structures,
             continuous_also=continuous_also,
             retain_structure_id=retain_structure_id,
         )
-        return extraction
 
     def _extract(self,
-        specimen: str | None = None,
+        specimen: str,
         study: str | None = None,
         histological_structures: set[int] | None = None,
         continuous_also: bool = False,
         retain_structure_id: bool = False,
     ) -> dict[str, MatrixBundle]:
-        if (specimen is None) == (study is None):
-            raise ValueError('Must specify exactly one of specimen or study.')
-        data_arrays = self._retrieve_expressions_from_database(
-            specimen=specimen,
-            study=study,
-            histological_structures=histological_structures,
-            continuous_also=continuous_also,
-        )
-        centroid_coordinates = self._retrieve_structure_centroids_from_database(
-            specimen=specimen,
-            study=study,
-            histological_structures=histological_structures,
-        )
         if study is None:
-            assert specimen is not None
             study = retrieve_study_from_specimen(self.database_config_file, specimen)
-
+        if histological_structures is None:
+            ids = ()
+        else:
+            ids = tuple(histological_structures) 
+        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+            a = CellsAccess(cursor)
+            location_phenotype, _ = a.get_cells_data(specimen, cell_identifiers=ids)
+            if continuous_also:
+                intensities = a.get_cells_data_intensity(specimen)
+            else:
+                intensities = None
         return self._create_feature_matrices(
-            data_arrays,
-            centroid_coordinates,
+            location_phenotype,
+            intensities,
             self._retrieve_phenotypes(study),
             self._create_channel_information(data_arrays),
             retain_structure_id,
         )
-
-    def _retrieve_expressions_from_database(self,
-        specimen: str | None = None,
-        study: str | None = None,
-        histological_structures: set[int] | None = None,
-        continuous_also: bool = False,
-    ) -> StudyDataArrays:
-        logger.info('Retrieving expression data from database.')
-        puller = SparseMatrixPuller(self.database_config_file)
-        puller.pull(
-            specimen=specimen,
-            study=study,
-            histological_structures=histological_structures,
-            continuous_also=continuous_also,
-        )
-        data_arrays = puller.get_data_arrays()
-        logger.info('Done retrieving expression data from database.')
-        return list(data_arrays.get_studies().values())[0]
-
-    def _retrieve_structure_centroids_from_database(self,
-        specimen: str | None = None,
-        study: str | None = None,
-        histological_structures: set[int] | None = None,
-    ) -> StudyStructureCentroids:
-        logger.info('Retrieving polygon centroids from shapefiles in database.')
-        puller = StructureCentroidsPuller(self.database_config_file)
-        puller.pull(
-            specimen=specimen,
-            study=study,
-            histological_structures=histological_structures,
-        )
-        structure_centroids = puller.get_structure_centroids()
-        logger.info('Done retrieving centroids.')
-        return list(structure_centroids.get_studies().values())[0]
 
     def _retrieve_phenotypes(self, study_name: str) -> dict[str, PhenotypeCriteria]:
         logger.info('Retrieving phenotypes from database.')
@@ -161,8 +125,7 @@ class FeatureMatrixExtractor:
         return phenotypes
 
     def _create_feature_matrices(self,
-        data_arrays: StudyDataArrays,
-        centroid_coordinates: StudyStructureCentroids,
+        bmatrix: CellsData,
         phenotypes: dict[str, PhenotypeCriteria],
         channel_information: list[str],
         retain_structure_id: bool,

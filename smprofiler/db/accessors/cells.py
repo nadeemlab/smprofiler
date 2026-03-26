@@ -81,7 +81,10 @@ class CellsAccess(SimpleReadOnlyProvider):
             if len(rows) > 20:
                 print('...')
             raise NoContinuousIntensitiesError(sample)
-        return cast(bytes, compressed[0])
+        if 'br' in accept_encoding:
+            return cast(bytes, compressed[0])
+        else:
+            return brotli.decompress(compressed[0])
 
     def _retrieve_blob(self, sample: str, blob_type: str) -> tuple[bytes] | None:
         """
