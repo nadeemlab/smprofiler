@@ -30,6 +30,14 @@ class CacheStore(Protocol):
     def delete_blob(self, study: str | None, specimen: str | None, blob_type: str) -> None:
         ...
 
+    def get_blob(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bytes:
+        ...
+
 
 class DatabaseCacheStore:
     def __init__(self, database_config_file: str | None) -> None:
@@ -72,6 +80,22 @@ class DatabaseCacheStore:
             cursor.execute(delete_query, (specimen, blob_type))
             cursor.close()
 
+    def get_blob(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bytes:
+        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+            select_query = '''
+                SELECT blob_contents FROM
+                ondemand_studies_index
+                WHERE specimen=%s , blob_type=% ;
+            '''
+            cursor.execute(select_query, (specimen, blob_type))
+            return tuple(cursor.fetchall())[0][0]
+
+
 
 @dataclass(frozen=True)
 class S3CacheLocation:
@@ -102,6 +126,15 @@ class S3CacheStore:
     def delete_blob(self, study: str | None, specimen: str | None, blob_type: str) -> None:
         key = self._build_key(study, specimen, blob_type)
         self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def get_blob(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bytes:
+        key = self._build_key(study, specimen, blob_type)
+        return self.client.get_object(Bucket=self.bucket, Key=key)
 
     def _build_key(self, study: str | None, specimen: str | None, blob_type: str) -> str:
         study_name = _sanitize_path_component(study or "unknown_study")
