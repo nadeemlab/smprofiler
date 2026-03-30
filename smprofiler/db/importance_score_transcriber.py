@@ -20,6 +20,13 @@ from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
 
+todo_message='''
+TODO: With no longer having database records with cell-level identifiers,
+it is now the responsibility of the importance-scores writer to save
+the specimen/sample name for each cell. And to generally reduce the
+reliance on cell identifiers.
+I.e. `df` below shouldy already include `specimen` column.
+'''
 
 def transcribe_importance(
     df: DataFrame,
@@ -31,6 +38,8 @@ def transcribe_importance(
     cohort_stratifier: str | None = None,
     per_specimen_selection_number: int = 1000,
 ) -> None:
+    if 'specimen' not in df.columns:
+        raise ValueError(todo_message)
     """Upload importance score output from a cg-gnn instance to the local db.
 
     Parameters:
@@ -71,7 +80,7 @@ def transcribe_importance(
             study,
             'cell importance',
         ).create()
-        _add_slide_column(connection, df)
+        #_add_slide_column(connection, df)
         df_most_important = _group_and_filter(df, per_specimen_selection_number)
         _upload(
             df_most_important,
@@ -84,21 +93,21 @@ def transcribe_importance(
         )
 
 
-def _add_slide_column(connection: PsycopgConnection, df: DataFrame) -> None:
-    lookup = read_sql("""
-        SELECT
-            hsi.histological_structure,
-            sdmp.specimen
-        FROM histological_structure_identification hsi
-            JOIN data_file df
-                ON hsi.data_source=df.sha256_hash
-            JOIN specimen_data_measurement_process sdmp
-                ON df.source_generation_process=sdmp.identifier
-        ;
-    """, connection)
-    lookup['histological_structure'] = lookup['histological_structure'].astype(int)
-    reindexed = lookup.set_index('histological_structure')
-    df['specimen'] = reindexed.loc[df.index, 'specimen']
+#def _add_slide_column(connection: PsycopgConnection, df: DataFrame) -> None:
+#    lookup = read_sql("""
+#        SELECT
+#            hsi.histological_structure,
+#            sdmp.specimen
+#        FROM histological_structure_identification hsi
+#            JOIN data_file df
+#                ON hsi.data_source=df.sha256_hash
+#            JOIN specimen_data_measurement_process sdmp
+#                ON df.source_generation_process=sdmp.identifier
+#        ;
+#    """, connection)
+#    lookup['histological_structure'] = lookup['histological_structure'].astype(int)
+#    #reindexed = lookup.set_index('histological_structure')
+#    # df['specimen'] = reindexed.loc[df.index, 'specimen']
 
 
 def _group_and_filter(df: DataFrame, filter_number: int) -> DataFrame:
