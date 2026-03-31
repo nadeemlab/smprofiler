@@ -1,0 +1,33 @@
+# Requirements for atlas reference model training and evaluation
+# Usage: pip install -r requirements.atlas_training.txt
+
+# AnnData / atlas file reading
+anndata>=0.10
+scanpy>=1.9
+
+# Core scientific stack
+numpy>=1.24
+pandas>=2.0
+scipy>=1.10
+
+# Machine learning
+scikit-learn>=1.3
+
+# ONNX export and inference
+onnx>=1.15
+skl2onnx>=0.15
+onnxmltools>=1.12
+onnxruntime>=1.17
+
+# Gradient boosting
+xgboost>=2.0
+
+# Visualization (evaluation notebook)
+matplotlib>=3.7
+seaborn>=0.13
+
+# Notebook environment
+jupyterlab>=4.0
+
+# Utilities
+tqdm>=4.65
