@@ -32,7 +32,10 @@ class CompressedMatrixHandling:
         self.cache_store.put_blob(study, None, ORDERED_FEATURE_NAMES, feature_names_str_bytes, drop_first=True)
 
     def _insert_blob(self, study: str | None, blob: bytearray, specimen: str, blob_type: str, drop_first: bool=False) -> None:
-        self.cache_store.put_blob(study, specimen, blob_type, blob, drop_first=drop_first)
+        self.cache_store.put_blob(study, specimen, blob_type, cast(bytes, blob), drop_first=drop_first)
+
+    def blob_exists(self, study: str, specimen: str, blob_type: str) -> bool:
+        return self.cache_store.blob_exists(study, specimen, blob_type)
 
     @staticmethod
     def form_intensities_compressed_blob(
@@ -53,8 +56,8 @@ class CompressedMatrixHandling:
     ) -> bytearray:
         blob = bytearray()
         for histological_structure_id, entry in data_array.items():
-            blob.extend(histological_structure_id.to_bytes(8, 'little'))
-            blob.extend(entry.to_bytes(8, 'little'))
+            blob.extend(histological_structure_id.to_bytes(8))
+            blob.extend(entry.to_bytes(8))
         return blob
 
     @classmethod
@@ -62,7 +65,7 @@ class CompressedMatrixHandling:
         phenotype_bytes: dict[int, bytes] = {}
         for cell_id, row in zip(cell_ids, discrete_matrix):
             mask = cls._bitmask(row)
-            phenotype_bytes[cell_id] = int(mask).to_bytes(8, 'little')
+            phenotype_bytes[cell_id] = int(mask).to_bytes(8)
         return phenotype_bytes
 
     @staticmethod
@@ -74,7 +77,7 @@ class CompressedMatrixHandling:
         return mask
 
     @staticmethod
-    def parse_rows_location_phenotype(blob: bytearray | bytes) -> tuple[tuple[float | int, ...], ...]:
+    def parse_rows_location_phenotype(blob: bytearray | bytes, number_features: int) -> tuple[tuple[float | int, ...], ...]:
         width = 20
         if len(blob) % width != 0:
             raise ValueError('Locations/phenotype payload should have 20 bytes per row, including the header.')
@@ -89,7 +92,7 @@ class CompressedMatrixHandling:
             y_sector = blob[row_i + 8: row_i + 12]
             y = int.from_bytes(y_sector)
             p_int = int.from_bytes(blob[row_i + 12: row_i + 20])
-            phenotype_bits = [(p_int >> j) % 2 for j in range(64)]
+            phenotype_bits = [(p_int >> j) % 2 for j in range(number_features)]
             rows.append(tuple([id, x, y] + phenotype_bits))
         return tuple(rows)
 
@@ -104,7 +107,7 @@ class CompressedMatrixHandling:
             row_i = width * i
             id_sector = blob[row_i: row_i + 4]
             id = int.from_bytes(id_sector)
-            values = tuple([id] + [decode_float8(cast(bytes, blob[row_i + 4 + j])) for j in range(number_features)])
+            values = tuple([id] + [decode_float8(blob[row_i + 4 + j].to_bytes()) for j in range(number_features)])
             rows.append(values)
         return tuple(rows)
 

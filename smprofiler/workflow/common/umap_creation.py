@@ -1,4 +1,4 @@
-"""The core calculator for the UMAP dimensional reduction."""
+"""UMAP dimensional reduction."""
 import warnings
 import brotli
 

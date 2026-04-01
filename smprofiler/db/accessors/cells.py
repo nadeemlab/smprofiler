@@ -7,6 +7,7 @@ import brotli
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
+from smprofiler.ondemand.defaults import LOCATION_PHENOTYPE_BROTLI
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
 from smprofiler.ondemand.defaults import WHOLE_STUDY_SUBSAMPLE_BINARY_ONLY
 from smprofiler.db.exchange_data_formats.cells import CellsData
@@ -42,7 +43,7 @@ class CellsAccess(SimpleReadOnlyProvider):
         involving such identifiers a different method should be used.
         """
         if cell_identifiers == ():
-            blob_type = VIRTUAL_SAMPLE_COMPRESSED if sample == VIRTUAL_SAMPLE else 'cell_data_brotli'
+            blob_type = VIRTUAL_SAMPLE_COMPRESSED if sample == VIRTUAL_SAMPLE else LOCATION_PHENOTYPE_BROTLI 
             compressed = self._retrieve_blob(sample, blob_type)
             if compressed is None:
                 logger.error(f'Requested "br" (Brotli) compressed blob that does not exist for {sample}.')
@@ -64,8 +65,6 @@ class CellsAccess(SimpleReadOnlyProvider):
         The format is the custom optimized binary format, the variant with custom
         8-bit floats.
         """
-        if accept_encoding != ('br',):
-            raise ValueError('Only "br" (brotli) encoding is supported.')
         compressed = self._retrieve_blob(sample, FEATURE_MATRIX_WITH_INTENSITIES)
         if compressed is None:
             self.cursor.execute('SELECT specimen, blob_type FROM ondemand_studies_index;')

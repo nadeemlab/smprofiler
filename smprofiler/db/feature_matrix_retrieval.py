@@ -1,5 +1,4 @@
 """Convenience provision of a feature matrix for each study, retrieved from the SMProfiler database."""
-
 from dataclasses import dataclass
 
 from pandas import DataFrame
@@ -32,7 +31,7 @@ class MatrixBundle:
     continuous_dataframe: DataFrame | None = None
 
 
-class FeatureMatrixExtractor:
+class FeatureMatrixRetrieval:
     """Pull from the database and create convenience bundle of feature matrices and metadata."""
     database_config_file: str | None
     cache_store: CacheStore
@@ -46,6 +45,7 @@ class FeatureMatrixExtractor:
         study: str | None = None,
         histological_structures: set[int] | None = None,
         continuous_also: bool = False,
+        composite_phenotypes: bool = False,
     ) -> dict[str, MatrixBundle]:
         """Extract feature matrices for a specimen.
 
@@ -65,6 +65,9 @@ class FeatureMatrixExtractor:
             Whether to also calculate and return a DataFrame for each specimen with continuous
             channel information in addition to the default DataFrame which provides binary cast
             channel information.
+        composite_phenotypes: bool = False
+            Whether to include additional columns for cell membership in each of the pre-defined
+            composite phenotypes.
 
         Returns
         -------
@@ -72,6 +75,8 @@ class FeatureMatrixExtractor:
             A dictionary of specimen names to a MatrixBundle dataclass instances, which contain:
                 1. `dataframe`, a DataFrame with the feature matrix for the specimen, including
                    centroid location, channel information, and phenotype information.
+                   If composite_phenotypes is selected, prefixes 'C ' and 'P ' appear to easily
+                   distinguish ordinary channels and composite phenotype channels.
                 2. `filename`, a filename for the DataFrame.
                 3. `continuous_dataframe`, a DataFrame with continuous channel information if
                    continuous_also is true, otherwise this property is None.
@@ -82,18 +87,20 @@ class FeatureMatrixExtractor:
         if specimens == () and study is not None:
             with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
                 specimens = StudyAccess(cursor).get_specimen_names(study)
-        return {s: self._extract(
+        return {s: self._extract_one_specimen(
             specimen=s,
             study=study,
             histological_structures=histological_structures,
             continuous_also=continuous_also,
+            composite_phenotypes=composite_phenotypes,
         ) for s in specimens}
 
-    def _extract(self,
+    def _extract_one_specimen(self,
         specimen: str,
         study: str | None = None,
         histological_structures: set[int] | None = None,
         continuous_also: bool = False,
+        composite_phenotypes: bool = False,
     ) -> MatrixBundle:
         if study is None:
             study = retrieve_study_from_specimen(self.database_config_file, specimen)
@@ -110,10 +117,11 @@ class FeatureMatrixExtractor:
                 intensities = None
         o = get_ordered_feature_names_abstract(study, self.cache_store)
         feature_names = tuple(map(lambda e: e.symbol, o.names))
+        phenotypes = self._retrieve_phenotypes(study) if composite_phenotypes else None
         return self._create_feature_matrices(
             location_phenotype,
             intensities,
-            self._retrieve_phenotypes(study),
+            phenotypes,
             feature_names,
         )
 
@@ -132,23 +140,24 @@ class FeatureMatrixExtractor:
         self,
         location_phenotype: CellsData,
         intensities: CellsData | None,
-        phenotypes: dict[str, PhenotypeCriteria],
+        phenotypes: dict[str, PhenotypeCriteria] | None,
         channel_information: tuple[str, ...],
     ) -> MatrixBundle:
         logger.info('Creating feature matrices from location/phenotype payload and intensities payload if available.')
-        rows = CompressedMatrixHandling.parse_rows_location_phenotype(location_phenotype)
-        channels = [f'C {cs}' for cs in channel_information]
+        channels = [f'C {cs}' for cs in channel_information] if phenotypes is not None else list(channel_information)
+        rows = CompressedMatrixHandling.parse_rows_location_phenotype(location_phenotype, len(channels))
         dataframe = DataFrame(rows, columns=['id', 'pixel x', 'pixel y'] + channels)
         if intensities is not None:
             rows = CompressedMatrixHandling.parse_rows_intensity(intensities, len(channel_information))
             i = DataFrame(rows, columns=['id'] + channels)
         else:
             i = None
-        for symbol, criteria in phenotypes.items():
-            dataframe[f'P {symbol}'] = (
-                dataframe[[f'C {m}' for m in criteria.positive_markers]].all(axis=1) &
-                ~dataframe[[f'C {m}' for m in criteria.negative_markers]].any(axis=1)
-            ).astype(int)
+        if phenotypes is not None:
+            for symbol, criteria in phenotypes.items():
+                dataframe[f'P {symbol}'] = (
+                    dataframe[[f'C {m}' for m in criteria.positive_markers]].all(axis=1) &
+                    ~dataframe[[f'C {m}' for m in criteria.negative_markers]].any(axis=1)
+                ).astype(int)
         bundle = MatrixBundle(dataframe, '0.tsv')
         if i is not None:
             bundle.continuous_dataframe = i

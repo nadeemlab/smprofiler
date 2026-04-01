@@ -20,11 +20,13 @@ def _check_locations(original: DataFrame, retrieved: DataFrame) -> None:
         assert row1['YMax'] >= row2['pixel y']
 
 def _map_channel(df: DataFrame, column_indicator: str='_Positive') -> dict[str, str]:
-    return {c: 'C ' + re.sub(column_indicator, '', c)
+    return {c: re.sub(column_indicator, '', c)
         for c in df.columns if re.search(column_indicator, c)
     }
 
 def _check_discrete_vectors(original: DataFrame, retrieved: DataFrame) -> None:
+    print(retrieved)
+
     map_channel = _map_channel(original)
     for i, ((_, row1), (_, row2)) in enumerate(zip(original.iterrows(), retrieved.iterrows())):
         for c1, c2 in map_channel.items():
@@ -64,3 +66,4 @@ def test_one_expressions_matrix():
 
 if __name__=='__main__':
     test_one_expressions_matrix()
+

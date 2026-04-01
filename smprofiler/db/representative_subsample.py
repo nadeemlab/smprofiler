@@ -5,10 +5,11 @@ import brotli  # type: ignore
 from numpy import uint64 as np_int64
 from pydantic import BaseModel
 
+from smprofiler.ondemand.cache_store import get_cache_store
 from smprofiler.ondemand.computers.counts_computer import CountsComputer
 from smprofiler.standalone_utilities.float8 import decode as decode8
 from smprofiler.standalone_utilities.float8 import encode as encode8
-from smprofiler.db.accessors.feature_names import get_ordered_feature_names
+from smprofiler.db.accessors.feature_names import get_ordered_feature_names_abstract 
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.accessors.study import StudyAccess
 from smprofiler.db.accessors.cells import CellsAccess
@@ -107,7 +108,7 @@ class Subsampler:
             s = StudyAccess(cursor).get_number_cells_by_sample(self.study, verbose=self.verbose)
         sample_names_alphabetical, sample_sizes = tuple(zip(*sorted(list(s), key=lambda pair: pair[0])))
         subsample_sizes_same_order = self._adjust_sample_sizes(sample_sizes)
-        channel_order = self._get_channel_names()
+        channel_order = self._get_channel_names()  # possibly need to supply study here..
         thresholds = self._determine_thresholds(sample_names_alphabetical, channel_order)
         subsample_counts = tuple(map(
             lambda args: SubsampleCountAndThresholds(
@@ -129,7 +130,7 @@ class Subsampler:
             access = CellsAccess(cursor)
             for sample in samples:
                 logger.info(f'Determing thresholds for {sample}.')
-                compressed = access.get_cells_data_intensity(sample, accept_encoding=('br',))
+                compressed = access.get_cells_data_intensity(sample, accept_encoding=('br',))   # TODO: Need to use the cache store for access
                 intensities = brotli.decompress(compressed)
                 compressed, _ = access.get_cells_data(sample, accept_encoding=('br',))
                 phenotypes = brotli.decompress(compressed)
@@ -137,31 +138,24 @@ class Subsampler:
         return t
 
     def _determine_thresholds_one_sample(self, intensities: bytes, phenotypes: bytes, channel_names: tuple[str, ...]) -> tuple[int, ...]:
-        sample_number_cells = int.from_bytes(phenotypes[0:4])
-        header_offset = 20
-        row_width = 20
-        N = len(channel_names)
+        location_phenotype_rows = CompressedMatrixHandling.parse_rows_location_phenotype(phenotypes, len(channel_names))
+        intensities_rows = CompressedMatrixHandling.parse_rows_intensity(intensities, len(channel_names))
         low_values: dict[str, list[float]] = {n: [] for n in channel_names}
         high_values: dict[str, list[float]] = {n: [] for n in channel_names}
-        signatures = {n: CountsComputer._compute_signature((n,), channel_names) for n in channel_names}
-        for i in range(sample_number_cells):
-            position1 = header_offset + i*row_width + 12
-            mask_size = 8
-            phenotype_mask_i = np_int64(int.from_bytes(
-                phenotypes[position1: position1 + mask_size], byteorder='little'
-            ))
-            position2 = (N + 4)*i
-            intensities_i = intensities[position2: position2 + N]
-            for j, n in enumerate(channel_names):
-                value = decode8(int.to_bytes(intensities_i[j]))
-                if phenotype_mask_i & signatures[n] == signatures[n]:
-                    high_values[n].append(value)
+        for phenotype_row, intensities_row in zip(location_phenotype_rows, intensities_rows):
+            phenotype = phenotype_row[1:]
+            intensities_vector = intensities_row[1:]
+            for j, (value, channel_name) in enumerate(zip(intensities_vector, channel_names)):
+                if phenotype[j] == 1:
+                    high_values[channel_name].append(value)
                 else:
-                    low_values[n].append(value)
+                    low_values[channel_name].append(value)
+
         def ensure_nontrivial(v: int) -> int:
             if v == 0:
                 return 1
             return v
+
         return tuple(
             ensure_nontrivial(int.from_bytes(encode8(
                 self._aggregate_low_high_values(
@@ -205,8 +199,8 @@ class Subsampler:
         return tuple(approximates)
 
     def _get_channel_names(self) -> tuple[str, ...]:
-        with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor:
-            n = get_ordered_feature_names(cursor)
+        cache_store = get_cache_store(self.database_config_file)
+        n = get_ordered_feature_names_abstract(self.study, cache_store=cache_store)
         return tuple(map(lambda channel: channel.symbol, n.names))
 
     def _get_subsample(self, sample: str, size: int, original: int, number_channels: int) -> bytes:
@@ -221,6 +215,8 @@ class Subsampler:
         blob = bytearray()
         N = number_channels
         for i in indices:
-            position = (N + 4)*i
+            position = (N + 4)*i + 4
             blob.extend(raw[position: position + N])
         return blob
+
+

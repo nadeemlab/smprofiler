@@ -1,4 +1,5 @@
 """Source file parsing for cell-level data."""
+from re import LOCALE
 from typing import cast
 
 from pandas import read_csv
@@ -10,6 +11,7 @@ import brotli
 
 from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
+from smprofiler.ondemand.defaults import LOCATION_PHENOTYPE_BROTLI
 from smprofiler.workflow.tabular_import.tabular_dataset_design import TabularCellMetadataDesign
 from smprofiler.workflow.common.logging.performance_timer import PerformanceTimerReporter
 from smprofiler.workflow.common.file_identifier_schema import get_input_filename_by_identifier
@@ -109,7 +111,7 @@ class CellManifestsParser(SourceToADIParser):
             chemical_species_identifiers_by_symbol,
         )
         self._loop_over_samples(file_manifest_file, ordered_symbols)
-        self._write_channel_metadata(target_index_lookup, target_by_symbol)
+        self._write_channel_metadata(ordered_symbols)
         self._handle_umap_generation(ordered_symbols)
 
     def _prepare_channel_metadata(self, chemical_species_identifiers_by_symbol: dict[str, str]):
@@ -220,7 +222,7 @@ class CellManifestsParser(SourceToADIParser):
         self.cache_store.put_blob(
             self.study_name,
             specimen,
-            'cell_data_brotli',
+            LOCATION_PHENOTYPE_BROTLI,
             compressed,
             drop_first=True,
         )
@@ -247,25 +249,13 @@ class CellManifestsParser(SourceToADIParser):
 
     def _write_channel_metadata(
         self,
-        target_index_lookup: dict[str, int],
-        target_by_symbol: dict[str, str],
+        ordered_symbols: tuple[str, ...],
     ) -> None:
         """
-        Creates the feature order once and for all for the dataset, and saves it to the database.
+        Saves the feature order once and for all for the dataset, and saves it to the database.
         """
         writer = CompressedMatrixHandling(self.database_config_file)
-        targets = {
-            int(index): target
-            for target, index in target_index_lookup.items()
-        }
-        symbols = {
-            target: symbol
-            for symbol, target in target_by_symbol.items()
-        }
-        feature_names_ordered = tuple(
-            symbols[targets[i]] for i in sorted([int(index) for index in targets.keys()])
-        )
-        writer.write_feature_order(self.study_name, feature_names_ordered)
+        writer.write_feature_order(self.study_name, ordered_symbols)
         logger.info('Done writing feature order to database.')
 
     def _handle_umap_generation(self, ordered_symbols: tuple[str, ...]) -> None:
