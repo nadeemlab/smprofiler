@@ -9,13 +9,14 @@ status=$?
 
 if [ $status -eq 0 ];
 then
-    echo "Response headers were as expected:"
-    echo
-    cat response.txt
-	rm response.txt
-    exit 0
+  echo "Response headers were as expected:"
+  echo
+  cat response.txt
+  rm response.txt
+  exit 0
 else
 	cat response.txt
 	rm response.txt
-    exit 1
+  exit 1
 fi
+

@@ -6,7 +6,7 @@ from pandas import DataFrame
 from pandas import read_csv
 from numpy import sqrt
 
-from smprofiler.db.feature_matrix_retrieval import FeatureMatrixExtractor
+from smprofiler.db.feature_matrix_retrieval import FeatureMatrixRetrieval
 
 def _compare(original: DataFrame, retrieved: DataFrame) -> None:
     _check_locations(original, retrieved)
@@ -25,8 +25,6 @@ def _map_channel(df: DataFrame, column_indicator: str='_Positive') -> dict[str, 
     }
 
 def _check_discrete_vectors(original: DataFrame, retrieved: DataFrame) -> None:
-    print(retrieved)
-
     map_channel = _map_channel(original)
     for i, ((_, row1), (_, row2)) in enumerate(zip(original.iterrows(), retrieved.iterrows())):
         for c1, c2 in map_channel.items():
@@ -57,7 +55,7 @@ def test_one_expressions_matrix():
     database_config_file = '.smprofiler_db.config.container'
     study = 'Melanoma intralesional IL2'
     specimen = 'lesion 0_1'
-    bundle = FeatureMatrixExtractor(database_config_file).extract(specimen, study, continuous_also=True)
+    bundle = FeatureMatrixRetrieval(database_config_file).extract(specimen, study, continuous_also=True)
     original = read_csv('../test_data/adi_preprocessed_tables/dataset1/0.csv')
     _compare(original, bundle['lesion 0_1'].dataframe)
     print('Locations in 0.csv match cell locations in processed feature matrix for lesion 0_1.')
