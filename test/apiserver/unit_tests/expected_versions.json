@@ -3,14 +3,14 @@
         "component_name": "Squidpy",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.7.0",
+        "version": "1.8.1",
         "relevant_to_reproducible_computation": true
     },
     {
         "component_name": "Pandas",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "3.0.0",
+        "version": "3.0.2",
         "relevant_to_reproducible_computation": true
     },
     {
@@ -24,7 +24,7 @@
         "component_name": "SciPy",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.17.0",
+        "version": "1.17.1",
         "relevant_to_reproducible_computation": true
     },
     {
@@ -45,7 +45,7 @@
         "component_name": "smprofiler",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.0.69",
+        "version": "1.0.70",
         "relevant_to_reproducible_computation": true
     },
     {

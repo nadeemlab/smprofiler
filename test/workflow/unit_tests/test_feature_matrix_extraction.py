@@ -2,7 +2,7 @@ import sys
 
 from pandas import read_csv, DataFrame
 
-from smprofiler.db.feature_matrix_extractor import (
+from smprofiler.db.feature_matrix_retrieval import (
     FeatureMatrixExtractor,
     MatrixBundle,
 )

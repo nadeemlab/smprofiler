@@ -6,7 +6,7 @@ from pandas import DataFrame
 from pandas import read_csv
 from numpy import sqrt
 
-from smprofiler.db.feature_matrix_extractor import FeatureMatrixExtractor
+from smprofiler.db.feature_matrix_retrieval import FeatureMatrixExtractor
 
 def _compare(original: DataFrame, retrieved: DataFrame) -> None:
     _check_locations(original, retrieved)
