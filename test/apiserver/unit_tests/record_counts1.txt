@@ -13,7 +13,7 @@
                 feature_specification        2
                     feature_specifier        8
                histological_structure        0
-histological_structure_identification      700
+histological_structure_identification        0
          histology_assessment_process        7
                          intervention        2
         permanent_condition_diagnosis        1
