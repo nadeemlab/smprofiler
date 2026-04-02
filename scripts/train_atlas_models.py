@@ -822,23 +822,25 @@ def run(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
+    _data_dir = Path(__file__).resolve().parent.parent.parent / "smprofiler-data"
+
     parser = argparse.ArgumentParser(
         description="Train atlas-reference regression models for SPT",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
         "--atlas",
-        default="/Users/gsf/Quantori/MSKCC/smprofiler-data/human_immune_health_atlas_full.h5ad",
+        default=str(_data_dir / "human_immune_health_atlas_full.h5ad"),
         help="Path to the Allen Institute Human Immune Health Atlas h5ad file",
     )
     parser.add_argument(
         "--annotations",
-        default="/Users/gsf/Quantori/MSKCC/smprofiler-data/annotations/channel_annotations.json",
+        default=str(_data_dir / "annotations" / "channel_annotations.json"),
         help="Path to channel_annotations.json",
     )
     parser.add_argument(
         "--datasets-dir",
-        default="/Users/gsf/Quantori/MSKCC/smprofiler-data/datasets",
+        default=str(_data_dir / "datasets"),
         help="Root directory containing per-study dataset folders",
     )
     parser.add_argument(
