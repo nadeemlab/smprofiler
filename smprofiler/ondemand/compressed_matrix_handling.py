@@ -65,7 +65,7 @@ class CompressedMatrixHandling:
         phenotype_bytes: dict[int, bytes] = {}
         for cell_id, row in zip(cell_ids, discrete_matrix):
             mask = cls._bitmask(row)
-            phenotype_bytes[cell_id] = int(mask).to_bytes(8)
+            phenotype_bytes[cell_id] = int(mask).to_bytes(8, byteorder='little')
         return phenotype_bytes
 
     @staticmethod
@@ -91,7 +91,7 @@ class CompressedMatrixHandling:
             x = int.from_bytes(x_sector)
             y_sector = blob[row_i + 8: row_i + 12]
             y = int.from_bytes(y_sector)
-            p_int = int.from_bytes(blob[row_i + 12: row_i + 20])
+            p_int = int.from_bytes(blob[row_i + 12: row_i + 20], byteorder='little')
             phenotype_bits = [(p_int >> j) % 2 for j in range(number_features)]
             rows.append(tuple([id, x, y] + phenotype_bits))
         return tuple(rows)

@@ -280,7 +280,7 @@ class CellManifestsParser(SourceToADIParser):
         modifier: str,
     ) -> DataFrame:
         columns = MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
-        index = list(range(1, len(rows) + 1))
+        index = list(range(len(rows)))
         return DataFrame(rows, columns=columns, index=index)
 
     def _get_cell_manifests(self, file_manifest_file):

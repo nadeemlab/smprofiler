@@ -1,6 +1,8 @@
 """Convenience accessor of all cell data for a given sample."""
 from typing import cast
+from typing import Iterable
 from itertools import product
+from itertools import islice
 
 import brotli
 
@@ -204,3 +206,10 @@ class CellsAccess(SimpleReadOnlyProvider):
             int(location[1]).to_bytes(4),
             phenotype,
         ))
+
+    @staticmethod
+    def _batched(iterable: Iterable, batch_size: int):
+        iterator = iter(iterable)
+        while batch := tuple(islice(iterator, batch_size)):
+            yield batch
+

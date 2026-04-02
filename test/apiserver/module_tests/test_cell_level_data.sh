@@ -23,7 +23,7 @@ function test_cell_data_binary() {
     cat _celldata.bin | tail -c +21 | xxd -e -b -c 20 > _celldata.dump
     rm _celldata.bin
 
-    diff $filename _celldata.dump
+    diff --strip-trailing-cr $filename _celldata.dump
 
     status=$?
     [ $status -eq 0 ] || (echo "API query for cell data failed, unexpected contents."; )
