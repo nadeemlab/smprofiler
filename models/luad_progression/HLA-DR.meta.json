@@ -1,0 +1,22 @@
+{
+  "study": "luad_progression",
+  "target_channel": "HLA-DR",
+  "input_channels": [
+    "CD14",
+    "CD20",
+    "CD3",
+    "CD31",
+    "CD68",
+    "CD8",
+    "KLRD1",
+    "FOXP3"
+  ],
+  "model_type": "xgboost",
+  "cv_r2": 0.660416,
+  "cv_r2_std": 0.001354,
+  "test_r2": 0.657603,
+  "test_mae": 0.397084,
+  "n_train": 800000,
+  "n_test": 200000,
+  "atlas_version": "allen-human-immune-health-atlas-2025"
+}

@@ -1,0 +1,22 @@
+{
+  "study": "luad_progression",
+  "target_channel": "ITGAX",
+  "input_channels": [
+    "CD14",
+    "CD20",
+    "CD3",
+    "CD31",
+    "CD68",
+    "CD8",
+    "KLRD1",
+    "FOXP3"
+  ],
+  "model_type": "random_forest",
+  "cv_r2": 0.246986,
+  "cv_r2_std": 0.00297,
+  "test_r2": 0.248439,
+  "test_mae": 0.42751,
+  "n_train": 800000,
+  "n_test": 200000,
+  "atlas_version": "allen-human-immune-health-atlas-2025"
+}

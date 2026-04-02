@@ -1,0 +1,22 @@
+{
+  "study": "luad_progression",
+  "target_channel": "FCGR3A",
+  "input_channels": [
+    "CD14",
+    "CD20",
+    "CD3",
+    "CD31",
+    "CD68",
+    "CD8",
+    "KLRD1",
+    "FOXP3"
+  ],
+  "model_type": "xgboost",
+  "cv_r2": 0.585455,
+  "cv_r2_std": 0.003391,
+  "test_r2": 0.586494,
+  "test_mae": 0.311258,
+  "n_train": 800000,
+  "n_test": 200000,
+  "atlas_version": "allen-human-immune-health-atlas-2025"
+}
