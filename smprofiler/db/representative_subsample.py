@@ -1,12 +1,12 @@
 from math import floor
 import random
+from typing import cast
 
-import brotli  # type: ignore
-from numpy import uint64 as np_int64
+import brotli
 from pydantic import BaseModel
+from pandas import DataFrame
 
 from smprofiler.ondemand.cache_store import get_cache_store
-from smprofiler.ondemand.computers.counts_computer import CountsComputer
 from smprofiler.standalone_utilities.float8 import decode as decode8
 from smprofiler.standalone_utilities.float8 import encode as encode8
 from smprofiler.db.accessors.feature_names import get_ordered_feature_names_abstract 
@@ -16,6 +16,8 @@ from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.accessors.cells import NoContinuousIntensitiesError
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
+from smprofiler.db.feature_matrix_retrieval import FeatureMatrixRetrieval
+from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
 from smprofiler.ondemand.defaults import WHOLE_STUDY_SUBSAMPLE_BINARY_ONLY
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -53,7 +55,7 @@ class Subsampler:
         return CompressedMatrixHandling(database_config_file).blob_exists(study, '', blob_type)
 
     def _continuous_intensity_example_available(self) -> bool:
-        with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor:
+        with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor: # TODO: use cache store instead
             cursor.execute('SELECT specimen FROM ondemand_studies_index WHERE LENGTH(specimen)>0 AND specimen!=%s LIMIT 1;', (VIRTUAL_SAMPLE,))
             samples = tuple(cursor.fetchall())
             if len(samples) == 0:
@@ -108,8 +110,7 @@ class Subsampler:
             s = StudyAccess(cursor).get_number_cells_by_sample(self.study, verbose=self.verbose)
         sample_names_alphabetical, sample_sizes = tuple(zip(*sorted(list(s), key=lambda pair: pair[0])))
         subsample_sizes_same_order = self._adjust_sample_sizes(sample_sizes)
-        channel_order = self._get_channel_names()  # possibly need to supply study here..
-        thresholds = self._determine_thresholds(sample_names_alphabetical, channel_order)
+        thresholds = self._determine_thresholds(sample_names_alphabetical)
         subsample_counts = tuple(map(
             lambda args: SubsampleCountAndThresholds(
                 specimen=args[0],
@@ -118,38 +119,34 @@ class Subsampler:
             ),
             zip(sample_names_alphabetical, subsample_sizes_same_order, thresholds),
         ))
+        channel_order = FeatureMatrixRetrieval(self.database_config_file).feature_names(self.study)
         return SubsampleMetadata(subsample_counts=subsample_counts, channel_order=channel_order), sample_sizes
 
     def _determine_thresholds(
         self,
         samples: tuple[str, ...],
-        channel_names: tuple[str, ...],
     ) -> list[tuple[int, ...]]:
         t: list[tuple[int, ...]] = []
-        with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor:
-            access = CellsAccess(cursor)
-            for sample in samples:
-                logger.info(f'Determing thresholds for {sample}.')
-                compressed = access.get_cells_data_intensity(sample, accept_encoding=('br',))   # TODO: Need to use the cache store for access
-                intensities = brotli.decompress(compressed)
-                compressed, _ = access.get_cells_data(sample, accept_encoding=('br',))
-                phenotypes = brotli.decompress(compressed)
-                t.append(self._determine_thresholds_one_sample(intensities, phenotypes, channel_names))
+        for sample in samples:
+            logger.info(f'Determing thresholds for {sample}.')
+            bundle = FeatureMatrixRetrieval(self.database_config_file).extract(sample, self.study, continuous_also=True)[sample]
+            df = bundle.dataframe
+            df_i = cast(DataFrame, bundle.continuous_dataframe)
+            t.append(self._determine_thresholds_one_sample(df_i, df))
         return t
 
-    def _determine_thresholds_one_sample(self, intensities: bytes, phenotypes: bytes, channel_names: tuple[str, ...]) -> tuple[int, ...]:
-        location_phenotype_rows = CompressedMatrixHandling.parse_rows_location_phenotype(phenotypes, len(channel_names))
-        intensities_rows = CompressedMatrixHandling.parse_rows_intensity(intensities, len(channel_names))
+    def _determine_thresholds_one_sample(self, df_i: DataFrame, df: DataFrame) -> tuple[int, ...]:
+        channel_names = [c for c in df_i.columns if not c == 'id']
         low_values: dict[str, list[float]] = {n: [] for n in channel_names}
         high_values: dict[str, list[float]] = {n: [] for n in channel_names}
-        for phenotype_row, intensities_row in zip(location_phenotype_rows, intensities_rows):
-            phenotype = phenotype_row[1:]
-            intensities_vector = intensities_row[1:]
-            for j, (value, channel_name) in enumerate(zip(intensities_vector, channel_names)):
-                if phenotype[j] == 1:
-                    high_values[channel_name].append(value)
+        for (_, row), (_, row_i) in zip(df.iterrows(), df_i.iterrows()):
+            for c in channel_names:
+                value = float(row_i[c])
+                phenotype_membership = row[c]
+                if phenotype_membership == 1:
+                    high_values[c].append(value)
                 else:
-                    low_values[channel_name].append(value)
+                    low_values[c].append(value)
 
         def ensure_nontrivial(v: int) -> int:
             if v == 0:
@@ -175,11 +172,14 @@ class Subsampler:
             message = 'No values recorded when iterating over cells for a given phenotype.'
             logger.error(message)
             raise ValueError(message)
+        t = None
         if len(high) == 0:
-            return max(low)
+            t = max(low)
         if len(low) == 0:
-            return min(high)
-        return (max(low) + min(high)) / 2
+            t = min(high)
+        if t is None:
+            t = (max(low) + min(high)) / 2
+        return t
 
     def _adjust_sample_sizes(self, sample_sizes: tuple[int, ...]) -> tuple[int, ...]:
         total = sum(list(sample_sizes))
@@ -198,25 +198,18 @@ class Subsampler:
             logger.error('Something was wrong with subsampling logic, too many cells selected.')
         return tuple(approximates)
 
-    def _get_channel_names(self) -> tuple[str, ...]:
-        cache_store = get_cache_store(self.database_config_file)
-        n = get_ordered_feature_names_abstract(self.study, cache_store=cache_store)
-        return tuple(map(lambda channel: channel.symbol, n.names))
-
     def _get_subsample(self, sample: str, size: int, original: int, number_channels: int) -> bytes:
         if self.verbose:
             logger.info(f'Subsampling: {sample} ({size}/{original} cells)')
-        with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor:
-            access = CellsAccess(cursor)
-            compressed = access.get_cells_data_intensity(sample, accept_encoding=('br',))
-        raw = brotli.decompress(compressed)
+        cache_store = get_cache_store(self.database_config_file)
+        raw = brotli.decompress(cache_store.get_blob(self.study, sample, FEATURE_MATRIX_WITH_INTENSITIES))
         random.seed(10001)
         indices = random.sample(list(range(original)), size)
         blob = bytearray()
         N = number_channels
         for i in indices:
-            position = (N + 4)*i + 4
-            blob.extend(raw[position: position + N])
+            position = (N + 4)*i
+            blob.extend(raw[position: position + N + 4])
         return blob
 
 

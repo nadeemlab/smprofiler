@@ -37,3 +37,4 @@ status=$?
 if [[ "$status" != "0" ]]; then echo 'Something wrong with rows_direct.txt.'; cat rows_direct.txt; fi;
 rm rows_direct.txt;
 consider_exit $status
+

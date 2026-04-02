@@ -1,5 +1,6 @@
 """Convenience provision of a feature matrix for each study, retrieved from the SMProfiler database."""
 from dataclasses import dataclass
+from json import loads as json_loads
 
 from pandas import DataFrame
 
@@ -8,6 +9,7 @@ from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.accessors.cells import CellsData
 from smprofiler.db.accessors.study import StudyAccess
 from smprofiler.db.accessors.feature_names import get_ordered_feature_names_abstract
+from smprofiler.ondemand.defaults import ORDERED_FEATURE_NAMES
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import retrieve_study_from_specimen
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
@@ -197,4 +199,6 @@ class FeatureMatrixRetrieval:
             lookup.add(row[0])
         return lookup
 
+    def feature_names(self, study: str) -> tuple[str, ...]:
+        return tuple(json_loads(self.cache_store.get_blob(study, None, ORDERED_FEATURE_NAMES).decode('utf-8')))
 

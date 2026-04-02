@@ -37,3 +37,4 @@ function get_downsampled() {
     rm x.bin
     echo "Saved rows_direct.txt"
 }
+

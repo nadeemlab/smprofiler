@@ -81,7 +81,7 @@ class CellsAccess(SimpleReadOnlyProvider):
         else:
             return brotli.decompress(compressed[0])
 
-    def _retrieve_blob(self, sample: str, blob_type: str) -> tuple[bytes] | None:
+    def _retrieve_blob(self, sample: str, blob_type: str) -> tuple[bytes] | None:   # TODO: Deprecate in favor of cache store
         """
         General purpose retrieval of the binary objects stored in the database.
         These are feature matrices of various types. See `ondemand.defaults.py`

@@ -19,7 +19,7 @@ brotli==1.2.0
 cattrs==26.1.0
 certifi==2026.2.25
 cffi==2.0.0
-charset-normalizer==3.4.6
+charset-normalizer==3.4.7
 click==8.3.1
 cloudpickle==3.1.2
 colorcet==3.1.0
@@ -35,7 +35,7 @@ distributed==2026.1.1
 docrep==0.3.2
 donfig==0.8.1.post1
 fast-array-utils==1.4
-fastapi==0.135.2
+fastapi==0.135.3
 fonttools==4.62.1
 frozenlist==1.8.0
 fsspec==2026.3.0
@@ -61,7 +61,7 @@ markupsafe==3.0.3
 matplotlib==3.10.8
 matplotlib-scalebar==0.9.0
 mdurl==0.1.2
-more-itertools==10.8.0
+more-itertools==11.0.1
 msgpack==1.1.2
 multidict==6.7.1
 multipledispatch==1.0.0
