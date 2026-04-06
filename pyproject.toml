@@ -125,7 +125,7 @@ ondemand = [
     "pydantic",
     "scipy",
     "scikit-learn",
-    "squidpy==1.6.5", "zarr",
+    "squidpy", "zarr",
     "tabulate",
     "tqdm",
     "umap-learn",
