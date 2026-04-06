@@ -33,6 +33,7 @@ dependencies = [
     "pytz",
     "requests",
     "scanpy==1.11.5",
+    "setuptools>=82",
     "termplotlib",
 ]
 
