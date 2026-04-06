@@ -5,4 +5,5 @@ Samples file	samples.tsv	Samples
 Subjects file	subjects.tsv	Manifest of subjects
 Study file	study.json	Project-level data
 Diagnosis file	diagnosis.tsv	List of subject diagnoses
-Interventions file	interventions.tsv	List of subject intervention events
+Permanent condition diagnosis file	permanent_condition_diagnosis.tsv	List of survival-type-data conditions
+Condition lack file	condition_lack.tsv	List of survival-type-data polarities
