@@ -101,7 +101,7 @@ def test_expression_vectors(
                     excess_count += 1
             if excess_count > 5:
                 raise ValueError(f'{excess_count} expression vectors differ by more than {t}')
-    print('Expression vector sets are as expected.')
+    print('Expression vector sets are close enough to expected.')
 
 
 def test_stratification(study: dict[str, DataFrame]):
