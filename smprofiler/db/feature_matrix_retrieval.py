@@ -188,11 +188,11 @@ class FeatureMatrixRetrieval:
 
     def _retrieve_component_studies(self, study: str) -> set[str]:
         with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
-            cursor.execute(f'''
+            cursor.execute('''
                 SELECT component_study
                 FROM study_component
-                WHERE primary_study = '{study}';
-            ''')
+                WHERE primary_study = %s ;
+            ''', (study,))
             rows = cursor.fetchall()
         lookup: set[str] = set()
         for row in rows:

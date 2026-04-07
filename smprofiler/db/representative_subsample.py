@@ -7,14 +7,11 @@ from pydantic import BaseModel
 from pandas import DataFrame
 
 from smprofiler.ondemand.cache_store import get_cache_store
-from smprofiler.standalone_utilities.float8 import decode as decode8
 from smprofiler.standalone_utilities.float8 import encode as encode8
-from smprofiler.db.accessors.feature_names import get_ordered_feature_names_abstract 
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.accessors.study import StudyAccess
-from smprofiler.db.accessors.cells import CellsAccess
-from smprofiler.db.accessors.cells import NoContinuousIntensitiesError
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
+from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
 from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.db.feature_matrix_retrieval import FeatureMatrixRetrieval
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
@@ -55,19 +52,8 @@ class Subsampler:
         return CompressedMatrixHandling(database_config_file).blob_exists(study, '', blob_type)
 
     def _continuous_intensity_example_available(self) -> bool:
-        with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor: # TODO: use cache store instead
-            cursor.execute('SELECT specimen FROM ondemand_studies_index WHERE LENGTH(specimen)>0 AND specimen!=%s LIMIT 1;', (VIRTUAL_SAMPLE,))
-            samples = tuple(cursor.fetchall())
-            if len(samples) == 0:
-                return False
-            sample = samples[0][0]
-            access = CellsAccess(cursor)
-            try:
-                _ = access.get_cells_data_intensity(sample, accept_encoding=('br',))
-            except NoContinuousIntensitiesError as error:
-                logger.error(error.message)
-                return False
-        return True
+        cache_store = get_cache_store(self.database_config_file)
+        return cache_store.blob_exists(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED)
 
     def _compute_and_store(self) -> None:
         blob = bytearray()
@@ -141,7 +127,7 @@ class Subsampler:
         high_values: dict[str, list[float]] = {n: [] for n in channel_names}
         for (_, row), (_, row_i) in zip(df.iterrows(), df_i.iterrows()):
             for c in channel_names:
-                value = float(row_i[c])
+                value = float(cast(float, row_i[c]))
                 phenotype_membership = row[c]
                 if phenotype_membership == 1:
                     high_values[c].append(value)
@@ -210,6 +196,6 @@ class Subsampler:
         for i in indices:
             position = (N + 4)*i
             blob.extend(raw[position: position + N + 4])
-        return blob
+        return cast(bytes, blob)
 
 

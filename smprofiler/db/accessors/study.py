@@ -4,6 +4,7 @@ from typing import cast
 import re
 
 from psycopg.errors import UndefinedTable
+from psycopg import sql as psycopg_sql
 
 from smprofiler.db.simple_method_cache import simple_instance_method_cache
 from smprofiler.workflow.common.export_features import ADIFeatureSpecificationUploader
@@ -75,12 +76,13 @@ class StudyAccess(SimpleReadOnlyProvider):
         }
         substudies = {}
         for key, tablename in substudy_tables.items():
-            self.cursor.execute(f'''
-            SELECT ss.name FROM {tablename} ss
-            JOIN study_component sc ON sc.component_study=ss.name
-            WHERE sc.primary_study=%s
-            ;
-            ''', (study,))
+            query = psycopg_sql.SQL('''
+                SELECT ss.name FROM {table} ss
+                JOIN study_component sc ON sc.component_study=ss.name
+                WHERE sc.primary_study=%s ;
+                '''
+            ).format(table=psycopg_sql.Identifier(tablename))
+            self.cursor.execute(query, (study,))
             name = [
                 row[0] for row in self.cursor.fetchall()
                 if not self._is_secondary_substudy(row[0])
@@ -91,12 +93,14 @@ class StudyAccess(SimpleReadOnlyProvider):
     def get_available_gnn(self, study: str) -> AvailableGNN:
         feature_class = get_feature_description("gnn importance score")
         self.cursor.execute('''
-        SELECT fsp.specifier
-        FROM feature_specification fs
-        JOIN feature_specifier fsp ON fs.identifier=fsp.feature_specification
-        JOIN study_component sc ON sc.component_study=fs.study
-        WHERE sc.primary_study=%s AND fs.derivation_method=%s AND fsp.ordinality='1';
-        ''', (study, feature_class))
+            SELECT fsp.specifier
+            FROM feature_specification fs
+            JOIN feature_specifier fsp ON fs.identifier=fsp.feature_specification
+            JOIN study_component sc ON sc.component_study=fs.study
+            WHERE sc.primary_study=%s AND fs.derivation_method=%s AND fsp.ordinality='1';
+            ''',
+            (study, feature_class),
+        )
         rows = tuple(self.cursor.fetchall())
         return AvailableGNN(plugins=tuple(specifier for (specifier, ) in rows))
 
@@ -106,24 +110,31 @@ class StudyAccess(SimpleReadOnlyProvider):
     def get_study_gnn_plot_configurations(self) -> list[str]:
         return self._get_study_small_artifacts('gnn_plot_configurations', None)
 
-    def _table_exists(self, table: str, study: str) -> bool:
-        schema = DBConnection.retrieve_study_schema(study, self.cursor)
-        query = f'''
+    def _table_exists(self, table: str, study: str | None) -> bool:
+        schema = cast(str, DBConnection.retrieve_study_schema(study, self.cursor))
+        query = psycopg_sql.SQL('''
         SELECT EXISTS (
         SELECT FROM pg_catalog.pg_class c
         JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-        WHERE  n.nspname = '{schema}'
-        AND    c.relname = '{table}'
+        WHERE  n.nspname = {schema}
+        AND    c.relname = {table}
         AND    c.relkind = 'r'    -- only tables
-        );'''
+        );
+        ''').format(
+            table=psycopg_sql.Identifier(table),
+            schema=psycopg_sql.Identifier(schema),
+        )
         self.cursor.execute(query)
         result = tuple(self.cursor.fetchall())[0][0]
         return result
 
-    def _get_study_small_artifacts(self, name: str, study: str) -> list[str]:
+    def _get_study_small_artifacts(self, name: str, study: str | None) -> list[str]:
         if self._table_exists(name, study):
-            self.cursor.execute(f'SELECT txt FROM {name} ORDER BY id;')
-            return [row[0] for row in self.cursor.fetchall()]
+            query = psycopg_sql.SQL(
+                'SELECT txt FROM {name} ORDER BY id;'
+            ).format(name=psycopg_sql.Identifier(name))
+            self.cursor.execute(query)
+            return list(map(lambda row: row[0], tuple(self.cursor.fetchall())))
         return []
 
     @staticmethod
@@ -195,7 +206,7 @@ class StudyAccess(SimpleReadOnlyProvider):
 
     @staticmethod
     def _rough_check_is_email(string):
-        return not re.match('^[A-Za-z0-9+_.-]+@([^ ]+)$', string) is None
+        return re.match('^[A-Za-z0-9+_.-]+@([^ ]+)$', string) is not None
 
     def _get_data_release(self, study: str) -> DataRelease:
         query = '''
@@ -389,3 +400,4 @@ class StudyAccess(SimpleReadOnlyProvider):
         if len(rows) == 0:
             return None
         return ' '.join([r[0] for r in rows])
+
