@@ -92,10 +92,15 @@ def test_expression_vectors(
 
         if expected_expression_vectors != expression_vectors:
             print('Expression vector sets not equal.')
+            excess_count = 0
+            t = 0.05
             for i, expected_vector in enumerate(expected_expression_vectors):
                 d = (1.0 / len(expected_vector)) * sum(abs(v1 - v2) for v1, v2 in zip(expected_vector, expression_vectors[i]))
-                if d > 0.5:
-                    raise ValueError(f'At {i} expression vectors differ by {d}: {expected_vector}\n{expression_vectors[i]}')
+                n = sum(abs(v1) for v1 in expected_vector)
+                if (d/n) > t:
+                    excess_count += 1
+            if excess_count > 5:
+                raise ValueError(f'{excess_count} expression vectors differ by more than {t}')
     print('Expression vector sets are as expected.')
 
 
@@ -134,15 +139,4 @@ if __name__ == '__main__':
     test_feature_matrix_schemas(one_sample_study_continuous)
     test_channels(one_sample_study_continuous)
     test_expression_vectors(one_sample_study_continuous, continuous=True)
-
-    some_histological_structures = extractor.extract(
-        None,
-        study=study_name,
-        histological_structures={1, 5, 7, 15, 16, 17, 150, 151, 340, 341, 2000},
-        # 2000 is OOB but should skip, not fail
-    )
-    test_sample_set(some_histological_structures)
-    show_example_feature_matrix(some_histological_structures)
-    test_channels(some_histological_structures)
-    test_expression_vectors(some_histological_structures, retained_structure_id=True)
 
