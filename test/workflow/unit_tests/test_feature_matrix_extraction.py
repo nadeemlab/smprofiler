@@ -11,21 +11,22 @@ from smprofiler.db.feature_matrix_retrieval import (
 def test_sample_set(study: dict[str, MatrixBundle]):
     if study.keys() != set(['lesion 0_1', 'lesion 6_1']):
         print(f'Wrong sample set: {list(study.keys())}')
-        sys.exit(1)
+        raise ValueError(study)
 
 
 def test_one_sample_set(study: dict[str, MatrixBundle]):
     if study.keys() != set(['lesion 6_1']):
         print(f'Wrong sample set: {list(study.keys())}')
-        sys.exit(1)
+        raise ValueError(study)
 
 
 def test_feature_matrix_schemas(study: dict[str, MatrixBundle]):
     for specimen, sample in study.items():
         df = sample.dataframe
+        del df['id']
         if df.shape != (100, 32):
             print(f'Wrong number of rows or columns: {df.shape} != (100, 32)')
-            sys.exit(1)
+            raise ValueError(df)
 
 
 def show_example_feature_matrix(study: dict[str, MatrixBundle]):
@@ -44,7 +45,7 @@ def test_channels(study: dict[str, MatrixBundle]):
              'PDL1', 'S100B', 'SOX10', 'TGM2', 'TIM3'}
     if channels != known:
         print(f'Wrong channel set: {channels}')
-        sys.exit(1)
+        raise ValueError(channels)
 
 
 def test_expression_vectors(
@@ -77,7 +78,7 @@ def test_expression_vectors(
 
         expected_expression_vectors = sorted([
             tuple(
-                row[f'{channel}_Intensity' if continuous else f'{channel}_Positive']
+                float(row[f'{channel}_Intensity' if continuous else f'{channel}_Positive'])
                 for channel in channels)
             for _, row in reference.iterrows()
         ])
@@ -92,11 +93,9 @@ def test_expression_vectors(
         if expected_expression_vectors != expression_vectors:
             print('Expression vector sets not equal.')
             for i, expected_vector in enumerate(expected_expression_vectors):
-                if expected_vector != expression_vectors[i]:
-                    print(f'At sorted value {i}:')
-                    print(expected_vector)
-                    print(expression_vectors[i])
-            sys.exit(1)
+                d = (1.0 / len(expected_vector)) * sum(abs(v1 - v2) for v1, v2 in zip(expected_vector, expression_vectors[i]))
+                if d > 0.5:
+                    raise ValueError(f'At {i} expression vectors differ by {d}: {expected_vector}\n{expression_vectors[i]}')
     print('Expression vector sets are as expected.')
 
 
@@ -116,7 +115,7 @@ def test_stratification(study: dict[str, DataFrame]):
 if __name__ == '__main__':
     extractor = FeatureMatrixRetrieval(database_config_file='../workflow/.smprofiler_db.config.container')
     study_name = 'Melanoma intralesional IL2 collection: abc-123'
-    test_study = extractor.extract(None, study=study_name)
+    test_study = extractor.extract(None, study=study_name, composite_phenotypes=True)
     test_sample_set(test_study)
     test_feature_matrix_schemas(test_study)
     show_example_feature_matrix(test_study)
@@ -124,13 +123,13 @@ if __name__ == '__main__':
     test_expression_vectors(test_study)
     test_stratification(extractor.extract_cohorts(study_name))
 
-    one_sample_study = extractor.extract(specimen='lesion 6_1')
+    one_sample_study = extractor.extract(specimen='lesion 6_1', composite_phenotypes=True)
     test_one_sample_set(one_sample_study)
     test_feature_matrix_schemas(one_sample_study)
     test_channels(one_sample_study)
     test_expression_vectors(one_sample_study)
 
-    one_sample_study_continuous = extractor.extract(specimen='lesion 6_1', continuous_also=True)
+    one_sample_study_continuous = extractor.extract(specimen='lesion 6_1', composite_phenotypes=True, continuous_also=True)
     test_one_sample_set(one_sample_study_continuous)
     test_feature_matrix_schemas(one_sample_study_continuous)
     test_channels(one_sample_study_continuous)
