@@ -46,11 +46,11 @@ def extract(
         strata_to_use,
     )
     df_cell = _create_cell_df({
-        specimen: extractor.extract(specimen=specimen, retain_structure_id=True)[specimen].dataframe
+        specimen: extractor.extract(specimen=specimen, composite_phenotypes=True)[specimen].dataframe
         for specimen in specimens
     } if (strata_to_use is not None) else {
         specimen: data.dataframe
-        for specimen, data in extractor.extract(study=study, retain_structure_id=True).items()
+        for specimen, data in extractor.extract(None, study=study, composite_phenotypes=True).items()
     })
     return df_cell, df_label, label_to_result_text
 
