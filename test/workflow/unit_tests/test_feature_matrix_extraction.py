@@ -3,7 +3,7 @@ import sys
 from pandas import read_csv, DataFrame
 
 from smprofiler.db.feature_matrix_retrieval import (
-    FeatureMatrixExtractor,
+    FeatureMatrixRetrieval,
     MatrixBundle,
 )
 
@@ -114,9 +114,9 @@ def test_stratification(study: dict[str, DataFrame]):
 
 
 if __name__ == '__main__':
-    extractor = FeatureMatrixExtractor(database_config_file='../workflow/.smprofiler_db.config.container')
+    extractor = FeatureMatrixRetrieval(database_config_file='../workflow/.smprofiler_db.config.container')
     study_name = 'Melanoma intralesional IL2 collection: abc-123'
-    test_study = extractor.extract(study=study_name)
+    test_study = extractor.extract(None, study=study_name)
     test_sample_set(test_study)
     test_feature_matrix_schemas(test_study)
     show_example_feature_matrix(test_study)
@@ -137,12 +137,13 @@ if __name__ == '__main__':
     test_expression_vectors(one_sample_study_continuous, continuous=True)
 
     some_histological_structures = extractor.extract(
+        None,
         study=study_name,
         histological_structures={1, 5, 7, 15, 16, 17, 150, 151, 340, 341, 2000},
         # 2000 is OOB but should skip, not fail
-        retain_structure_id=True,
     )
     test_sample_set(some_histological_structures)
     show_example_feature_matrix(some_histological_structures)
     test_channels(some_histological_structures)
     test_expression_vectors(some_histological_structures, retained_structure_id=True)
+

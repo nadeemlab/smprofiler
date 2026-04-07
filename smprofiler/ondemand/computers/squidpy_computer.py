@@ -62,7 +62,7 @@ class SquidpyComputer(GenericJobComputer):
         return compute_squidpy_metric_for_one_sample(df, phenotypes, feature_class, radius=radius)
 
     @staticmethod
-    def _form_cells_dataframe(arrays: CellDataArrays) -> DataFrame:
+    def _form_cells_dataframe(arrays: CellDataArrays) -> DataFrame:   # TODO: Migrate this to feature matrix extraction, deprecate extract_binary and its dependent test
         features = tuple(f.symbol for f in arrays.feature_names.names)
         rows = []
         zipped = zip(arrays.identifiers, arrays.phenotype, arrays.location.transpose())
