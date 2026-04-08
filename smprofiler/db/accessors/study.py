@@ -113,18 +113,16 @@ class StudyAccess(SimpleReadOnlyProvider):
     def _table_exists(self, table: str, study: str | None) -> bool:
         schema = cast(str, DBConnection.retrieve_study_schema(study, self.cursor))
         query = psycopg_sql.SQL('''
-        SELECT EXISTS (
-        SELECT FROM pg_catalog.pg_class c
-        JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-        WHERE  n.nspname = {schema}
-        AND    c.relname = {table}
-        AND    c.relkind = 'r'    -- only tables
-        );
-        ''').format(
-            table=psycopg_sql.Identifier(table),
-            schema=psycopg_sql.Identifier(schema),
+            SELECT EXISTS (
+            SELECT FROM pg_catalog.pg_class c
+            JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE  n.nspname = %s
+            AND    c.relname = %s
+            AND    c.relkind = 'r'    -- only tables
+            );
+            ''',
         )
-        self.cursor.execute(query)
+        self.cursor.execute(query, (schema, table))
         result = tuple(self.cursor.fetchall())[0][0]
         return result
 
@@ -271,7 +269,7 @@ class StudyAccess(SimpleReadOnlyProvider):
 
     def get_number_cells_by_sample(self, study: str, verbose: bool=False) -> tuple[tuple[str, int], ...]:
         components = self.get_study_components(study)
-        access = CellsAccess(self.cursor)
+        access = CellsAccess(self.cursor, database_config_file=self.database_config_file)
         samples = self._get_specimens(components.measurement)
         if verbose:
             logger.info(f'Retrieving cell counts for {study}')

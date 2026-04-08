@@ -10,8 +10,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import QuantileTransformer
 
 from smprofiler.ondemand.compressed_matrix_handling import compress_bitwise_to_int
-from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
+from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping # Why not used? Maybe this is why the UMAP intensities are wrong
@@ -93,7 +93,7 @@ class UMAPCreator:
 
         phenotype_bytes = {cell_id: integer.to_bytes(8, 'little') for cell_id, integer in data_array.items()}
        
-        raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
+        raw = CompressedMatrixHandling.zip_location_and_phenotype_data(centroids, phenotype_bytes)
         compressed = brotli.compress(raw, quality=11, lgwin=24)
         cache_store = get_cache_store(self.database_config_file)
         self._drop_existing_umap_cache(cache_store)
@@ -106,7 +106,7 @@ class UMAPCreator:
         #logger.info('Done.')
 
         logger.info('Saving UMAP specialized intensities matrix.')
-        intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=ordered_symbols)
+        intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=list(ordered_symbols))
         intensities_dict = {int(i): tuple(float(intensities.loc[i, c]) for c in intensities.columns) for i in intensities.index}
         cache_store.put_blob(
             self.study,

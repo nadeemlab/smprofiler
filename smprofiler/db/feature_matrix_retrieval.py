@@ -3,13 +3,16 @@ from dataclasses import dataclass
 from json import loads as json_loads
 
 from pandas import DataFrame
+from brotli import decompress as brotli_decompress
 
 from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
-from smprofiler.db.accessors.cells import CellsAccess
+from smprofiler.ondemand.compressed_matrix_handling import filter_on_ids
 from smprofiler.db.accessors.cells import CellsData
 from smprofiler.db.accessors.study import StudyAccess
 from smprofiler.db.accessors.feature_names import get_ordered_feature_names_abstract
+from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.ondemand.defaults import ORDERED_FEATURE_NAMES
+from smprofiler.ondemand.defaults import LOCATION_PHENOTYPE_BROTLI
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import retrieve_study_from_specimen
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
@@ -106,17 +109,13 @@ class FeatureMatrixRetrieval:
     ) -> MatrixBundle:
         if study is None:
             study = retrieve_study_from_specimen(self.database_config_file, specimen)
-        if histological_structures is None:
-            ids = ()
-        else:
-            ids = tuple(histological_structures) 
-        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
-            a = CellsAccess(cursor)
-            location_phenotype, _ = a.get_cells_data(specimen, cell_identifiers=ids)
-            if continuous_also:
-                intensities = a.get_cells_data_intensity(specimen)
-            else:
-                intensities = None
+        ids = () if histological_structures is None else tuple(histological_structures)
+        location_phenotype = self.cache_store.get_blob(study, specimen, LOCATION_PHENOTYPE_BROTLI)
+        location_phenotype = brotli_decompress(location_phenotype)
+        intensities = None
+        if continuous_also:
+            intensities = self.cache_store.get_blob(study, specimen, FEATURE_MATRIX_WITH_INTENSITIES)
+            intensities = brotli_decompress(intensities)
         o = get_ordered_feature_names_abstract(study, self.cache_store)
         feature_names = tuple(map(lambda e: e.symbol, o.names))
         phenotypes = self._retrieve_phenotypes(study) if composite_phenotypes else None
@@ -125,6 +124,7 @@ class FeatureMatrixRetrieval:
             intensities,
             phenotypes,
             feature_names,
+            ids = ids,
         )
 
     def _retrieve_phenotypes(self, study_name: str) -> dict[str, PhenotypeCriteria]:
@@ -144,13 +144,18 @@ class FeatureMatrixRetrieval:
         intensities: CellsData | None,
         phenotypes: dict[str, PhenotypeCriteria] | None,
         channel_information: tuple[str, ...],
+        ids: tuple[int, ...] = (),
     ) -> MatrixBundle:
         logger.info('Creating feature matrices from location/phenotype payload and intensities payload if available.')
         channels = [f'C {cs}' for cs in channel_information] if phenotypes is not None else list(channel_information)
         rows = CompressedMatrixHandling.parse_rows_location_phenotype(location_phenotype, len(channels))
+        if ids != ():
+            rows = filter_on_ids(ids, rows)
         dataframe = DataFrame(rows, columns=['id', 'pixel x', 'pixel y'] + channels)
         if intensities is not None:
             rows = CompressedMatrixHandling.parse_rows_intensity(intensities, len(channel_information))
+            if ids != ():
+                rows = filter_on_ids(ids, rows)
             i = DataFrame(rows, columns=['id'] + channels)
         else:
             i = None

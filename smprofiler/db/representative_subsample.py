@@ -93,7 +93,10 @@ class Subsampler:
 
     def _form_subsample_metadata(self) -> tuple[SubsampleMetadata, tuple[int, ...]]:
         with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor:
-            s = StudyAccess(cursor).get_number_cells_by_sample(self.study, verbose=self.verbose)
+            s = StudyAccess(
+                cursor,
+                database_config_file=self.database_config_file,
+            ).get_number_cells_by_sample(self.study, verbose=self.verbose)
         sample_names_alphabetical, sample_sizes = tuple(zip(*sorted(list(s), key=lambda pair: pair[0])))
         subsample_sizes_same_order = self._adjust_sample_sizes(sample_sizes)
         thresholds = self._determine_thresholds(sample_names_alphabetical)

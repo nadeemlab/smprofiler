@@ -337,7 +337,7 @@ def _create_postgres_schema(database_config_file: str | None, schema_name: str) 
 class SimpleReadOnlyProvider:
     """State-holder for basic read-only one-time database data provider classes."""
     cursor: PsycopgCursor
-
+    database_config_file: str | None = None
 
 class QueryCursor:
     """Dispatches calls to a provided handler class (most likely QueryHandler).

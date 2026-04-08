@@ -216,7 +216,7 @@ class CellManifestsParser(SourceToADIParser):
         phenotype_bytes = CompressedMatrixHandling.form_phenotype_bytes(cell_ids, discrete_matrix)
 
         self.timer.timepoint('Aggregating location and phenotype data.')
-        raw = CellsAccess._zip_location_and_phenotype_data(centroids, phenotype_bytes)
+        raw = CompressedMatrixHandling.zip_location_and_phenotype_data(centroids, phenotype_bytes)
         compressed = brotli.compress(raw, quality=11, lgwin=24)
         self.timer.timepoint('Done aggregating location and phenotype data.')
         self.cache_store.put_blob(
