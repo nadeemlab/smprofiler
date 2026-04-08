@@ -52,7 +52,7 @@ class CellsAccess(SimpleReadOnlyProvider):
         """
         if cell_identifiers == ():
             blob_type = VIRTUAL_SAMPLE_COMPRESSED if sample == VIRTUAL_SAMPLE else LOCATION_PHENOTYPE_BROTLI
-            cache_store = get_cache_store(self.database_config_file)
+            cache_store = self._get_cache_store()
             study = get_primary_study(self.cursor)
             if not cache_store.blob_exists(study, sample, blob_type):
                 logger.error(f'Requested "br" (Brotli) compressed blob that does not exist for {sample}.')
@@ -75,7 +75,7 @@ class CellsAccess(SimpleReadOnlyProvider):
         The format is the custom optimized binary format, the variant with custom
         8-bit floats.
         """
-        cache_store = get_cache_store(None)
+        cache_store = self._get_cache_store()
         study = get_primary_study(self.cursor)
         blob_type = FEATURE_MATRIX_WITH_INTENSITIES
         if not cache_store.blob_exists(study, sample, blob_type):
@@ -98,7 +98,7 @@ class CellsAccess(SimpleReadOnlyProvider):
         """
         if accept_encoding != ('br',):
             raise ValueError('Only "br" (brotli) encoding is supported.')
-        cache_store = get_cache_store(None)
+        cache_store = self._get_cache_store()
         study = get_primary_study(self.cursor)
         blob_type = FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
         if not cache_store.blob_exists(study, None, blob_type):
@@ -118,7 +118,7 @@ class CellsAccess(SimpleReadOnlyProvider):
         """
         if accept_encoding != ('br',):
             raise ValueError('Only "br" (brotli) encoding is supported.')
-        cache_store = get_cache_store(None)
+        cache_store = self._get_cache_store()
         study = get_primary_study(self.cursor)
         blob_type = WHOLE_STUDY_SUBSAMPLE_BINARY_ONLY
         if not cache_store.blob_exists(study, None, blob_type):
