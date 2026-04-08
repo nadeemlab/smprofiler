@@ -138,7 +138,7 @@ class UMAPReducer:
 
     @staticmethod
     def drop_discrete_features(df: DataFrame) -> DataFrame:
-        non_droppables = set(map(lambda c: len(set(df[c])) > 2, df.columns))
+        non_droppables = set(filter(lambda c: len(set(df[c])) > 2, df.columns))
         if len(non_droppables) == 0:
             raise NoContinuousIntensityDataError
         ordered = [c for c in df.columns if c in non_droppables]
