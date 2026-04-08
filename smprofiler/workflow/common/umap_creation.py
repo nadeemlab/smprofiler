@@ -17,8 +17,6 @@ from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.ondemand.cache_store import get_cache_store
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
-from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC1
-from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC2
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
@@ -100,8 +98,6 @@ class UMAPCreator:
 
     def _drop_existing_umap_cache(self, cache_store):
         logger.info('  Dropping existing UMAP cache blobs.')
-        cache_store.delete_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1])
-        cache_store.delete_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1])
         cache_store.delete_blob(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED)
         cache_store.delete_blob(self.study, VIRTUAL_SAMPLE, FEATURE_MATRIX_WITH_INTENSITIES)
         logger.info('  Done.')
