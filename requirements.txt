@@ -144,7 +144,7 @@ tqdm==4.67.3
 typeguard==4.5.1
 typing-extensions==4.15.0
 typing-inspection==0.4.2
-umap-learn==0.5.11
+umap-learn==0.5.12
 universal-pathlib==0.3.10
 urllib3==2.6.3
 uvicorn==0.44.0
