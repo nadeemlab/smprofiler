@@ -1,6 +1,7 @@
 """UMAP dimensional reduction."""
 import warnings
 import brotli
+from typing import cast
 
 from pandas import DataFrame
 import pandas.errors as pd_errors
@@ -14,14 +15,12 @@ from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandl
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.database_connection import DBCursor
-from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping # Why not used? Maybe this is why the UMAP intensities are wrong
-from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.ondemand.cache_store import get_cache_store
-
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC1
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC2
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
+from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 warnings.simplefilter(action='ignore', category=pd_errors.PerformanceWarning)
 warnings.filterwarnings(action='ignore', message='n_jobs value 1 overridden to 1 by setting random_state. Use no seed for parallelism.')
@@ -77,34 +76,17 @@ class UMAPCreator:
         ordered_symbols: tuple[str, ...],
     ) -> None:
         data_array = self._create_data_array(discrete, ordered_symbols=ordered_symbols)
-#        blob = bytearray()
-#        for histological_structure_id, entry in data_array.items():
-#            blob.extend(histological_structure_id.to_bytes(8, 'little'))
-#            blob.extend(entry.to_bytes(8, 'little'))
-        #centroid_data = {
-        #    VIRTUAL_SAMPLE_SPEC2[0]: dict(tuple(
-        #        zip(tuple(discrete.index.astype(int)), tuple(zip(reduced[:,0], reduced[:,1])))
-        #    ))
-        #}
-
         centroids = dict(tuple(
             zip(tuple(discrete.index.astype(int)), tuple(zip(reduced[:,0], reduced[:,1])))
         ))
 
         phenotype_bytes = {cell_id: integer.to_bytes(8, 'little') for cell_id, integer in data_array.items()}
-       
         raw = CompressedMatrixHandling.zip_location_and_phenotype_data(centroids, phenotype_bytes)
         compressed = brotli.compress(raw, quality=11, lgwin=24)
         cache_store = get_cache_store(self.database_config_file)
         self._drop_existing_umap_cache(cache_store)
         cache_store.put_blob(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED, compressed)
         logger.info('Saved UMAP centroids and feature matrix combo.')
-
-        #logger.info('Saving UMAP centroids and feature matrix.')
-        #cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1], blob, drop_first=True)
-        #cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1], pickle.dumps(centroid_data), drop_first=True)
-        #logger.info('Done.')
-
         logger.info('Saving UMAP specialized intensities matrix.')
         intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=list(ordered_symbols))
         intensities_dict = {int(i): tuple(float(intensities.loc[i, c]) for c in intensities.columns) for i in intensities.index}
@@ -136,15 +118,15 @@ class UMAPCreator:
             ordered_symbols = [n.symbol for n in ordered.names]
         symbols = [(modifier, n) for n in ordered_symbols]
         logger.info(f'Using feature order: {[s[1] for s in symbols]}')
-        df_ordered = df[symbols]
+        df_ordered = cast(DataFrame, df[symbols])
         return df_ordered.sort_index()
 
     def _create_data_array(self, df: DataFrame, ordered_symbols: tuple[str, ...]) -> dict[int, int]:
-        df_ordered = self._normalize_column_order(df, 'discrete_value', ordered_symbols=ordered_symbols)
+        df_ordered = self._normalize_column_order(df, 'discrete_value', ordered_symbols=list(ordered_symbols))
         data_array = {}
-        for i, row in df_ordered.iterrows():
+        for i, (_, row) in enumerate(df_ordered.iterrows()):
             binary = row.astype(int).to_numpy()
-            data_array[int(i)] = compress_bitwise_to_int(binary)
+            data_array[i] = compress_bitwise_to_int(binary)
         return data_array
 
 
@@ -160,14 +142,11 @@ class UMAPReducer:
 
     @staticmethod
     def drop_discrete_features(df: DataFrame) -> DataFrame:
-        droppables = []
-        for column in df.columns:
-            if len(set(df[column])) <= 2:
-                droppables.append(column)
-        remainder = [c for c in df.columns if not c in droppables]
-        if len(remainder) == 0:
+        non_droppables = set(map(lambda c: len(set(df[c])) > 2, df.columns))
+        if len(non_droppables) == 0:
             raise NoContinuousIntensityDataError
-        return df[remainder]
+        ordered = [c for c in df.columns if c in non_droppables]
+        return cast(DataFrame, df[ordered])
 
     @staticmethod
     def preprocess_univariate_adjustments(df):
@@ -190,3 +169,4 @@ class UMAPReducer:
         first = tuple(zip(scaled[0:5,0], scaled[0:5,1]))
         logger.info(f'After scaling: {first}')
         return scaled
+
