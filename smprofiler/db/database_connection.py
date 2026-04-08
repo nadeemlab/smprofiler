@@ -16,6 +16,7 @@ from psycopg import Connection as PsycopgConnection
 from psycopg import Cursor as PsycopgCursor
 from psycopg import Error as PsycopgError
 from psycopg import OperationalError
+from psycopg import sql as psycopg_sql
 from psycopg.errors import DuplicateDatabase
 from psycopg.errors import DuplicateSchema
 from attr import define
@@ -313,7 +314,7 @@ def _create_postgres_schema(database_config_file: str | None, schema_name: str) 
         logger.error(message)
         raise ValueError(message)
     credentials = retrieve_credentials_from_file(database_config_file)
-    create_statement = f'CREATE SCHEMA {schema_name} ;'
+    create_statement = 'CREATE SCHEMA {schema_name} ;'
     connection = connect(
         dbname=credentials.database,
         host=credentials.endpoint,
@@ -324,9 +325,10 @@ def _create_postgres_schema(database_config_file: str | None, schema_name: str) 
         connection.autocommit = True
         try:
             with connection.cursor() as cursor:
-                logger.info('Creating schema in database "%s":' % credentials.database)
+                logger.info('Creating schema (%s) in database "%s":' % (schema_name, credentials.database))
                 logger.info(f'    {create_statement}')
-                cursor.execute(create_statement)
+                query = psycopg_sql.SQL(create_statement).format(schema_name=psycopg_sql.Identifier(schema_name))
+                cursor.execute(query)
         except DuplicateSchema:
             logger.warning('Attempt to recreate existing schema "%s".', schema_name)
     finally:
