@@ -281,7 +281,11 @@ class CellManifestsParser(SourceToADIParser):
     ) -> DataFrame:
         columns = MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
         index = list(range(len(rows)))
-        return DataFrame(rows, columns=columns, index=index)
+        df = DataFrame(rows, columns=columns, index=index)
+        scale = 1.0 / 10.0
+        for c in columns:
+            df[c] = scale * df[c]
+        return df
 
     def _get_cell_manifests(self, file_manifest_file):
         file_metadata = read_csv(file_manifest_file, sep='\t')

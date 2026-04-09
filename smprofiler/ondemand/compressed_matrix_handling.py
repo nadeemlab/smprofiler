@@ -46,13 +46,22 @@ class CompressedMatrixHandling:
     def form_intensities_compressed_blob(
         data_array: dict[int, tuple[float, ...]],
     ):
+        number_channels = len(data_array[list(data_array.keys())[0]])
+        clip_counts = {i: 0 for i in range(number_channels)}
         blob = bytearray()
         for histological_structure_id in sorted(list(data_array.keys())):
             blob.extend(int(histological_structure_id).to_bytes(4))
-            for value in data_array[histological_structure_id]:
-                encoded = encode_float8_with_clipping(value)
+            for i, value in enumerate(data_array[histological_structure_id]):
+                encoded, clipped = encode_float8_with_clipping(value)
+                if clipped:
+                    clip_counts[i] += 1
                 blob.extend(encoded)
         compressed_blob = brotli.compress(blob, quality=11, lgwin=24)
+        N = len(data_array)
+        for i in range(number_channels):
+            c = clip_counts[i]
+            if c * 1.0 / N > 0.5:
+                logger.warning(f'More than 50% ({c} / {N}) of the values clipped in channel {i} this sample when using 8-bit float format.')
         return compressed_blob
 
     @classmethod
