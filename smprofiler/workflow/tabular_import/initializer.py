@@ -4,7 +4,7 @@ from json import loads
 
 from smprofiler.workflow.component_interfaces.initializer import Initializer
 from smprofiler.db.schema_infuser import SchemaInfuser
-from smprofiler.workflow.tabular_import.parsing.skimmer import DataSkimmer
+from smprofiler.workflow.tabular_import.parsing.parser import Parser
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
@@ -30,7 +30,7 @@ class TabularImportInitializer(Initializer): #pylint: disable=too-few-public-met
         infuser = SchemaInfuser(database_config_file=database_config_file)
         infuser.setup_lightweight_metaschema()
 
-        skimmer = DataSkimmer(database_config_file=database_config_file)
+        parser = Parser(database_config_file=database_config_file)
         files = {
             'file manifest': kwargs['file_manifest_file'],
             'channels': kwargs['channels_file'],
@@ -48,5 +48,5 @@ class TabularImportInitializer(Initializer): #pylint: disable=too-few-public-met
             f = re.sub(' ', '_', key)
             if f'{f}_file' in kwargs:
                 files[key] = kwargs[f'{f}_file']
-        skimmer.parse(files)
+        parser.parse(files)
 
