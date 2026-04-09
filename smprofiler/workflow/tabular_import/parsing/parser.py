@@ -18,8 +18,6 @@ from smprofiler.workflow.tabular_import.parsing.study import StudyParser
 from smprofiler.db.database_connection import DBConnection
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import create_dataset_area
-from smprofiler.db.modify_constraints import DBConstraintsToggling
-from smprofiler.db.modify_constraints import toggle_constraints
 from smprofiler.db.schema_infuser import SchemaInfuser
 from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.db.exchange_data_formats.study import StudyHandle
@@ -117,13 +115,6 @@ class Parser:
         study_name = self._register_study(_files['study'])
         with as_file(files('adiscstudies').joinpath('fields.tsv')) as path:
             fields = pandas_read_csv(path, sep='\t', na_filter=False)
-
-        toggle_constraints(
-            self.database_config_file,
-            study_name,
-            state=DBConstraintsToggling.DROP,
-        )
-
         with DBConnection(database_config_file=self.database_config_file, study=study_name) as connection:
             self._cache_all_record_counts(connection, fields)
             StudyParser(fields).parse(connection, _files['study'])
@@ -154,10 +145,4 @@ class Parser:
                 TableTranscriber((_files[pcd], _files[cl]), connection).transcribe()
             SampleStratificationCreator.create_sample_stratification(connection)
             self._report_record_count_changes(connection, fields)
-
-        toggle_constraints(
-            self.database_config_file,
-            study_name,
-            state=DBConstraintsToggling.RECREATE,
-        )
 
