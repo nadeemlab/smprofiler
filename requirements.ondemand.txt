@@ -51,7 +51,7 @@ markupsafe==3.0.3
 matplotlib==3.10.8
 matplotlib-scalebar==0.9.0
 mdurl==0.1.2
-more-itertools==11.0.1
+more-itertools==11.0.2
 msgpack==1.1.2
 multidict==6.7.1
 multipledispatch==1.0.0
