@@ -45,7 +45,7 @@
         "component_name": "smprofiler",
         "format": "Python package",
         "source": "Python package index (PyPI)",
-        "version": "1.0.70",
+        "version": "1.0.71",
         "relevant_to_reproducible_computation": true
     },
     {
