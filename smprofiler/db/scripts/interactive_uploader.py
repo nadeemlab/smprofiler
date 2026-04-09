@@ -18,12 +18,6 @@ from configparser import ConfigParser
 from json import loads as json_loads
 from typing import cast
 
-S3_BUCKET: str | None
-if 'SMProfiler_S3_BUCKET' in os_environ:
-    S3_BUCKET = os_environ['SMProfiler_S3_BUCKET']
-else:
-    S3_BUCKET = None
-
 from psycopg import connect
 
 from boto3 import client as boto3_client
@@ -36,6 +30,13 @@ from smprofiler.db.credentials import MissingKeysError
 from smprofiler.workflow.scripts.configure import _parse_s3_reference
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.standalone_utilities.log_formats import CustomFormatter
+
+S3_BUCKET: str | None
+if 'SMProfiler_S3_BUCKET' in os_environ:
+    S3_BUCKET = os_environ['SMProfiler_S3_BUCKET']
+else:
+    S3_BUCKET = None
+
 
 PREVIOUS_FILENAME = '.smprofiler_last_used_config'
 
@@ -178,6 +179,7 @@ class InteractiveUploader:
                 host=credentials.endpoint,
                 user=credentials.user,
                 password=credentials.password,
+                connect_timeout=5,
             ) as _:
                 return True
         except Exception:

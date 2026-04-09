@@ -185,12 +185,17 @@ def generate_metadata_table(f: SmallFloatByteFormat) -> tuple[list[SmallFloatMet
     return rows, df
 
 
-def encode_float8_with_clipping(value) -> bytes:
+def encode_float8_with_clipping(value) -> tuple[bytes, bool]:
+    clipped = False
     try:
         encoded = encode(value)
     except Float8OverflowError as error:
         if error._is_underflow:
             encoded = encode(0.0)
+            clipped = True
         else:
             encoded = encode(1.0)
-    return encoded
+            clipped = True
+    return encoded, clipped
+
+

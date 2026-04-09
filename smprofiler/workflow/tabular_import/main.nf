@@ -89,9 +89,6 @@ process workflow_main {
      --phenotypes-file=${phenotypes_file} \
      --permanent-condition-diagnosis-file=${permanent_condition_diagnosis_file} \
      --condition-lack-file=${condition_lack_file} ;
-    smprofiler ondemand assess-recreate-cache \
-     --database-config-file=${db_config_file} \
-     --study-file=${study} ;
     """
 }
 

@@ -75,3 +75,4 @@ class SquidpyComputer(GenericJobComputer):
         df = DataFrame(rows, columns=columns)
         df.set_index('histological_structure_id', inplace=True)
         return df
+

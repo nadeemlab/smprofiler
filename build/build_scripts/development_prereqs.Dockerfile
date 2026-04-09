@@ -33,7 +33,7 @@ ENV PATH="/root/.local/bin/:$PATH"
 COPY pyproject.toml .
 RUN bash -c 'source /opt/venv/bin/activate && uv pip install --all-extras -r pyproject.toml'
 COPY requirements.txt .
-RUN grep setuptools requirements.txt | xargs python -m pip install
+RUN python -m pip install setuptools>=82
 RUN bash -c 'source /opt/venv/bin/activate && uv pip install -r requirements.txt'
 RUN python -m pip install build
 RUN python -m pip install twine

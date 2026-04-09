@@ -3,7 +3,7 @@
 from pandas import DataFrame, concat, merge  # type: ignore
 from numpy import sort  # type: ignore
 
-from smprofiler.db.feature_matrix_extractor import FeatureMatrixExtractor
+from smprofiler.db.feature_matrix_retrieval import FeatureMatrixRetrieval
 
 
 def extract(
@@ -38,7 +38,7 @@ def extract(
     label_to_result_text: dict[int, str]
         Mapping from class integer label to human-interpretable result text.
     """
-    extractor = FeatureMatrixExtractor(database_config_file=database_config_file)
+    extractor = FeatureMatrixRetrieval(database_config_file=database_config_file)
     cohorts = extractor.extract_cohorts(study)
     specimens, df_label, label_to_result_text = _create_label_df(
         cohorts['assignments'],
@@ -46,11 +46,11 @@ def extract(
         strata_to_use,
     )
     df_cell = _create_cell_df({
-        specimen: extractor.extract(specimen=specimen, retain_structure_id=True)[specimen].dataframe
+        specimen: extractor.extract(specimen=specimen, composite_phenotypes=True)[specimen].dataframe
         for specimen in specimens
     } if (strata_to_use is not None) else {
         specimen: data.dataframe
-        for specimen, data in extractor.extract(study=study, retain_structure_id=True).items()
+        for specimen, data in extractor.extract(None, study=study, composite_phenotypes=True).items()
     })
     return df_cell, df_label, label_to_result_text
 

@@ -4,6 +4,7 @@ from typing import cast
 import re
 
 from psycopg.errors import UndefinedTable
+from psycopg import sql as psycopg_sql
 
 from smprofiler.db.simple_method_cache import simple_instance_method_cache
 from smprofiler.workflow.common.export_features import ADIFeatureSpecificationUploader
@@ -21,11 +22,13 @@ from smprofiler.db.exchange_data_formats.study import (
     Products,
 )
 from smprofiler.db.accessors.cells import CellsAccess
+from smprofiler.db.accessors.primary_study import get_primary_study
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.db.exchange_data_formats.metrics import AvailableGNN
 from smprofiler.db.simple_query_patterns import GetSingleResult
 from smprofiler.db.cohorts import get_sample_cohorts
 from smprofiler.db.database_connection import SimpleReadOnlyProvider
+from smprofiler.db.database_connection import DBConnection
 from smprofiler.db.describe_features import get_feature_description
 from smprofiler.workflow.automated_analysis.pdf_server import PDFReportServer
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -46,7 +49,7 @@ class StudyAccess(SimpleReadOnlyProvider):
         publication = self._get_publication(study)
         assay = self._get_assay(components.measurement)
         sample_cohorts = get_sample_cohorts(self.cursor, study)
-        findings = self.get_study_findings()
+        findings = self.get_study_findings(study)
         has_umap = self.has_umap()
         has_intensities = self.has_intensities()
         has_pdf_report = PDFReportServer(None, study).exists()
@@ -63,7 +66,9 @@ class StudyAccess(SimpleReadOnlyProvider):
             curation_notes=curation_notes,
         )
 
-    def get_study_components(self, study: str) -> StudyComponents:
+    def get_study_components(self, study: str | None) -> StudyComponents:
+        if study is None:
+            study = get_primary_study(self.cursor)
         substudy_tables = {
             'collection': 'specimen_collection_study',
             'measurement': 'specimen_measurement_study',
@@ -71,12 +76,13 @@ class StudyAccess(SimpleReadOnlyProvider):
         }
         substudies = {}
         for key, tablename in substudy_tables.items():
-            self.cursor.execute(f'''
-            SELECT ss.name FROM {tablename} ss
-            JOIN study_component sc ON sc.component_study=ss.name
-            WHERE sc.primary_study=%s
-            ;
-            ''', (study,))
+            query = psycopg_sql.SQL('''
+                SELECT ss.name FROM {table} ss
+                JOIN study_component sc ON sc.component_study=ss.name
+                WHERE sc.primary_study=%s ;
+                '''
+            ).format(table=psycopg_sql.Identifier(tablename))
+            self.cursor.execute(query, (study,))
             name = [
                 row[0] for row in self.cursor.fetchall()
                 if not self._is_secondary_substudy(row[0])
@@ -87,24 +93,47 @@ class StudyAccess(SimpleReadOnlyProvider):
     def get_available_gnn(self, study: str) -> AvailableGNN:
         feature_class = get_feature_description("gnn importance score")
         self.cursor.execute('''
-        SELECT fsp.specifier
-        FROM feature_specification fs
-        JOIN feature_specifier fsp ON fs.identifier=fsp.feature_specification
-        JOIN study_component sc ON sc.component_study=fs.study
-        WHERE sc.primary_study=%s AND fs.derivation_method=%s AND fsp.ordinality='1';
-        ''', (study, feature_class))
+            SELECT fsp.specifier
+            FROM feature_specification fs
+            JOIN feature_specifier fsp ON fs.identifier=fsp.feature_specification
+            JOIN study_component sc ON sc.component_study=fs.study
+            WHERE sc.primary_study=%s AND fs.derivation_method=%s AND fsp.ordinality='1';
+            ''',
+            (study, feature_class),
+        )
         rows = tuple(self.cursor.fetchall())
         return AvailableGNN(plugins=tuple(specifier for (specifier, ) in rows))
 
-    def get_study_findings(self) -> list[str]:
-        return self._get_study_small_artifacts('findings')
+    def get_study_findings(self, study: str) -> list[str]:
+        return self._get_study_small_artifacts('findings', study)
 
     def get_study_gnn_plot_configurations(self) -> list[str]:
-        return self._get_study_small_artifacts('gnn_plot_configurations')
+        return self._get_study_small_artifacts('gnn_plot_configurations', None)
 
-    def _get_study_small_artifacts(self, name: str) -> list[str]:
-        self.cursor.execute(f'SELECT txt FROM {name} ORDER BY id;')
-        return [row[0] for row in self.cursor.fetchall()]
+    def _table_exists(self, table: str, study: str | None) -> bool:
+        schema = cast(str, DBConnection.retrieve_study_schema(study, self.cursor))
+        query = psycopg_sql.SQL('''
+            SELECT EXISTS (
+            SELECT FROM pg_catalog.pg_class c
+            JOIN   pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE  n.nspname = %s
+            AND    c.relname = %s
+            AND    c.relkind = 'r'    -- only tables
+            );
+            ''',
+        )
+        self.cursor.execute(query, (schema, table))
+        result = tuple(self.cursor.fetchall())[0][0]
+        return result
+
+    def _get_study_small_artifacts(self, name: str, study: str | None) -> list[str]:
+        if self._table_exists(name, study):
+            query = psycopg_sql.SQL(
+                'SELECT txt FROM {name} ORDER BY id;'
+            ).format(name=psycopg_sql.Identifier(name))
+            self.cursor.execute(query)
+            return list(map(lambda row: row[0], tuple(self.cursor.fetchall())))
+        return []
 
     @staticmethod
     def _is_secondary_substudy(substudy: str) -> bool:
@@ -175,7 +204,7 @@ class StudyAccess(SimpleReadOnlyProvider):
 
     @staticmethod
     def _rough_check_is_email(string):
-        return not re.match('^[A-Za-z0-9+_.-]+@([^ ]+)$', string) is None
+        return re.match('^[A-Za-z0-9+_.-]+@([^ ]+)$', string) is not None
 
     def _get_data_release(self, study: str) -> DataRelease:
         query = '''
@@ -240,7 +269,7 @@ class StudyAccess(SimpleReadOnlyProvider):
 
     def get_number_cells_by_sample(self, study: str, verbose: bool=False) -> tuple[tuple[str, int], ...]:
         components = self.get_study_components(study)
-        access = CellsAccess(self.cursor)
+        access = CellsAccess(self.cursor, database_config_file=self.database_config_file)
         samples = self._get_specimens(components.measurement)
         if verbose:
             logger.info(f'Retrieving cell counts for {study}')
@@ -369,3 +398,4 @@ class StudyAccess(SimpleReadOnlyProvider):
         if len(rows) == 0:
             return None
         return ' '.join([r[0] for r in rows])
+

@@ -46,19 +46,6 @@ def drop_cache_files(database_config_file: str | None, blob_type: str, study: st
                 ''')
 
 
-def retrieve_expressions_index(database_config_file: str, study: str) -> str | None:
-    with DBCursor(database_config_file=database_config_file, study=study) as cursor:
-        cursor.execute('''
-            SELECT blob_contents FROM ondemand_studies_index osi
-            WHERE osi.blob_type='expressions_index' ;
-        ''')
-        rows = tuple(cursor.fetchall())
-        if len(rows) == 0:
-            return None
-        result_blob = bytearray(rows[0][0])
-    return result_blob.decode(encoding='utf-8')
-
-
 def retrieve_indexed_samples(database_config_file: str, study: str) -> tuple[str, ...]:
     with DBCursor(database_config_file=database_config_file, study=study) as cursor:
         cursor.execute('''

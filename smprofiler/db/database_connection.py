@@ -16,6 +16,7 @@ from psycopg import Connection as PsycopgConnection
 from psycopg import Cursor as PsycopgCursor
 from psycopg import Error as PsycopgError
 from psycopg import OperationalError
+from psycopg import sql as psycopg_sql
 from psycopg.errors import DuplicateDatabase
 from psycopg.errors import DuplicateSchema
 from attr import define
@@ -193,7 +194,8 @@ class DBCursor(DBConnection):
         else:
             schema = DBConnection.retrieve_study_schema(self.study, self.get_cursor())
         if schema is not None:
-            self.cursor.execute(f'SET search_path TO {schema} ;')
+            query = psycopg_sql.SQL('SET search_path TO {schema} ;').format(schema=psycopg_sql.Identifier(schema))
+            self.cursor.execute(query)
         return self.get_cursor()
 
     def __exit__(self, exception_type, exception_value, traceback):
@@ -204,7 +206,8 @@ class DBCursor(DBConnection):
 
 
 def ensure_main_database_created(database_config_file: str | None) -> None:
-    create_statement = f'CREATE DATABASE {main_database_name()} ;'
+    db = main_database_name()
+    create_statement = 'CREATE DATABASE {db} ;'
     if database_config_file is not None:
         credentials = retrieve_credentials_from_file(database_config_file)
     else:
@@ -218,9 +221,10 @@ def ensure_main_database_created(database_config_file: str | None) -> None:
     ) as connection:
         with connection.cursor() as cursor:
             try:
-                logger.info('Creating database:')
+                logger.info(f'Creating database ({db}):')
                 logger.info(f'    {create_statement}')
-                cursor.execute(create_statement)
+                query = psycopg_sql.SQL(create_statement).format(db=psycopg_sql.Identifier(db))
+                cursor.execute(query)
             except DuplicateDatabase:
                 pass
 
@@ -313,7 +317,7 @@ def _create_postgres_schema(database_config_file: str | None, schema_name: str) 
         logger.error(message)
         raise ValueError(message)
     credentials = retrieve_credentials_from_file(database_config_file)
-    create_statement = f'CREATE SCHEMA {schema_name} ;'
+    create_statement = 'CREATE SCHEMA {schema_name} ;'
     connection = connect(
         dbname=credentials.database,
         host=credentials.endpoint,
@@ -324,9 +328,10 @@ def _create_postgres_schema(database_config_file: str | None, schema_name: str) 
         connection.autocommit = True
         try:
             with connection.cursor() as cursor:
-                logger.info('Creating schema in database "%s":' % credentials.database)
+                logger.info('Creating schema (%s) in database "%s":' % (schema_name, credentials.database))
                 logger.info(f'    {create_statement}')
-                cursor.execute(create_statement)
+                query = psycopg_sql.SQL(create_statement).format(schema_name=psycopg_sql.Identifier(schema_name))
+                cursor.execute(query)
         except DuplicateSchema:
             logger.warning('Attempt to recreate existing schema "%s".', schema_name)
     finally:
@@ -337,7 +342,7 @@ def _create_postgres_schema(database_config_file: str | None, schema_name: str) 
 class SimpleReadOnlyProvider:
     """State-holder for basic read-only one-time database data provider classes."""
     cursor: PsycopgCursor
-
+    database_config_file: str | None = None
 
 class QueryCursor:
     """Dispatches calls to a provided handler class (most likely QueryHandler).

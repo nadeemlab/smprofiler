@@ -1,4 +1,3 @@
-
 # Data structure to represent summarized cell-level data for one slide
 
 For memory- and time-efficient manipulation, a simple binary data structure is used to represent the cell data for one slide.

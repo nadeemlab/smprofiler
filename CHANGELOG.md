@@ -1,4 +1,16 @@
-# v1.70.0
+# v1.0.71
+- A new cache store abstraction (`CacheStore`) is introduced, with optional database/S3 backing, for the preprocessed cell-level data payloads
+- Many ETL steps are merged into one, to reduce the bandwidth usage associated with saving/retrieving from the database for operations done only once, as well as to reduce the database storage usage and associated access performance problems. This includes bypassing the big-data portion of the database tables (`histological_structure_identification`, `shape_file`, etc.) at least for cell-level use. The tables remain since they can be used for smaller data (e.g. tissue region annotations). Overall the effect is to vastly improve ETL performance, and make database management easier (enable fast backups, total extraction as SQLite database, etc.). For details see [#419](https://github.com/nadeemlab/smprofiler/issues/419).
+- The deprecations include:
+  - `assess-recreate-cache` script
+  - `cache_assessment`
+  - `cache_pulling`
+  - `sparse_matrix_puller`
+  - `structure_centroids_puller`
+  - `count-cells` script
+- A bug is fixed in continuous dataframe parsing where the first 4 bytes of each row were accidentally parsed as channel data (these contain a cell ID), and corresponding test data artifact update.
+
+# v1.0.70
 Adds support for survival-type data (overall survival, disease progression, etc.). This is achieved by including two new metadata tables, annotating diagnosis condition and result (pairs) representing the types of events recorded. New records in the diagnosis table (referring to the new metadata) can then be added with event time data.
 
 New datasets prepared for the ETL process must now include `permanent_condition_diagnosis.tsv` and `condition_lack.tsv`, as well as any needed `diagnosis.tsv` rows. These additions will be picked up by the normal ETL for the whole dataset, but they can also be uploaded on an isolated one-time basis with:

@@ -25,7 +25,7 @@ class SourceToADIParser:
         return study_name + " - specimen collection"
 
     @staticmethod
-    def get_measurement_study_name(study_name):
+    def get_measurement_study_name(study_name) -> str:
         return study_name + " - measurement"
 
     @staticmethod

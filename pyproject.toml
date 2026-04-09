@@ -1,13 +1,13 @@
 [build-system]
 requires = [
-    "setuptools>=63",
+    "setuptools>=82",
     "wheel"
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "smprofiler"
-version = "1.0.70"
+version = "1.0.71"
 authors = [
     { name = "James Mathews", email = "mathewj2@mskcc.org" }
 ]
@@ -33,6 +33,7 @@ dependencies = [
     "pytz",
     "requests",
     "scanpy==1.11.5",
+    "spatialdata>=0.7.2",
     "termplotlib",
 ]
 
@@ -52,6 +53,7 @@ all = [
     "cryptography",
     "dask[dataframe]",
     "dask-expr",
+    "dask-image>=2025.11.0",
     "fastapi",
     "h5py",
     "jinja2",
@@ -214,7 +216,6 @@ packages = [
 ]
 "smprofiler.ondemand.scripts" = [
     "read_expression_dump_file.py",
-    "assess_recreate_cache.py",
     "start.py",
 ]
 "smprofiler.db.scripts" = [
@@ -230,7 +231,6 @@ packages = [
     "interactive_uploader.py",
     "load_testing.py",
     "sync_annotations.py",
-    "count_cells.py",
     "cache_subsample.py",
 ]
 "smprofiler.db.data_model" = [

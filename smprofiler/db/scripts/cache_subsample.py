@@ -261,9 +261,9 @@ class InteractiveSubsampler:
         self.print('and save to the database at'.ljust(26), 'message', end='')
         assert self.credentials is not None
         self.print(f'  {self.credentials.endpoint}', 'item', end='')
-        self.print(f'  (from credentials ', 'message', end='')
+        self.print('  (from credentials ', 'message', end='')
         self.print(f'{self.selected_database_config_file}', 'popout', end='')
-        self.print(f' )', 'message')
+        self.print(' )', 'message')
         print()
 
     def _do_specified_caching(self) -> None:
@@ -279,9 +279,9 @@ class InteractiveSubsampler:
             if only_uncreated and Subsampler.cache_exists(study, database_config_file):
                 InteractiveSubsampler.print(f'Skipping "{study}" because cache exists.', 'message')
                 continue
-            InteractiveSubsampler.print(f'Processing study ', 'message', end='')
+            InteractiveSubsampler.print('Processing study ', 'message', end='')
             InteractiveSubsampler.print(f'{abbreviate(study)}', 'popout', end='')
-            InteractiveSubsampler.print(f' ', 'message')
+            InteractiveSubsampler.print(' ', 'message')
             f = database_config_file
             Subsampler(study, f, maximum_number_cells=maximum_number_cells, verbose=verbose)
 

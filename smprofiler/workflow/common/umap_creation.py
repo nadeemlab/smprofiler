@@ -1,39 +1,31 @@
-"""The core calculator for the UMAP dimensional reduction."""
+"""UMAP dimensional reduction."""
 import warnings
-import pickle
+import brotli
+from typing import cast
 
-import brotli  # type: ignore
+from pandas import DataFrame
+import pandas.errors as pd_errors
+from umap import UMAP
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import QuantileTransformer
 
-from pandas import DataFrame  # type: ignore
-import pandas.errors as pd_errors  # type: ignore
-
-from umap import UMAP  # type: ignore
-from sklearn.impute import SimpleImputer  # type: ignore
-from sklearn.pipeline import make_pipeline  # type: ignore
-from sklearn.preprocessing import QuantileTransformer  # type: ignore
-
-from smprofiler.workflow.common.sparse_matrix_puller import SparseMatrixPuller
+from smprofiler.ondemand.compressed_matrix_handling import compress_bitwise_to_int
+from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
-from smprofiler.ondemand.compressed_matrix_writer import CompressedMatrixWriter
-
-
 from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.db.database_connection import DBCursor
-from smprofiler.standalone_utilities.float8 import encode_float8_with_clipping
-from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.ondemand.cache_store import get_cache_store
+from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
+from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
+from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 warnings.simplefilter(action='ignore', category=pd_errors.PerformanceWarning)
 warnings.filterwarnings(action='ignore', message='n_jobs value 1 overridden to 1 by setting random_state. Use no seed for parallelism.')
 
-from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
-from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC1
-from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_SPEC2
-from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
-
 logger = colorized_logger(__name__)
 
-UMAP_POINT_LIMIT = 100000
+UMAP_POINT_LIMIT = 40000
 
 class NoContinuousIntensityDataError(ValueError):
     pass
@@ -47,69 +39,16 @@ class UMAPCreator:
         self.database_config_file = database_config_file
         self.study = study
 
-    def create(self) -> None:
-        self._generate_and_write_reductions()
-
     def create_from_dense_frames(
         self,
         continuous: DataFrame,
         discrete: DataFrame,
-        ordered_symbols: list[str],
+        ordered_symbols: tuple[str, ...],
     ) -> None:
         if all(continuous.isna().all()):
             raise NoContinuousIntensityDataError
         reduced = UMAPReducer.create_2d_point_cloud(continuous)
         self._write_to_database(reduced, discrete, continuous, ordered_symbols=ordered_symbols)
-
-    def _generate_and_write_reductions(self) -> None:
-        continuous, discrete = self.retrieve_feature_matrix_dense(cell_limit=UMAP_POINT_LIMIT)
-        reduced = UMAPReducer.create_2d_point_cloud(continuous)
-        self._write_to_database(reduced, discrete, continuous)
-
-    def retrieve_feature_matrix_dense(self, cell_limit=None):
-        sparse_df = self.retrieve_feature_matrix_sparse(cell_limit=cell_limit)
-        continuous = UMAPCreator.sparse_to_dense(sparse_df, 'quantity')
-        if all(continuous.isna().all()):
-            raise NoContinuousIntensityDataError
-        discrete = UMAPCreator.sparse_to_dense(sparse_df, 'discrete_value')
-        continuous.sort_index(inplace=True)
-        discrete.sort_index(inplace=True)
-        return (continuous, discrete)
-
-    def retrieve_feature_matrix_sparse(self, cell_limit=None):
-        if cell_limit is None:
-            raise ValueError('Need to choose a cell_limit.')
-        logger.info(f'Retrieving cell data for "{self.study}".')
-        with DBCursor(database_config_file=self.database_config_file, study=self.study) as cursor:
-            cursor.execute('SELECT COUNT(*) FROM histological_structure;')
-            total = tuple(cursor.fetchall())[0][0]
-            cursor.execute(f'''
-            SELECT
-                eq.histological_structure,
-                cs.symbol,
-                eq.quantity,
-                CASE WHEN eq.discrete_value='positive' THEN 1 ELSE 0 END discrete_value
-            FROM expression_quantification eq
-            JOIN chemical_species cs ON cs.identifier=eq.target
-            JOIN histological_structure_identification hsi ON eq.histological_structure=hsi.histological_structure
-            JOIN data_file df ON df.sha256_hash=hsi.data_source            
-            JOIN specimen_data_measurement_process sdmp ON df.source_generation_process=sdmp.identifier
-            JOIN specimen_collection_process scp ON scp.specimen=sdmp.specimen
-            JOIN study_component sc ON scp.study=sc.component_study
-            WHERE sc.primary_study=%s AND eq.histological_structure IN (
-                SELECT temp.random_id FROM (
-                        SELECT generate_series (1, {UMAP_POINT_LIMIT}), (random() * {total})::int::VARCHAR(512) AS random_id
-                        FROM (SELECT 1 AS n) AS temp1
-                    ) AS temp
-                )
-            ;
-            ''', (self.study,))
-            rows = cursor.fetchall()
-        sparse_df = DataFrame(rows, columns=['structure', 'channel', 'quantity', 'discrete_value'])
-        sparse_df = sparse_df.astype({'structure': str, 'channel': str, 'quantity': float, 'discrete_value': int})
-        self.validate_all_structures_have_same_channels(sparse_df)
-        logger.info('Dataframe pulled: %s', sparse_df.columns.values.tolist())
-        return sparse_df
 
     @staticmethod
     def sparse_to_dense(sparse_df: DataFrame, values_column: str) -> DataFrame:
@@ -132,36 +71,33 @@ class UMAPCreator:
         reduced,
         discrete: DataFrame,
         continuous: DataFrame,
-        ordered_symbols: list[str] | None = None,
+        ordered_symbols: tuple[str, ...],
     ) -> None:
         data_array = self._create_data_array(discrete, ordered_symbols=ordered_symbols)
-        blob = bytearray()
-        for histological_structure_id, entry in data_array.items():
-            blob.extend(histological_structure_id.to_bytes(8, 'little'))
-            blob.extend(entry.to_bytes(8, 'little'))
-        centroid_data = {
-            VIRTUAL_SAMPLE_SPEC2[0]: dict(tuple(
-                zip(tuple(discrete.index.astype(int)), tuple(zip(reduced[:,0], reduced[:,1])))
-            ))
-        }
+        centroids = dict(tuple(
+            zip(tuple(discrete.index.astype(int)), tuple(zip(reduced[:,0], reduced[:,1])))
+        ))
 
-        logger.info('Saving UMAP centroids and feature matrix.')
+        phenotype_bytes = {cell_id: integer.to_bytes(8, 'little') for cell_id, integer in data_array.items()}
+        raw = CompressedMatrixHandling.zip_location_and_phenotype_data(centroids, phenotype_bytes)
+        compressed = brotli.compress(raw, quality=11, lgwin=24)
         cache_store = get_cache_store(self.database_config_file)
         self._drop_existing_umap_cache(cache_store)
-        cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1], blob, drop_first=True)
-        cache_store.put_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1], pickle.dumps(centroid_data), drop_first=True)
-        logger.info('Done.')
-
+        cache_store.put_blob(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED, compressed)
+        logger.info('Saved UMAP centroids and feature matrix combo.')
         logger.info('Saving UMAP specialized intensities matrix.')
-        intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=ordered_symbols)
+        intensities = self._normalize_column_order(continuous, 'quantity', ordered_symbols=list(ordered_symbols))
         intensities_dict = {int(i): tuple(float(intensities.loc[i, c]) for c in intensities.columns) for i in intensities.index}
-        CompressedMatrixWriter(self.database_config_file)._write_intensities_data_array_to_db(intensities_dict, None, VIRTUAL_SAMPLE, self.study)
+        cache_store.put_blob(
+            self.study,
+            VIRTUAL_SAMPLE,
+            FEATURE_MATRIX_WITH_INTENSITIES,
+            CompressedMatrixHandling.form_intensities_compressed_blob(intensities_dict),
+        )
         logger.info('Done.')
 
     def _drop_existing_umap_cache(self, cache_store):
         logger.info('  Dropping existing UMAP cache blobs.')
-        cache_store.delete_blob(self.study, VIRTUAL_SAMPLE_SPEC1[0], VIRTUAL_SAMPLE_SPEC1[1])
-        cache_store.delete_blob(self.study, VIRTUAL_SAMPLE_SPEC2[0], VIRTUAL_SAMPLE_SPEC2[1])
         cache_store.delete_blob(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED)
         cache_store.delete_blob(self.study, VIRTUAL_SAMPLE, FEATURE_MATRIX_WITH_INTENSITIES)
         logger.info('  Done.')
@@ -178,15 +114,15 @@ class UMAPCreator:
             ordered_symbols = [n.symbol for n in ordered.names]
         symbols = [(modifier, n) for n in ordered_symbols]
         logger.info(f'Using feature order: {[s[1] for s in symbols]}')
-        df_ordered = df[symbols]
+        df_ordered = cast(DataFrame, df[symbols])
         return df_ordered.sort_index()
 
-    def _create_data_array(self, df: DataFrame, ordered_symbols: list[str] | None = None) -> dict[int, int]:
-        df_ordered = self._normalize_column_order(df, 'discrete_value', ordered_symbols=ordered_symbols)
+    def _create_data_array(self, df: DataFrame, ordered_symbols: tuple[str, ...]) -> dict[int, int]:
+        df_ordered = self._normalize_column_order(df, 'discrete_value', ordered_symbols=list(ordered_symbols))
         data_array = {}
-        for i, row in df_ordered.iterrows():
+        for i, (_, row) in enumerate(df_ordered.iterrows()):
             binary = row.astype(int).to_numpy()
-            data_array[int(i)] = SparseMatrixPuller._compress_bitwise_to_int(binary)
+            data_array[i] = compress_bitwise_to_int(binary)
         return data_array
 
 
@@ -202,14 +138,11 @@ class UMAPReducer:
 
     @staticmethod
     def drop_discrete_features(df: DataFrame) -> DataFrame:
-        droppables = []
-        for column in df.columns:
-            if len(set(df[column])) <= 2:
-                droppables.append(column)
-        remainder = [c for c in df.columns if not c in droppables]
-        if len(remainder) == 0:
+        non_droppables = set(filter(lambda c: len(set(df[c])) > 2, df.columns))
+        if len(non_droppables) == 0:
             raise NoContinuousIntensityDataError
-        return df[remainder]
+        ordered = [c for c in df.columns if c in non_droppables]
+        return cast(DataFrame, df[ordered])
 
     @staticmethod
     def preprocess_univariate_adjustments(df):
@@ -232,3 +165,4 @@ class UMAPReducer:
         first = tuple(zip(scaled[0:5,0], scaled[0:5,1]))
         logger.info(f'After scaling: {first}')
         return scaled
+

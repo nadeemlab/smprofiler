@@ -6,13 +6,20 @@ from dataclasses import dataclass
 import os
 import re
 from typing import Protocol
+from typing import Any
 
 from boto3 import client as boto3_client
+from botocore.exceptions import ClientError
 
 from smprofiler.db.database_connection import DBCursor
 
 
 S3_CACHE_URI_ENV = "SMProfiler_S3_CACHE_URI"
+
+class CacheStoreObjectNotFound(ValueError):
+    def __init__(self, requested_key: Any, valid_keys: tuple[Any, ...]):
+        message = f'Requested key "{requested_key}" not in store. Valid keys: {valid_keys}'
+        super().__init__(message)
 
 
 class CacheStore(Protocol):
@@ -30,6 +37,21 @@ class CacheStore(Protocol):
     def delete_blob(self, study: str | None, specimen: str | None, blob_type: str) -> None:
         ...
 
+    def get_blob(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bytes:
+        ...
+
+    def blob_exists(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bool:
+        ...
 
 class DatabaseCacheStore:
     def __init__(self, database_config_file: str | None) -> None:
@@ -44,6 +66,7 @@ class DatabaseCacheStore:
         *,
         drop_first: bool = False,
     ) -> None:
+        specimen = self._preprocess_handle(specimen)
         with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
             if drop_first:
                 drop = '''
@@ -64,6 +87,7 @@ class DatabaseCacheStore:
             cursor.close()
 
     def delete_blob(self, study: str | None, specimen: str | None, blob_type: str) -> None:
+        specimen = self._preprocess_handle(specimen)
         with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
             delete_query = '''
                 DELETE FROM ondemand_studies_index
@@ -71,6 +95,52 @@ class DatabaseCacheStore:
             '''
             cursor.execute(delete_query, (specimen, blob_type))
             cursor.close()
+
+    def get_blob(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bytes:
+        specimen = self._preprocess_handle(specimen)
+        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+            select_query = '''
+                SELECT blob_contents FROM
+                ondemand_studies_index
+                WHERE specimen=%s AND blob_type=%s ;
+            '''
+            cursor.execute(select_query, (specimen, blob_type))
+            rows = tuple(cursor.fetchall())
+            if len(rows) == 0:
+                valid_keys = self._get_valid_keys(study)
+                raise CacheStoreObjectNotFound((study, specimen, blob_type), valid_keys)
+            return rows[0][0]
+
+    def _get_valid_keys(self, study: str | None) -> tuple[Any, ...]:
+        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+            cursor.execute('SELECT specimen, blob_type FROM ondemand_studies_index;')
+            return tuple(map(lambda row: (study, *row), tuple(cursor.fetchall())))
+
+    def blob_exists(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bool:
+        specimen = self._preprocess_handle(specimen)
+        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+            select_query = '''
+                SELECT COUNT(*) FROM
+                ondemand_studies_index
+                WHERE specimen=%s AND blob_type=%s ;
+            '''
+            cursor.execute(select_query, (specimen, blob_type))
+            return tuple(cursor.fetchall())[0][0] >= 1
+
+    def _preprocess_handle(self, specimen: str | None) -> str:
+        if specimen is None:
+            return ''
+        return specimen
 
 
 @dataclass(frozen=True)
@@ -102,6 +172,30 @@ class S3CacheStore:
     def delete_blob(self, study: str | None, specimen: str | None, blob_type: str) -> None:
         key = self._build_key(study, specimen, blob_type)
         self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def get_blob(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bytes:
+        key = self._build_key(study, specimen, blob_type)
+        return self.client.get_object(Bucket=self.bucket, Key=key)
+
+    def blob_exists(
+        self,
+        study: str | None,
+        specimen: str | None,
+        blob_type: str,
+    ) -> bool:
+        key = self._build_key(study, specimen, blob_type)
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=key)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchKey':
+                return False
+            raise e
+        return True
 
     def _build_key(self, study: str | None, specimen: str | None, blob_type: str) -> str:
         study_name = _sanitize_path_component(study or "unknown_study")
