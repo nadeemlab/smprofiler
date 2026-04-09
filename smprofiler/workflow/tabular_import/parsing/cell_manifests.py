@@ -107,14 +107,17 @@ class CellManifestsParser(SourceToADIParser):
         """
         if self.study_name is None:
             raise ValueError('study_name is required to build preprocessed_samples in memory.')
-        ordered_symbols, target_index_lookup, target_by_symbol = self._prepare_channel_metadata(
+        ordered_symbols = self._prepare_channel_metadata(
             chemical_species_identifiers_by_symbol,
         )
         self._loop_over_samples(file_manifest_file, ordered_symbols)
         self._write_channel_metadata(ordered_symbols)
         self._handle_umap_generation(ordered_symbols)
 
-    def _prepare_channel_metadata(self, chemical_species_identifiers_by_symbol: dict[str, str]):
+    def _prepare_channel_metadata(
+        self,
+        chemical_species_identifiers_by_symbol: dict[str, str],
+    ) -> tuple[str, ...]:
         """
         This gathers the channel metadata specific to our database schema, for:
         1. The expressions index file, annotating all of our binary per-sample payloads.
@@ -139,8 +142,7 @@ class CellManifestsParser(SourceToADIParser):
         }
         ordered_targets = sorted(list(symbols_by_target.keys()))
         ordered_symbols = tuple([symbols_by_target[target] for target in ordered_targets])
-        target_index_lookup = {target: i for i, target in enumerate(ordered_targets)}
-        return ordered_symbols, target_index_lookup, target_by_symbol
+        return ordered_symbols
 
     def _loop_over_samples(
         self,
