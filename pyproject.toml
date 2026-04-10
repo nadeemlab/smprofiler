@@ -33,6 +33,7 @@ dependencies = [
     "pytz",
     "requests",
     "scanpy==1.11.5",
+    "setuptools>=82",
     "spatialdata>=0.7.2",
     "termplotlib",
 ]
@@ -70,6 +71,7 @@ all = [
     "pytz",
     "requests",
     "secure",
+    "setuptools>=82",
     "scipy",
     "scikit-learn",
     "squidpy", "zarr",

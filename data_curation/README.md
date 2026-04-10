@@ -5,7 +5,7 @@ The scripts here are used to import dataset into a PostgreSQL database for the S
 
 # Curation or pre-processing
 
-Datasets are stored in subdirectories of `datasets/`. To prepare a new dataset, follow the full example [here](`datasets/moldoveanu/README.md`). The example includes files pre-generated in a format ready for import into the database, but you can also re-generate them yourself.
+Datasets are stored in subdirectories of `datasets/`. To prepare a new dataset, follow the full example [here](datasets/moldoveanu/README.md). The example includes files pre-generated in a format ready for import into the database, but you can also re-generate them yourself.
 
 Extraction scripts tend to be dataset-specific, but there are some common tasks like quantification over segments in images, and formulation of standardized representations of channel or clinical metadata.
 
