@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from atexit import register as register_at_exit
 from dataclasses import dataclass
 import os
 import re
@@ -10,9 +11,10 @@ from typing import Any
 
 from boto3 import client as boto3_client
 from botocore.exceptions import ClientError
+from psycopg import Connection as PsycopgConnection
 
 from smprofiler.db.database_connection import DBCursor
-
+from smprofiler.db.database_connection import DBConnection
 
 S3_CACHE_URI_ENV = "SMProfiler_S3_CACHE_URI"
 
@@ -54,8 +56,18 @@ class CacheStore(Protocol):
         ...
 
 class DatabaseCacheStore:
-    def __init__(self, database_config_file: str | None) -> None:
-        self.database_config_file = database_config_file
+    connection: DBConnection
+
+    def __init__(self, database_config_file: str | None, connection: DBConnection | None=None) -> None:
+        if connection is not None:
+            self.connection = connection
+        else:
+            self.connection = DBConnection(database_config_file=database_config_file)
+            self.connection.__enter__()
+        register_at_exit(self._cleanup)
+
+    def _cleanup(self) -> None:
+        self.connection.__exit__(None, None, None)
 
     def put_blob(
         self,
@@ -67,7 +79,7 @@ class DatabaseCacheStore:
         drop_first: bool = False,
     ) -> None:
         specimen = self._preprocess_handle(specimen)
-        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+        with DBCursor(connection=self.connection, study=study) as cursor:
             if drop_first:
                 drop = '''
                 DELETE FROM
@@ -88,7 +100,7 @@ class DatabaseCacheStore:
 
     def delete_blob(self, study: str | None, specimen: str | None, blob_type: str) -> None:
         specimen = self._preprocess_handle(specimen)
-        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+        with DBCursor(connection=self.connection, study=study) as cursor:
             delete_query = '''
                 DELETE FROM ondemand_studies_index
                 WHERE specimen=%s AND blob_type=%s ;
@@ -103,7 +115,7 @@ class DatabaseCacheStore:
         blob_type: str,
     ) -> bytes:
         specimen = self._preprocess_handle(specimen)
-        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+        with DBCursor(connection=self.connection, study=study) as cursor:
             select_query = '''
                 SELECT blob_contents FROM
                 ondemand_studies_index
@@ -117,7 +129,7 @@ class DatabaseCacheStore:
             return rows[0][0]
 
     def _get_valid_keys(self, study: str | None) -> tuple[Any, ...]:
-        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+        with DBCursor(connection=self.connection, study=study) as cursor:
             cursor.execute('SELECT specimen, blob_type FROM ondemand_studies_index;')
             return tuple(map(lambda row: (study, *row), tuple(cursor.fetchall())))
 
@@ -128,7 +140,7 @@ class DatabaseCacheStore:
         blob_type: str,
     ) -> bool:
         specimen = self._preprocess_handle(specimen)
-        with DBCursor(database_config_file=self.database_config_file, study=study) as cursor:
+        with DBCursor(connection=self.connection, study=study) as cursor:
             select_query = '''
                 SELECT COUNT(*) FROM
                 ondemand_studies_index
