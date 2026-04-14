@@ -10,7 +10,7 @@ except ModuleNotFoundError as e:
     SuggestExtrasException(e, 'db')
 import pandas as pd  # pylint: disable=ungrouped-imports
 
-from smprofiler.workflow.tabular_import.parsing.skimmer import DataSkimmer
+from smprofiler.workflow.tabular_import.parsing.parser import Parser
 from smprofiler.db.check_tables import check_tables  # pylint: disable=ungrouped-imports
 from smprofiler.db.database_connection import get_and_validate_database_config
 from smprofiler.db.database_connection import DBCursor
@@ -35,7 +35,7 @@ def aggregate_counts(all_counts):
         'Table': [row[0] for row in rows],
         'Records': [int(row[1]) for row in rows],
     })
-    aggregated = df.groupby('Table').sum()
+    aggregated = df.groupby('Table').agg('sum')
     aggregated.reset_index(inplace=True)
     return aggregated
 
@@ -52,7 +52,7 @@ def main():
     all_counts = []
     for study in studies:
         with DBCursor(database_config_file=config_file, study=study) as cursor:
-            schema_name = DataSkimmer.sanitize_study_to_identifier(study)
+            schema_name = Parser.sanitize_study_to_identifier(study)
             present, counted = check_tables(cursor, schema_name)
             if not present:
                 logger.error('Some tables are missing in "%s" database.', study)

@@ -58,7 +58,7 @@ if __name__ == "__main__":
     if not (exists(dict_filename) and exists(cells_filename) and exists(labels_filename)):
         makedirs(args.output_directory, exist_ok=True)
         df_cell, df_label, label_to_result = extract(*config_values)
-        df_cell.to_hdf(cells_filename, 'cells')
-        df_label.to_hdf(labels_filename, 'labels')
+        df_cell.to_hdf(cells_filename, key='cells')
+        df_label.to_hdf(labels_filename, key='labels')
         with open(dict_filename, 'w', encoding='utf-8') as f:
             dump(label_to_result, f)

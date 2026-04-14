@@ -40,7 +40,7 @@ password = ...
 if __name__ == "__main__":
     args = parse_arguments()
 
-    from smprofiler.db.feature_matrix_extractor import FeatureMatrixExtractor
-    extractor = FeatureMatrixExtractor(database_config_file=args.database_config_file)
+    from smprofiler.db.feature_matrix_retrieval import FeatureMatrixRetrieval
+    extractor = FeatureMatrixRetrieval(database_config_file=args.database_config_file)
     strata = extractor.extract_cohorts(study=args.study_name)['strata']
     print(strata.to_string())

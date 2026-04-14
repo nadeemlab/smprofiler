@@ -5,7 +5,7 @@ from os import makedirs
 from os.path import join
 from pickle import dump
 
-from tqdm import tqdm  # type: ignore
+from tqdm import tqdm
 
 from smprofiler.graphs.config_reader import read_extract_config, read_generation_config
 from smprofiler.graphs.extract import extract
@@ -70,4 +70,5 @@ if __name__ == "__main__":
         # Skip specimens without labels
         if exclude_unlabeled and (specimen not in df_label.index):
             continue
-        df_specimen.to_hdf(join(specimens_directory, f'{specimen}.h5'), 'cells')
+        df_specimen.to_hdf(join(specimens_directory, f'{specimen}.h5'), key='cells')
+
