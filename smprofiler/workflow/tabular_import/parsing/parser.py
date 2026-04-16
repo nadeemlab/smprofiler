@@ -141,7 +141,7 @@ class Parser:
             )
             pcd = 'permanent condition diagnosis'
             cl = 'condition lack'
-            if pcd in _files and cl in _files and _files[pcd] is not None and _filces[cl] is not None:
+            if pcd in _files and cl in _files and _files[pcd] is not None and _files[cl] is not None:
                 TableTranscriber((_files[pcd], _files[cl]), connection).transcribe()
             SampleStratificationCreator.create_sample_stratification(connection)
             self._report_record_count_changes(connection, fields)
