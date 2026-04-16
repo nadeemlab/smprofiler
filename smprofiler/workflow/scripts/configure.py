@@ -69,11 +69,19 @@ def _write_config_file(variables: dict[str, str]) -> None:
     with open(join(getcwd(), NF_CONFIG_FILE), 'wt', encoding='utf-8') as file:
         file.write(file_to_write)
 
+def _consider_remove_nones(f: str, options: dict) -> str:
+    lines = f.split('\n')
+    if 'permanent_condition_diagnosis' not in options:
+        lines = list(filter(lambda line: not re.search('permanent_condition_diagnosis', line), lines))
+    if 'condition_lack' not in options:
+        lines = list(filter(lambda line: not re.search('condition_lack', line), lines))
+    return '\n'.join(lines)
 
-def _write_pipeline_script(workflow: WorkflowModules) -> None:
+def _write_pipeline_script(workflow: WorkflowModules, options: dict) -> None:
     main_seen: bool = False
     for subpackage, filename, is_main in workflow.assets_needed:
-        pipeline_file = _retrieve_from_library(subpackage, filename)
+        pipeline_file = cast(str, _retrieve_from_library(subpackage, filename))
+        pipeline_file = _consider_remove_nones(pipeline_file, options)
         if is_main:
             if main_seen:
                 raise ValueError(
@@ -436,5 +444,5 @@ if __name__ == '__main__':
             copy_profile_from_saml_to_default()
 
     _write_config_file(config_variables)
-    _write_pipeline_script(workflow_configuration)
+    _write_pipeline_script(workflow_configuration, config_variables)
     _record_configuration_command(config_variables, args.config_file)
