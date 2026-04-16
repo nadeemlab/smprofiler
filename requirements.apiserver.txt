@@ -9,8 +9,8 @@ annsel==0.1.2
 anyio==4.13.0
 array-api-compat==1.14.0
 attrs==26.1.0
-boto3==1.42.87
-botocore==1.42.87
+boto3==1.42.89
+botocore==1.42.89
 brotli==1.2.0
 cattrs==26.1.0
 certifi==2026.2.25
@@ -81,8 +81,8 @@ psycopg2==2.9.11
 pyarrow==23.0.1
 pycparser==3.0
 pyct==0.6.0
-pydantic==2.12.5
-pydantic-core==2.41.5
+pydantic==2.13.0
+pydantic-core==2.46.0
 pygments==2.20.0
 pyjwt==2.12.1
 pymupdf==1.27.2.2
@@ -96,7 +96,7 @@ pytz==2026.1.post1
 pyyaml==6.0.3
 rangehttpserver==1.4.0
 requests==2.33.1
-rich==14.3.3
+rich==15.0.0
 s3fs==0.4.2
 s3transfer==0.16.0
 scanpy==1.11.5
@@ -119,7 +119,7 @@ statsmodels==0.14.6
 tblib==3.2.2
 termplotlib==0.3.9
 threadpoolctl==3.6.0
-tifffile==2026.3.3
+tifffile==2026.4.11
 toolz==1.1.0
 tornado==6.5.5
 tqdm==4.67.3
@@ -130,7 +130,7 @@ universal-pathlib==0.3.10
 urllib3==2.6.3
 uvicorn==0.44.0
 wrapt==2.1.2
-xarray==2026.2.0
+xarray==2026.4.0
 xarray-dataclass==3.0.0
 xarray-spatial==0.9.6
 yarl==1.23.0
