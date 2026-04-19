@@ -29,6 +29,7 @@ import contextlib
 import json
 import logging
 import os
+import pickle
 import sys
 import time
 from pathlib import Path
@@ -39,7 +40,7 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 from sklearn.ensemble import ExtraTreesRegressor, RandomForestRegressor
-from sklearn.linear_model import ElasticNet, HuberRegressor, Ridge
+from sklearn.linear_model import BayesianRidge, ElasticNet, HuberRegressor, Ridge
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.pipeline import Pipeline
@@ -449,6 +450,13 @@ def build_model_candidates() -> list[tuple[str, object]]:
             ]),
         ),
         (
+            "bayesian_ridge",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("bayesian_ridge", BayesianRidge()),
+            ]),
+        ),
+        (
             "xgboost",
             XGBRegressor(
                 n_estimators=200,
@@ -511,6 +519,37 @@ def train_and_select_best(
     return best_name, best_model, best_r2, best_std
 
 
+def predict_with_std(
+    model,
+    model_name: str,
+    X_norm: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray | None]:
+    """
+    Return (y_mean, y_std) for a fitted model evaluated on normalized inputs.
+
+    y_std is per-sample predictive std where available, otherwise None
+    (caller falls back to global_residual_std stored in metadata).
+
+    Dispatch rules:
+        bayesian_ridge  → posterior predictive std from BayesianRidge.predict()
+        random_forest / extra_trees → std across individual tree predictions
+        all others      → (predictions, None)
+    """
+    if model_name == "bayesian_ridge":
+        X_scaled = model.named_steps["scaler"].transform(X_norm)
+        inner = model.named_steps["bayesian_ridge"]
+        y_mean, y_std = inner.predict(X_scaled, return_std=True)
+        return y_mean, y_std
+
+    if model_name in ("random_forest", "extra_trees"):
+        tree_preds = np.stack(
+            [t.predict(X_norm) for t in model.estimators_], axis=0
+        )  # (n_trees, n_samples)
+        return tree_preds.mean(axis=0), tree_preds.std(axis=0)
+
+    return model.predict(X_norm), None
+
+
 # ---------------------------------------------------------------------------
 # ONNX export and validation
 # ---------------------------------------------------------------------------
@@ -568,6 +607,9 @@ def write_metadata(
     n_train: int,
     n_test: int,
     atlas_version: str,
+    sum_normalized: bool = True,
+    std_method: str = "global_residual_std",
+    global_std: float = float("nan"),
 ) -> None:
     meta = {
         "study": study,
@@ -581,6 +623,9 @@ def write_metadata(
         "n_train": n_train,
         "n_test": n_test,
         "atlas_version": atlas_version,
+        "sum_normalized": sum_normalized,
+        "std_method": std_method,
+        "global_std": round(float(global_std), 8) if not np.isnan(global_std) else None,
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
@@ -712,6 +757,21 @@ def run(args: argparse.Namespace) -> None:
         col_idx = {name: i for i, name in enumerate(needed_spt)}
         X_identity = X_all[:, [col_idx[c] for c in id_in_atlas]]
 
+        # Sum-normalize by identity-channel row sums (removes overall scale effect)
+        row_sums = X_identity.sum(axis=1)           # shape (n_cells,)
+        valid_mask = row_sums > 1e-8
+        n_zero_sum = int((~valid_mask).sum())
+        if n_zero_sum:
+            log.info("  Removed %d cells with zero identity-channel sum", n_zero_sum)
+        X_identity_norm = X_identity[valid_mask] / row_sums[valid_mask, np.newaxis]
+        X_all_filtered = X_all[valid_mask]
+        S_valid = row_sums[valid_mask]
+        log.info(
+            "  Normalized: %s cells retained  (%.2f%% of loaded)",
+            f"{X_identity_norm.shape[0]:,}",
+            100.0 * X_identity_norm.shape[0] / X_all.shape[0],
+        )
+
         for target_idx_local, target_channel in enumerate(fn_in_atlas, 1):
             model_counter += 1
             _subsection(
@@ -721,21 +781,21 @@ def run(args: argparse.Namespace) -> None:
             )
 
             target_col = col_idx[target_channel]
-            y = X_all[:, target_col]
+            y_norm = X_all_filtered[:, target_col] / S_valid
 
-            # Skip if target has zero variance (uninformative)
-            if y.std() < 1e-6:
+            # Skip if target has zero variance after normalization (uninformative)
+            if y_norm.std() < 1e-6:
                 log.warning("Skipping: target '%s' has near-zero variance", target_channel)
                 continue
 
-            log.info("  Features : %d identity markers, %s train cells",
-                     X_identity.shape[1], f"{int(X_identity.shape[0] * 0.8):,}")
-            log.info("  Target   : '%s'  (range %.3f – %.3f, mean %.3f)",
-                     target_channel, float(y.min()), float(y.max()), float(y.mean()))
+            log.info("  Features : %d identity markers, %s cells (after S>0 filter)",
+                     X_identity_norm.shape[1], f"{X_identity_norm.shape[0]:,}")
+            log.info("  Target   : '%s' (norm; range %.4f – %.4f, mean %.4f)",
+                     target_channel, float(y_norm.min()), float(y_norm.max()), float(y_norm.mean()))
 
-            # Train/test split
+            # Train/test split on normalized data
             X_train, X_test, y_train, y_test = train_test_split(
-                X_identity, y, test_size=0.2, random_state=42
+                X_identity_norm, y_norm, test_size=0.2, random_state=42
             )
             log.info("  Split    : %s train / %s test",
                      f"{len(X_train):,}", f"{len(X_test):,}")
@@ -749,27 +809,43 @@ def run(args: argparse.Namespace) -> None:
             )
 
             # Evaluate on held-out test set
-            y_pred = best_model.predict(X_test)
-            test_r2 = float(r2_score(y_test, y_pred))
-            test_mae = float(mean_absolute_error(y_test, y_pred))
+            y_pred_mean, y_pred_std = predict_with_std(best_model, best_name, X_test)
+            test_r2 = float(r2_score(y_test, y_pred_mean))
+            test_mae = float(mean_absolute_error(y_test, y_pred_mean))
+            residuals = y_test - y_pred_mean
+            global_std = float(residuals.std())
+            if best_name == "bayesian_ridge":
+                std_method = "bayesian_posterior"
+            elif best_name in ("random_forest", "extra_trees"):
+                std_method = "tree_variance"
+            else:
+                std_method = "global_residual_std"
             train_elapsed = _fmt_elapsed(time.monotonic() - t_train_start)
             log.info(
-                "  Result   : model='%s'  test_R²=%.4f  test_MAE=%.4f  [%s]",
-                best_name, test_r2, test_mae, train_elapsed,
+                "  Result   : model='%s'  test_R²=%.4f  test_MAE=%.4f"
+                "  std_method=%s  global_std=%.4f  [%s]",
+                best_name, test_r2, test_mae, std_method, global_std, train_elapsed,
             )
 
             # Sanitize channel name for filesystem
             safe_target = target_channel.replace("/", "_").replace(" ", "_")
             study_out_dir = output_dir / study_name
             onnx_path = study_out_dir / f"{safe_target}.onnx"
+            pkl_path  = study_out_dir / f"{safe_target}.pkl"
             meta_path = study_out_dir / f"{safe_target}.meta.json"
 
             # Export to ONNX
-            export_to_onnx(best_model, X_identity.shape[1], onnx_path)
+            export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path)
 
             # Validate ONNX output matches sklearn
             n_validate = min(500, X_test.shape[0])
             validate_onnx(onnx_path, best_model, X_test[:n_validate])
+
+            # Save sklearn model pickle (for Python-side per-cell std computation)
+            study_out_dir.mkdir(parents=True, exist_ok=True)
+            with open(pkl_path, "wb") as _pkl_f:
+                pickle.dump(best_model, _pkl_f)
+            log.info("Pickle saved: %s (%.1f KB)", pkl_path, pkl_path.stat().st_size / 1024)
 
             # Write metadata
             write_metadata(
@@ -785,12 +861,16 @@ def run(args: argparse.Namespace) -> None:
                 n_train=len(X_train),
                 n_test=len(X_test),
                 atlas_version=ATLAS_VERSION,
+                sum_normalized=True,
+                std_method=std_method,
+                global_std=global_std,
             )
 
             summary_rows.append({
                 "study": study_name,
                 "target": target_channel,
                 "model": best_name,
+                "std_method": std_method,
                 "cv_R²": cv_r2,
                 "test_R²": test_r2,
                 "test_MAE": test_mae,
@@ -801,15 +881,14 @@ def run(args: argparse.Namespace) -> None:
     total_elapsed = _fmt_elapsed(time.monotonic() - run_start)
     _section(f"Training complete — {model_counter} models in {total_elapsed}")
     if summary_rows:
-        col_widths = {"study": 24, "target": 16, "model": 24,
-                      "cv_R²": 8, "test_R²": 8, "test_MAE": 10, "onnx_kb": 8}
-        header = (f"  {'Study':<24}  {'Target':<16}  {'Model':<24}"
+        header = (f"  {'Study':<24}  {'Target':<16}  {'Model':<24}  {'Std method':<22}"
                   f"  {'cv_R²':>8}  {'test_R²':>8}  {'test_MAE':>10}  {'KB':>6}")
         print(header, flush=True)
         print("  " + "─" * (_SEP_WIDTH - 2), flush=True)
         for row in summary_rows:
             print(
                 f"  {row['study']:<24}  {row['target']:<16}  {row['model']:<24}"
+                f"  {row['std_method']:<22}"
                 f"  {row['cv_R²']:>8.4f}  {row['test_R²']:>8.4f}"
                 f"  {row['test_MAE']:>10.4f}  {row['onnx_kb']:>6}",
                 flush=True,
