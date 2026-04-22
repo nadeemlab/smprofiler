@@ -117,7 +117,7 @@ class Parser:
             fields = pandas_read_csv(path, sep='\t', na_filter=False)
         with DBConnection(database_config_file=self.database_config_file, study=study_name) as connection:
             self._cache_all_record_counts(connection, fields)
-            StudyParser(fields).parse(connection, _files['study'])
+            _, scale_denominator = StudyParser(fields).parse(connection, _files['study'])
             SubjectsParser(fields).parse(connection, _files['subjects'])
             DiagnosisParser(fields).parse(connection, _files['diagnosis'])
             InterventionsParser(fields).parse(connection, _files['interventions'])
@@ -138,6 +138,7 @@ class Parser:
                 connection,
                 _files['file manifest'],
                 chemical_species_identifiers_by_symbol,
+                scale_denominator,
             )
             pcd = 'permanent condition diagnosis'
             cl = 'condition lack'

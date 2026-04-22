@@ -1,7 +1,7 @@
 """Source file parsing for overall study/project metadata."""
 import json
 
-from psycopg import cursor as PsycopgCursor
+from psycopg import Cursor as PsycopgCursor
 
 from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.db.source_file_parser_interface import SourceToADIParser
@@ -9,6 +9,7 @@ from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
 
+DEFAULT_SCALE_DENOMINATOR = 10.0
 
 class StudyParser(SourceToADIParser):
     """Parse source files containing study-level metadata."""
@@ -28,7 +29,7 @@ class StudyParser(SourceToADIParser):
             record = [study_name, substudy]
             self._cautious_insert('study_component', record, cursor)
 
-    def parse(self, connection, study_file) -> str:
+    def parse(self, connection, study_file) -> tuple[str, float]:
         with open(study_file, 'rt', encoding='utf-8') as file:
             study = json.loads(file.read())
         study_name = StudyCollectionNaming.extract_study_from_file(study_file)
@@ -75,4 +76,7 @@ class StudyParser(SourceToADIParser):
         logger.info('Parsed records for study "%s".', study_name)
         connection.commit()
         cursor.close()
-        return study_name
+
+        sd = 'Scale denominator'
+        scale_denominator = study[sd] if sd in study else DEFAULT_SCALE_DENOMINATOR
+        return (study_name, scale_denominator)
