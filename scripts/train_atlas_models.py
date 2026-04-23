@@ -32,6 +32,9 @@ import os
 import pickle
 import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Optional
 
@@ -135,7 +138,7 @@ def load_channel_annotations(annotations_path: Path) -> tuple[set, set, dict]:
 
     functional_channels: set = set()
     for group_name, group_data in groups.items():
-        if group_name not in ("identity", "tumor"):
+        if group_name != "identity":
             functional_channels.update(group_data["channels"])
 
     all_channels = identity_channels | functional_channels
@@ -153,9 +156,204 @@ def load_channel_annotations(annotations_path: Path) -> tuple[set, set, dict]:
     return identity_channels, functional_channels, aliases
 
 
+def load_channel_annotations_from_api(
+    base_url: str,
+    timeout: int = 30,
+) -> tuple[set, set, dict]:
+    """
+    Fetch channel annotations from the smprofiler API.
+
+    Calls:
+        GET {base_url}/channel-annotations/
+        GET {base_url}/channel-aliases/
+
+    Returns the same (identity_channels, functional_channels, aliases) tuple
+    as load_channel_annotations().
+    """
+    base = base_url.rstrip("/")
+
+    def _get_json(url: str) -> dict:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode())
+
+    annotations_url = f"{base}/channel-annotations/"
+    aliases_url = f"{base}/channel-aliases/"
+
+    log.info("Fetching channel annotations from API: %s", annotations_url)
+    ann_data = _get_json(annotations_url)
+    log.info("Fetching channel aliases from API: %s", aliases_url)
+    ali_data = _get_json(aliases_url)
+
+    channel_groups: dict = ann_data.get("channelGroups", {})
+    identity_channels: set = set(channel_groups.get("identity", {}).get("channels", []))
+
+    functional_channels: set = set()
+    for group_name, group_data in channel_groups.items():
+        if group_name != "identity":
+            functional_channels.update(group_data.get("channels", []))
+
+    all_channels = identity_channels | functional_channels
+
+    raw_aliases: dict = ali_data.get("aliases", {})
+    aliases = {
+        alias: canonical
+        for alias, canonical in raw_aliases.items()
+        if isinstance(canonical, str) and canonical in all_channels
+    }
+
+    log.info(
+        "Channel annotations (API): %d identity, %d functional, %d aliases",
+        len(identity_channels), len(functional_channels), len(aliases),
+    )
+    return identity_channels, functional_channels, aliases
+
+
 def normalize_name(name: str, aliases: dict) -> str:
     """Resolve a channel name to its canonical form via the aliases map."""
     return aliases.get(name, name)
+
+
+def normalize_names_to_hgnc(
+    names: list[str],
+    cache_path: Path,
+    timeout: int = 30,
+) -> dict[str, str]:
+    """
+    Resolve a list of gene/channel names to their HGNC-approved symbols.
+
+    Strategy:
+    1. Load existing cache from disk (JSON: {original: hgnc_approved_symbol}).
+    2. For uncached names, batch-query mygene.info POST /v3/query.
+    3. For names still unresolved, try HGNC REST API per-symbol.
+    4. Persist the updated cache to disk for future offline use.
+
+    Returns a dict mapping each input name to its HGNC-approved symbol.
+    Names with no authoritative match are mapped to themselves (identity).
+    """
+    # Load existing cache
+    cache: dict[str, str] = {}
+    if cache_path.exists():
+        with open(cache_path) as f:
+            cache = json.load(f)
+        log.info("HGNC cache: loaded %d entries from %s", len(cache), cache_path)
+    else:
+        log.info("HGNC cache not found at %s — will query APIs", cache_path)
+
+    to_resolve = [n for n in names if n not in cache]
+    if not to_resolve:
+        log.info("All %d names found in HGNC cache (no network calls needed)", len(names))
+        return {n: cache.get(n, n) for n in names}
+
+    log.info(
+        "Resolving %d names via HGNC normalization (%d already cached)",
+        len(to_resolve), len(cache),
+    )
+
+    # --- mygene.info batch query ---
+    def _mygene_batch(symbols: list[str]) -> dict[str, str]:
+        """Return {input_symbol: hgnc_approved_symbol} for resolved entries."""
+        url = "https://mygene.info/v3/query"
+        body = json.dumps({
+            "q": list(symbols),
+            "fields": "symbol",
+            "species": "human",
+            "scopes": "symbol",
+        }).encode()
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+        except (urllib.error.URLError, OSError) as exc:
+            log.warning("mygene.info batch query failed: %s", exc)
+            return {}
+        # Batch POST returns a list — one entry per query symbol
+        if not isinstance(data, list):
+            data = data.get("hits", [])
+        result: dict[str, str] = {}
+        for hit in data:
+            if not isinstance(hit, dict) or hit.get("notfound"):
+                continue
+            approved = hit.get("symbol")
+            query_sym = hit.get("query", "")
+            if approved and query_sym:
+                result[query_sym] = approved
+        return result
+
+    def _hgnc_single(symbol: str) -> str | None:
+        """Try HGNC REST API for a single symbol; returns approved symbol or None."""
+        encoded = urllib.parse.quote(symbol)
+        url = f"https://rest.genenames.org/search/symbol/{encoded}"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode()
+            data = json.loads(raw)
+        except (urllib.error.URLError, OSError) as exc:
+            log.debug("HGNC REST query failed for '%s': %s", symbol, exc)
+            return None
+        except json.JSONDecodeError as exc:
+            log.debug("HGNC REST returned non-JSON for '%s': %s", symbol, exc)
+            return None
+        docs = data.get("response", {}).get("docs", [])
+        return docs[0].get("symbol") if docs else None
+
+    # mygene.info batch (process in chunks of 500)
+    mygene_resolved: dict[str, str] = {}
+    batch_size = 500
+    for i in range(0, len(to_resolve), batch_size):
+        batch = to_resolve[i: i + batch_size]
+        resolved = _mygene_batch(batch)
+        mygene_resolved.update(resolved)
+        log.info(
+            "mygene.info: resolved %d/%d names in batch [%d:%d]",
+            len(resolved), len(batch), i, i + len(batch),
+        )
+
+    # HGNC REST fallback for names mygene didn't resolve
+    still_unresolved = [n for n in to_resolve if n not in mygene_resolved]
+    hgnc_resolved: dict[str, str] = {}
+    if still_unresolved:
+        log.info("HGNC REST fallback for %d unresolved names…", len(still_unresolved))
+        for sym in still_unresolved:
+            approved = _hgnc_single(sym)
+            if approved and approved != sym:
+                hgnc_resolved[sym] = approved
+                log.debug("  HGNC REST: '%s' → '%s'", sym, approved)
+
+    # Merge results into cache (mygene takes precedence over HGNC REST)
+    for sym in to_resolve:
+        if sym in mygene_resolved:
+            cache[sym] = mygene_resolved[sym]
+        elif sym in hgnc_resolved:
+            cache[sym] = hgnc_resolved[sym]
+        else:
+            cache[sym] = sym  # no authoritative symbol found; keep original
+
+    # Persist updated cache
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(cache_path, "w") as f:
+        json.dump(cache, f, indent=2, sort_keys=True)
+    log.info("HGNC cache saved: %s (%d total entries)", cache_path, len(cache))
+
+    changed = {sym: cache[sym] for sym in to_resolve if cache[sym] != sym}
+    log.info(
+        "HGNC normalization: %d/%d newly resolved names mapped to a different symbol",
+        len(changed), len(to_resolve),
+    )
+    if changed:
+        for orig, approved in sorted(changed.items()):
+            log.debug("  '%s' → '%s'", orig, approved)
+
+    return {n: cache.get(n, n) for n in names}
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +389,7 @@ def _read_channel_names_from_file(path: Path, aliases: dict) -> list[str]:
     for raw in df[col].dropna():
         canonical = normalize_name(str(raw).strip(), aliases)
         names.append(canonical)
+    log.debug("  %s: %d channel names read (column '%s')", path.name, len(names), col)
     return names
 
 
@@ -247,6 +446,10 @@ def discover_study_channels(
                 seen.add(n)
                 unique_names.append(n)
 
+        log.info(
+            "Study '%s': %d unique channels in dataset files",
+            study_name, len(unique_names),
+        )
         identity = [n for n in unique_names if n in identity_channels]
         functional = [n for n in unique_names if n in functional_channels]
 
@@ -293,6 +496,7 @@ def build_atlas_channel_map(
     spt_channels: set,
     aliases: dict,
     extra_mapping: dict | None = None,
+    hgnc_cache_path: Path | None = None,
 ) -> dict[str, str]:
     """
     Build a mapping: atlas_var_name → canonical SPT channel name.
@@ -301,17 +505,36 @@ def build_atlas_channel_map(
     1. Extra manual mapping (channel_name_mapping.json)
     2. Alias lookup (e.g. atlas has 'CD8A', SPT has 'CD8' via alias CD8A→CD8)
     3. Exact case-insensitive match
+    4. HGNC normalization: both atlas name and SPT name normalized to the HGNC
+       approved symbol; match on that shared canonical form. Only fires if
+       hgnc_cache_path is provided.
 
     Returns dict of {atlas_var_name: spt_canonical_name} for matched entries only.
     """
     extra = extra_mapping or {}
-    # Build reverse alias map: canonical → [aliases...]  (not needed directly)
-    # Build lookup from atlas name → SPT canonical
-    atlas_upper_to_name = {n.upper(): n for n in atlas_var_names}
 
+    # Build case-insensitive SPT lookup for tier 3
     spt_channels_upper = {c.upper(): c for c in spt_channels}
 
+    # Tier 4: HGNC normalization pre-computation
+    # hgnc_spt_map:     approved_hgnc_symbol → spt_canonical
+    # hgnc_atlas_lookup: atlas_name → approved_hgnc_symbol
+    hgnc_spt_map: dict[str, str] = {}
+    hgnc_atlas_lookup: dict[str, str] = {}
+    if hgnc_cache_path is not None:
+        all_names_for_hgnc = list(atlas_var_names) + list(spt_channels)
+        hgnc_norm = normalize_names_to_hgnc(all_names_for_hgnc, hgnc_cache_path)
+        # Build reverse: HGNC symbol → SPT canonical (first mapping wins)
+        for spt_ch in spt_channels:
+            h = hgnc_norm.get(spt_ch, spt_ch)
+            if h not in hgnc_spt_map:
+                hgnc_spt_map[h] = spt_ch
+        # Build atlas → HGNC lookup
+        for atlas_name in atlas_var_names:
+            hgnc_atlas_lookup[atlas_name] = hgnc_norm.get(atlas_name, atlas_name)
+
     atlas_to_spt: dict[str, str] = {}
+    hgnc_match_count = 0
     for atlas_name in atlas_var_names:
         # 1. Manual mapping
         if atlas_name in extra:
@@ -332,12 +555,31 @@ def build_atlas_channel_map(
             atlas_to_spt[atlas_name] = spt_channels_upper[upper]
             continue
 
+        # 4. HGNC normalization: atlas_name → HGNC symbol → SPT canonical
+        if hgnc_spt_map:
+            atlas_hgnc = hgnc_atlas_lookup.get(atlas_name, atlas_name)
+            if atlas_hgnc in hgnc_spt_map:
+                spt_ch = hgnc_spt_map[atlas_hgnc]
+                atlas_to_spt[atlas_name] = spt_ch
+                hgnc_match_count += 1
+                log.debug(
+                    "  HGNC match: atlas '%s' → HGNC '%s' → SPT '%s'",
+                    atlas_name, atlas_hgnc, spt_ch,
+                )
+                continue
+
     # Reverse: which SPT channels have no atlas match?
     matched_spt = set(atlas_to_spt.values())
     unmatched = spt_channels - matched_spt
     if unmatched:
         log.warning("SPT channels with NO atlas match: %s", sorted(unmatched))
 
+    if hgnc_cache_path is not None and hgnc_match_count > 0:
+        log.info(
+            "HGNC normalization contributed %d additional matches "
+            "(beyond manual/alias/case-insensitive tiers)",
+            hgnc_match_count,
+        )
     log.info(
         "Atlas ↔ SPT mapping: %d matched (out of %d SPT channels)",
         len(matched_spt), len(spt_channels),
@@ -646,8 +888,11 @@ def run(args: argparse.Namespace) -> None:
     if not atlas_path.exists():
         log.error("Atlas file not found: %s", atlas_path)
         sys.exit(1)
-    if not annotations_path.exists():
-        log.error("Annotations file not found: %s", annotations_path)
+    if not args.annotations_api_url and not annotations_path.exists():
+        log.error(
+            "Annotations file not found and no API URL configured: %s",
+            annotations_path,
+        )
         sys.exit(1)
 
     # Load extra atlas→SPT name mapping if provided
@@ -657,8 +902,25 @@ def run(args: argparse.Namespace) -> None:
             extra_mapping = json.load(f)
         log.info("Loaded %d entries from extra atlas mapping", len(extra_mapping))
 
-    # Step 1: Load channel annotations
-    identity_channels, functional_channels, aliases = load_channel_annotations(annotations_path)
+    # Step 1: Load channel annotations (API primary, local file fallback)
+    hgnc_cache_path = Path(args.hgnc_cache) if args.hgnc_cache else None
+    annotations_loaded = False
+    if args.annotations_api_url:
+        try:
+            identity_channels, functional_channels, aliases = load_channel_annotations_from_api(
+                args.annotations_api_url
+            )
+            annotations_loaded = True
+        except Exception as exc:
+            log.warning(
+                "Failed to load annotations from API (%s): %s — falling back to local file",
+                args.annotations_api_url, exc,
+            )
+    if not annotations_loaded:
+        if not annotations_path.exists():
+            log.error("Annotations file not found: %s", annotations_path)
+            sys.exit(1)
+        identity_channels, functional_channels, aliases = load_channel_annotations(annotations_path)
     all_channels = identity_channels | functional_channels
 
     # Step 2: Discover per-study channel lists
@@ -683,16 +945,29 @@ def run(args: argparse.Namespace) -> None:
 
     # Step 4: Build atlas ↔ SPT mapping
     atlas_to_spt = build_atlas_channel_map(
-        atlas_var_names, all_channels, aliases, extra_mapping
+        atlas_var_names, all_channels, aliases, extra_mapping, hgnc_cache_path
     )
     # Reverse map: SPT canonical → atlas var_name
     spt_to_atlas = {spt: atl for atl, spt in atlas_to_spt.items()}
+    log.info(
+        "Atlas feature summary: %d total atlas genes, %d SPT channels with atlas match",
+        len(atlas_var_names), len(atlas_to_spt),
+    )
 
     # ── Compute training plan up-front ──────────────────────────────────────
     plan: list[dict] = []
     for study_name, channels in study_channels.items():
         id_in_atlas = [c for c in channels["identity"] if c in spt_to_atlas]
         fn_in_atlas = [c for c in channels["functional"] if c in spt_to_atlas]
+        log.info(
+            "Study '%s': %d dataset channels → %d atlas-matched "
+            "(identity %d/%d, functional %d/%d)",
+            study_name,
+            len(channels["identity"]) + len(channels["functional"]),
+            len(id_in_atlas) + len(fn_in_atlas),
+            len(id_in_atlas), len(channels["identity"]),
+            len(fn_in_atlas), len(channels["functional"]),
+        )
         if id_in_atlas and fn_in_atlas:
             plan.append({
                 "study": study_name,
@@ -931,6 +1206,25 @@ def parse_args() -> argparse.Namespace:
         "--atlas-mapping",
         default=None,
         help="Optional JSON file with extra atlas_var_name → spt_channel_name mappings",
+    )
+    parser.add_argument(
+        "--annotations-api-url",
+        default="https://smprofiler.io/api",
+        help=(
+            "Base URL for the smprofiler API used to fetch channel annotations. "
+            "Used as the primary source; falls back to --annotations local file on failure. "
+            "Pass an empty string to skip the API and use only the local file."
+        ),
+    )
+    parser.add_argument(
+        "--hgnc-cache",
+        default=str(Path(__file__).parent / "hgnc_symbol_cache.json"),
+        help=(
+            "Path to the HGNC symbol normalization cache (JSON). "
+            "Created on first run via mygene.info + HGNC REST API; "
+            "subsequent runs use only the cached data (fully offline). "
+            "Pass an empty string to disable HGNC normalization entirely."
+        ),
     )
     parser.add_argument(
         "--max-cells",
