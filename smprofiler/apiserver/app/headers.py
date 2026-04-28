@@ -41,9 +41,9 @@ csp_general = ContentSecurityPolicy().default_src(
 csp_permissive = ContentSecurityPolicy().default_src(
         "'self'"
     ).script_src(
-        "'self' https://cdn.jsdelivr.net/npm/redoc@2/bundles/redoc.standalone.js"
+        "'self'; https://cdn.jsdelivr.net/npm/redoc@2/bundles/redoc.standalone.js"
     ).style_src(
-        "'self' 'unsafe-inline'"
+        "'self'; 'unsafe-inline'"
     ).object_src(
         "'none'"
     ).worker_src("blob:")
