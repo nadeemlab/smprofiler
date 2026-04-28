@@ -240,6 +240,7 @@ class CellManifestsParser(SourceToADIParser):
         if intensities_available:
             intensity_matrix = cells[intensity_columns].astype(float).to_numpy()
             scale = 1.0 / scale_denominator
+            logger.info(f'Using scale: {scale}')
             intensity_arrays: dict[int, tuple[float, ...]] = {}
             for cell_id, row in zip(cell_ids, intensity_matrix):
                 intensity_arrays[cell_id] = tuple(float(value) * scale for value in row)
