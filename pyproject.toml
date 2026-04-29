@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "smprofiler"
-version = "1.0.72"
+version = "1.0.73"
 authors = [
     { name = "James Mathews", email = "mathewj2@mskcc.org" }
 ]
@@ -70,7 +70,7 @@ all = [
     "pyshp",
     "pytz",
     "requests",
-    "secure",
+    "secure==1.0.1",
     "setuptools>=82",
     "scipy",
     "scikit-learn",
@@ -100,7 +100,7 @@ apiserver = [
     "pytz",
     "requests",
     "scipy",
-    "secure",
+    "secure==1.0.1",
     "sqlalchemy",
     "uvicorn",
     "zstandard",

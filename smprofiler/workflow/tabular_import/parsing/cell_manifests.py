@@ -72,6 +72,7 @@ class CellManifestsParser(SourceToADIParser):
         connection: PsycopgConnection,
         file_manifest_file: str,
         chemical_species_identifiers_by_symbol: dict[str, str],
+        scale_denominator: float,
     ):
         """
         Parse each sample's cell data file, creating specialized/custom binary
@@ -89,6 +90,7 @@ class CellManifestsParser(SourceToADIParser):
         self._parse_and_build_preprocessed_samples(
             file_manifest_file,
             chemical_species_identifiers_by_symbol,
+            scale_denominator,
         )
         logger.error('Only build_preprocessed_samples_in_memory is supported.')
 
@@ -96,6 +98,7 @@ class CellManifestsParser(SourceToADIParser):
         self,
         file_manifest_file: str,
         chemical_species_identifiers_by_symbol: dict[str, str],
+        scale_denominator: float,
     ) -> None:
         """
         Uses direct processing of each sample, only writing final products to the
@@ -110,9 +113,9 @@ class CellManifestsParser(SourceToADIParser):
         ordered_symbols = self._prepare_channel_metadata(
             chemical_species_identifiers_by_symbol,
         )
-        self._loop_over_samples(file_manifest_file, ordered_symbols)
+        self._loop_over_samples(file_manifest_file, ordered_symbols, scale_denominator)
         self._write_channel_metadata(ordered_symbols)
-        self._handle_umap_generation(ordered_symbols)
+        self._handle_umap_generation(ordered_symbols, scale_denominator)
 
     def _prepare_channel_metadata(
         self,
@@ -148,6 +151,7 @@ class CellManifestsParser(SourceToADIParser):
         self,
         file_manifest_file: str,
         ordered_symbols: tuple[str, ...],
+        scale_denominator: float,
     ):
         """
         Skeleton of loop over the samples.
@@ -178,6 +182,7 @@ class CellManifestsParser(SourceToADIParser):
                 specimen,
                 ordered_symbols,
                 subsampled_remaining=subsampled_remaining,
+                scale_denominator=scale_denominator,
             )
             if subsampled is not None:
                 discrete_sample, continuous_sample = subsampled
@@ -197,6 +202,7 @@ class CellManifestsParser(SourceToADIParser):
         specimen: str,
         ordered_symbols: tuple[str, ...],
         subsampled_remaining: int,
+        scale_denominator: float,
     ) -> tuple[tuple[list[list[int]], list[list[float]]] | None, int]:
         feature_names, intensities_available = self.dataset_design.get_exact_column_names(
             ordered_symbols,
@@ -233,7 +239,8 @@ class CellManifestsParser(SourceToADIParser):
         subsample: tuple[list[list[int]], list[list[float]]] | None = None
         if intensities_available:
             intensity_matrix = cells[intensity_columns].astype(float).to_numpy()
-            scale = 1.0 / 10.0
+            scale = 1.0 / scale_denominator
+            logger.info(f'Using scale: {scale}')
             intensity_arrays: dict[int, tuple[float, ...]] = {}
             for cell_id, row in zip(cell_ids, intensity_matrix):
                 intensity_arrays[cell_id] = tuple(float(value) * scale for value in row)
@@ -260,11 +267,11 @@ class CellManifestsParser(SourceToADIParser):
         writer.write_feature_order(self.study_name, ordered_symbols)
         logger.info('Done writing feature order to database.')
 
-    def _handle_umap_generation(self, ordered_symbols: tuple[str, ...]) -> None:
+    def _handle_umap_generation(self, ordered_symbols: tuple[str, ...], scale_denominator: float) -> None:
         if len(self.subsampled_continuous_rows) > 0:
-            discrete_df = self._build_umap_frame(self.subsampled_discrete_rows, ordered_symbols, 'discrete_value')
+            discrete_df = self._build_umap_frame(self.subsampled_discrete_rows, ordered_symbols, 'discrete_value', scale_denominator)
             logger.info('Done preparing dataframe for discrete UMAP.')
-            continuous_df = self._build_umap_frame(self.subsampled_continuous_rows, ordered_symbols, 'quantity')
+            continuous_df = self._build_umap_frame(self.subsampled_continuous_rows, ordered_symbols, 'quantity', scale_denominator)
             logger.info('Done preparing dataframe for continuous UMAP.')
             creator = UMAPCreator(self.database_config_file, self.study_name)
             try:
@@ -280,11 +287,12 @@ class CellManifestsParser(SourceToADIParser):
         rows: list[list[int]] | list[list[float]],
         ordered_symbols: tuple[str, ...],
         modifier: str,
+        scale_denominator: float,
     ) -> DataFrame:
         columns = MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
         index = list(range(len(rows)))
         df = DataFrame(rows, columns=columns, index=index)
-        scale = 1.0 / 10.0
+        scale = 1.0 / scale_denominator
         for c in columns:
             df[c] = scale * df[c]
         return df

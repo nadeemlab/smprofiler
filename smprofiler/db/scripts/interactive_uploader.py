@@ -290,7 +290,7 @@ class InteractiveUploader:
             self.print(f' {source}', style='dataset source')
         print()
 
-    def _retrieve_study_name(self, source: str) -> str:
+    def _retrieve_study_name(self, source: str) -> str | None:
         study_name = None
         study_file = join(source, 'study.json')
         if isfile(study_file):
@@ -300,7 +300,10 @@ class InteractiveUploader:
             resource = _parse_s3_reference(join(source, 'study.json'))
             client = boto3_client('s3')
             local_study_file = '_study.temp.json'
-            client.download_file(resource.bucket, resource.get_key_string(), local_study_file)
+            try:
+                client.download_file(resource.bucket, resource.get_key_string(), local_study_file)
+            except ClientError as e:
+                return None
             with open(local_study_file, 'rt', encoding='utf-8') as file:
                 study_name = json_loads(file.read())['Study name']
         if study_name is None:
@@ -319,6 +322,8 @@ class InteractiveUploader:
             self.existing_studies = tuple(sorted(list(self.study_names_by_schema.keys())))
         try:
             study_name = self._retrieve_study_name(source)
+            if study_name is None:
+                return 'not a valid study'
         except ValueError:
             return 'not a valid study'
         normal = re.sub(r'[ \-]', '_', study_name).lower()
@@ -410,6 +415,8 @@ class InteractiveUploader:
 
     def _drop_first(self) -> None:
         study_name = self._retrieve_study_name(cast(str, self.selected_dataset_source))
+        if study_name is None:
+            return
         command = f'smprofiler db drop --database-config-file={self.selected_database_config_file} --study-name="{study_name}"'
         self.print(f'  {command}', 'item')
         os_system(command)
