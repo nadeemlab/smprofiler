@@ -58,16 +58,21 @@ class CacheStore(Protocol):
 class DatabaseCacheStore:
     connection: DBConnection
 
-    def __init__(self, database_config_file: str | None, connection: DBConnection | None=None) -> None:
+    def __init__(self, database_config_file: str | None, connection: DBConnection | None=None, register_cleanup: bool=True) -> None:
         if connection is not None:
             self.connection = connection
         else:
             self.connection = DBConnection(database_config_file=database_config_file)
             self.connection.__enter__()
-        register_at_exit(self._cleanup)
+        if register_cleanup:
+            register_at_exit(self.cleanup)
 
-    def _cleanup(self) -> None:
-        self.connection.__exit__(None, None, None)
+    def cleanup(self) -> None:
+        try:
+            self.connection.__exit__(None, None, None)
+        except Exception as e:
+            print('Connection probably already closed.')
+            raise e
 
     def put_blob(
         self,
@@ -229,9 +234,9 @@ def _parse_s3_cache_uri(uri: str) -> S3CacheLocation:
     return S3CacheLocation(bucket=bucket, prefix=prefix)
 
 
-def get_cache_store(database_config_file: str | None) -> CacheStore:
+def get_cache_store(database_config_file: str | None, cleanup_connection_on_exit: bool=True) -> CacheStore:
     cache_uri = os.environ.get(S3_CACHE_URI_ENV)
     if cache_uri:
         location = _parse_s3_cache_uri(cache_uri)
         return S3CacheStore(location.bucket, location.prefix)
-    return DatabaseCacheStore(database_config_file)
+    return DatabaseCacheStore(database_config_file, register_cleanup=cleanup_connection_on_exit)
