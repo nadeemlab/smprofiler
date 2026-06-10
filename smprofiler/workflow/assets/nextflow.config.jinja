@@ -7,47 +7,47 @@ singularity.enabled = true
 process.container = '{{ image }}'
 {% endif %}
 
-env.workflow_ = '{{ workflow }}'
+params.workflow_ = '{{ workflow }}'
 {% if input_path is defined %}
-env.input_path_ = '{{ input_path }}'{% endif %}
+params.input_path_ = '{{ input_path }}'{% endif %}
 {% if file_manifest_filename is defined %}
-env.file_manifest_filename_ = '{{ file_manifest_filename }}'{% endif %}
+params.file_manifest_filename_ = '{{ file_manifest_filename }}'{% endif %}
 
 {%- if samples_file is defined and samples_file|length %}
-env.samples_file_ = '{{ samples_file }}'{% endif %}
+params.samples_file_ = '{{ samples_file }}'{% endif %}
 
 {%- if db_config_file is defined and db_config_file|length %}
-env.db_config_file_ = '{{ db_config_file }}'{% endif %}
+params.db_config_file_ = '{{ db_config_file }}'{% endif %}
 
 {%- if subjects_file is defined and subjects_file|length %}
-env.subjects_file_ = '{{ subjects_file }}'{% endif %}
+params.subjects_file_ = '{{ subjects_file }}'{% endif %}
 
 {%- if study_file is defined and study_file|length %}
-env.study_file_ = '{{ study_file }}'{% endif %}
+params.study_file_ = '{{ study_file }}'{% endif %}
 
 {%- if diagnosis_file is defined and diagnosis_file|length %}
-env.diagnosis_file_ = '{{ diagnosis_file }}'{% endif %}
+params.diagnosis_file_ = '{{ diagnosis_file }}'{% endif %}
 
 {%- if interventions_file is defined and interventions_file|length %}
-env.interventions_file_ = '{{ interventions_file }}'{% endif %}
+params.interventions_file_ = '{{ interventions_file }}'{% endif %}
 
 {%- if channels_file is defined and channels_file|length %}
-env.channels_file_ = '{{ channels_file }}'{% endif %}
+params.channels_file_ = '{{ channels_file }}'{% endif %}
 
 {%- if phenotypes_file is defined and phenotypes_file|length %}
-env.phenotypes_file_ = '{{ phenotypes_file }}'{% endif %}
+params.phenotypes_file_ = '{{ phenotypes_file }}'{% endif %}
 
 {%- if permanent_condition_diagnosis_file is defined and permanent_condition_diagnosis_file|length %}
-env.permanent_condition_diagnosis_file = '{{ permanent_condition_diagnosis_file }}'{% endif %}
+params.permanent_condition_diagnosis_file = '{{ permanent_condition_diagnosis_file }}'{% endif %}
 
 {%- if condition_lack_file is defined and condition_lack_file|length %}
-env.condition_lack_file = '{{ condition_lack_file }}'{% endif %}
+params.condition_lack_file = '{{ condition_lack_file }}'{% endif %}
 
 {%- if workflow in ['graph generation', 'graph plugin'] %}
-env.graph_config_file_ = '{{ graph_config_file }}'
+params.graph_config_file_ = '{{ graph_config_file }}'
 {%- endif %}
 {%- if workflow == 'graph plugin' %}
-env.graph_plugin_image_ = '{{ graph_plugin_image }}'
-env.graph_plugin_singularity_run_options_ = '{{ graph_plugin_singularity_run_options }}'
-env.upload_importances_ = '{{ upload_importances }}'
+params.graph_plugin_image_ = '{{ graph_plugin_image }}'
+params.graph_plugin_singularity_run_options_ = '{{ graph_plugin_singularity_run_options }}'
+params.upload_importances_ = '{{ upload_importances }}'
 {%- endif %}

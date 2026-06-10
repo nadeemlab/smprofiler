@@ -7,6 +7,7 @@ import brotli
 
 from smprofiler.ondemand.cache_store import get_cache_store
 from smprofiler.ondemand.cache_store import CacheStore
+from smprofiler.ondemand.cache_store import DatabaseCacheStore
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
@@ -34,7 +35,7 @@ class CellsAccess(SimpleReadOnlyProvider):
 
     def _get_cache_store(self) -> CacheStore:
         database_config_file = self.database_config_file
-        return get_cache_store(database_config_file)
+        return get_cache_store(database_config_file, cleanup_connection_on_exit=False)
 
     def get_cells_data(
         self,
@@ -58,6 +59,7 @@ class CellsAccess(SimpleReadOnlyProvider):
                 logger.error(f'Requested "br" (Brotli) compressed blob that does not exist for {sample}.')
                 return bytes(), None
             compressed = cache_store.get_blob(study, sample, blob_type)
+            cast(DatabaseCacheStore, cache_store).cleanup()
             if 'br' in accept_encoding:
                 return compressed, 'br'
             else:
@@ -82,6 +84,7 @@ class CellsAccess(SimpleReadOnlyProvider):
             logger.error(f'Requested "br" (Brotli) compressed intensities blob that does not exist for {sample}.')
             raise NoContinuousIntensitiesError(sample)
         compressed = cache_store.get_blob(study, sample, blob_type)
+        cast(DatabaseCacheStore, cache_store).cleanup()
         if 'br' in accept_encoding:
             return cast(bytes, compressed)
         else:
@@ -105,6 +108,7 @@ class CellsAccess(SimpleReadOnlyProvider):
             logger.error('Requested "br" (Brotli) compressed intensities blob that does not exist for whole study subsample.')
             raise NoContinuousIntensitiesError(study)
         compressed = cache_store.get_blob(study, None, blob_type)
+        cast(DatabaseCacheStore, cache_store).cleanup()
         return cast(bytes, compressed)
 
     def get_cells_data_intensity_whole_study_subsample_binary_only(
@@ -125,6 +129,7 @@ class CellsAccess(SimpleReadOnlyProvider):
             logger.error('Requested "br" (Brotli) compressed intensities blob that does not exist for whole study subsample (binary only).')
             raise NoContinuousIntensitiesError(study)
         compressed = cache_store.get_blob(study, None, blob_type)
+        cast(DatabaseCacheStore, cache_store).cleanup()
         return cast(bytes, compressed)
 
     def get_ordered_feature_names(self) -> BitMaskFeatureNames:
