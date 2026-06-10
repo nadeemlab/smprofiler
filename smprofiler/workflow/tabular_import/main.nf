@@ -20,19 +20,19 @@ process echo_environment_variables {
     script:
     """
     #!/bin/bash
-    echo -n "${workflow_}" > workflow
-    echo -n "${file_manifest_filename_}" > file_manifest_filename
-    echo -n "${input_path_}" > input_path
-    echo -n "${study_file_}" > study_file
-    echo -n "${diagnosis_file_}" > diagnosis_file
-    echo -n "${interventions_file_}" > interventions_file
-    echo -n "${samples_file_}" > samples_file
-    echo -n "${db_config_file_}" > db_config_file
-    echo -n "${subjects_file_}" > subjects_file
-    echo -n "${channels_file_}" > channels_file
-    echo -n "${phenotypes_file_}" > phenotypes_file
-    echo -n "${permanent_condition_diagnosis_file}" > permanent_condition_diagnosis_file
-    echo -n "${condition_lack_file}" > condition_lack_file
+    echo -n "$params.workflow_" > workflow
+    echo -n "$params.file_manifest_filename_" > file_manifest_filename
+    echo -n "$params.input_path_" > input_path
+    echo -n "$params.study_file_" > study_file
+    echo -n "$params.diagnosis_file_" > diagnosis_file
+    echo -n "$params.interventions_file_" > interventions_file
+    echo -n "$params.samples_file_" > samples_file
+    echo -n "$params.db_config_file_" > db_config_file
+    echo -n "$params.subjects_file_" > subjects_file
+    echo -n "$params.channels_file_" > channels_file
+    echo -n "$params.phenotypes_file_" > phenotypes_file
+    echo -n "$params.permanent_condition_diagnosis_file" > permanent_condition_diagnosis_file
+    echo -n "$params.condition_lack_file" > condition_lack_file
     """
 }
 
