@@ -20,8 +20,10 @@ def get_ordered_feature_names_abstract(study: str, cache_store: CacheStore) -> B
 
 def get_ordered_feature_names(cursor: PsycopgCursor) -> BitMaskFeatureNames:
     study = get_primary_study(cursor)
-    cache_store = get_cache_store(None)
-    return get_ordered_feature_names_abstract(study, cache_store)
+    cache_store = get_cache_store(None, cleanup_connection_on_exit=False)
+    result = get_ordered_feature_names_abstract(study, cache_store)
+    cache_store.cleanup()
+    return result
 
 
 

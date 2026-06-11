@@ -43,4 +43,6 @@ if __name__ == "__main__":
     from smprofiler.db.feature_matrix_retrieval import FeatureMatrixRetrieval
     extractor = FeatureMatrixRetrieval(database_config_file=args.database_config_file)
     strata = extractor.extract_cohorts(study=args.study_name)['strata']
+    extractor.cleanup()
     print(strata.to_string())
+

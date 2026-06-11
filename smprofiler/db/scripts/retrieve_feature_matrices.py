@@ -28,6 +28,7 @@ def retrieve(args: argparse.Namespace):
     for _, specimen_data in feature_matrices.items():
         specimen_data.dataframe.to_csv(specimen_data.filename, sep='\t', index=False)
     outcomes = extractor.extract_cohorts(args.study_name)['assignments']
+    extractor.cleanup()
     filename = 'assignments.tsv'
     outcomes.to_csv(filename, sep='\t', index=False)
 

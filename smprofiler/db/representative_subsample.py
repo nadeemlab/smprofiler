@@ -49,11 +49,16 @@ class Subsampler:
     @classmethod
     def cache_exists(cls, study: str, database_config_file: str | None) -> bool:
         blob_type = FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
-        return CompressedMatrixHandling(database_config_file).blob_exists(study, '', blob_type)
+        h = CompressedMatrixHandling(database_config_file)
+        exists = h.blob_exists(study, '', blob_type)
+        h.cleanup()
+        return exists
 
     def _continuous_intensity_example_available(self) -> bool:
-        cache_store = get_cache_store(self.database_config_file)
-        return cache_store.blob_exists(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED)
+        cache_store = get_cache_store(self.database_config_file, cleanup_connection_on_exit=False)
+        exists = cache_store.blob_exists(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED)
+        cache_store.cleanup()
+        return exists
 
     def _compute_and_store(self) -> None:
         blob = bytearray()
@@ -79,7 +84,8 @@ class Subsampler:
         if self.verbose:
             logger.info('Writing blob to database.')
         blob_type = FEATURE_MATRIX_WITH_INTENSITIES_SUBSAMPLE_WHOLE_STUDY
-        CompressedMatrixHandling(self.database_config_file)._insert_blob(
+        h = CompressedMatrixHandling(self.database_config_file)
+        h._insert_blob(
             self.study, compressed_blob, '', blob_type, drop_first=True,
         )
 
@@ -87,9 +93,10 @@ class Subsampler:
             logger.info('Compressing binary portion separately, and writing to database.')
         blob_type = WHOLE_STUDY_SUBSAMPLE_BINARY_ONLY
         compressed_blob = brotli.compress(blob[offset:], quality=11, lgwin=24)
-        CompressedMatrixHandling(self.database_config_file)._insert_blob(
+        h._insert_blob(
             self.study, compressed_blob, '', blob_type, drop_first=True,
         )
+        h.cleanup()
 
     def _form_subsample_metadata(self) -> tuple[SubsampleMetadata, tuple[int, ...]]:
         with DBCursor(study=self.study, database_config_file=self.database_config_file) as cursor:
@@ -108,7 +115,9 @@ class Subsampler:
             ),
             zip(sample_names_alphabetical, subsample_sizes_same_order, thresholds),
         ))
-        channel_order = FeatureMatrixRetrieval(self.database_config_file).feature_names(self.study)
+        r = FeatureMatrixRetrieval(self.database_config_file)
+        channel_order = r.feature_names(self.study)
+        r.cleanup()
         return SubsampleMetadata(subsample_counts=subsample_counts, channel_order=channel_order), sample_sizes
 
     def _determine_thresholds(
@@ -118,7 +127,9 @@ class Subsampler:
         t: list[tuple[int, ...]] = []
         for sample in samples:
             logger.info(f'Determing thresholds for {sample}.')
-            bundle = FeatureMatrixRetrieval(self.database_config_file).extract(sample, self.study, continuous_also=True)[sample]
+            r = FeatureMatrixRetrieval(self.database_config_file)
+            bundle = r.extract(sample, self.study, continuous_also=True)[sample]
+            r.cleanup()
             df = bundle.dataframe
             df_i = cast(DataFrame, bundle.continuous_dataframe)
             t.append(self._determine_thresholds_one_sample(df_i, df))
@@ -190,8 +201,9 @@ class Subsampler:
     def _get_subsample(self, sample: str, size: int, original: int, number_channels: int) -> bytes:
         if self.verbose:
             logger.info(f'Subsampling: {sample} ({size}/{original} cells)')
-        cache_store = get_cache_store(self.database_config_file)
+        cache_store = get_cache_store(self.database_config_file, cleanup_connection_on_exit=False)
         raw = brotli.decompress(cache_store.get_blob(self.study, sample, FEATURE_MATRIX_WITH_INTENSITIES))
+        cache_store.cleanup()
         random.seed(10001)
         indices = random.sample(list(range(original)), size)
         blob = bytearray()
