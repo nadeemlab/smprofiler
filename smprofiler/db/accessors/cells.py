@@ -7,6 +7,7 @@ import brotli
 
 from smprofiler.ondemand.cache_store import get_cache_store
 from smprofiler.ondemand.cache_store import CacheStore
+from smprofiler.ondemand.cache_store import DatabaseCacheStore
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE
 from smprofiler.workflow.common.umap_defaults import VIRTUAL_SAMPLE_COMPRESSED
 from smprofiler.ondemand.defaults import FEATURE_MATRIX_WITH_INTENSITIES
