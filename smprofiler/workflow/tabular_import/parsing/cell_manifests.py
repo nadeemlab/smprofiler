@@ -19,7 +19,6 @@ from smprofiler.db.source_file_parser_interface import SourceToADIParser
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.ondemand.cache_store import get_cache_store
 from smprofiler.ondemand.cache_store import CacheStore
-from smprofiler.db.accessors.cells import CellsAccess
 from smprofiler.workflow.common.umap_creation import UMAPCreator
 from smprofiler.workflow.common.umap_creation import NoContinuousIntensityDataError
 from smprofiler.workflow.common.umap_creation import UMAP_POINT_LIMIT
@@ -65,7 +64,7 @@ class CellManifestsParser(SourceToADIParser):
         self.dataset_design = TabularCellMetadataDesign(**kwargs)
         self.study_name = cast(str, kwargs.get('study_name'))
         self.database_config_file = cast(str | None, kwargs.get('database_config_file'))
-        self.cache_store = get_cache_store(self.database_config_file)
+        self.cache_store = get_cache_store(self.database_config_file, cleanup_connection_on_exit=False)
         self.timer = Timing()
 
     def parse(self,
@@ -92,7 +91,7 @@ class CellManifestsParser(SourceToADIParser):
             chemical_species_identifiers_by_symbol,
             scale_denominator,
         )
-        logger.error('Only build_preprocessed_samples_in_memory is supported.')
+        self.cache_store.cleanup()
 
     def _parse_and_build_preprocessed_samples(
         self,
@@ -265,6 +264,7 @@ class CellManifestsParser(SourceToADIParser):
         """
         writer = CompressedMatrixHandling(self.database_config_file)
         writer.write_feature_order(self.study_name, ordered_symbols)
+        writer.cleanup()
         logger.info('Done writing feature order to database.')
 
     def _handle_umap_generation(self, ordered_symbols: tuple[str, ...], scale_denominator: float) -> None:

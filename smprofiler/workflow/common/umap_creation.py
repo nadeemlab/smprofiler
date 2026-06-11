@@ -81,7 +81,7 @@ class UMAPCreator:
         phenotype_bytes = {cell_id: integer.to_bytes(8, 'little') for cell_id, integer in data_array.items()}
         raw = CompressedMatrixHandling.zip_location_and_phenotype_data(centroids, phenotype_bytes)
         compressed = brotli.compress(raw, quality=11, lgwin=24)
-        cache_store = get_cache_store(self.database_config_file)
+        cache_store = get_cache_store(self.database_config_file, cleanup_connection_on_exit=False)
         self._drop_existing_umap_cache(cache_store)
         cache_store.put_blob(self.study, VIRTUAL_SAMPLE, VIRTUAL_SAMPLE_COMPRESSED, compressed)
         logger.info('Saved UMAP centroids and feature matrix combo.')
@@ -94,6 +94,7 @@ class UMAPCreator:
             FEATURE_MATRIX_WITH_INTENSITIES,
             CompressedMatrixHandling.form_intensities_compressed_blob(intensities_dict),
         )
+        cache_store.cleanup()
         logger.info('Done.')
 
     def _drop_existing_umap_cache(self, cache_store):

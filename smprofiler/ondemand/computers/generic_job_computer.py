@@ -53,9 +53,10 @@ class GenericJobComputer(ABC):
         if len(cell_identifiers) == 0 and self.cache.has(study, sample):
             raw, feature_names = self.cache.retrieve(study, sample)
         else:
-            cache_store = get_cache_store(None)
+            cache_store = get_cache_store(None, cleanup_connection_on_exit=False)
             feature_names = get_ordered_feature_names_abstract(study, cache_store)
             raw = brotli_decompress(cache_store.get_blob(study, sample, LOCATION_PHENOTYPE_BROTLI))
+            cache_store.cleanup()
         if len(cell_identifiers) == 0:
             self.cache.consider_insertion(study, sample, (raw, feature_names))
         rows = CompressedMatrixHandling.parse_rows_location_phenotype(raw, len(feature_names.names), phenotype_mask_as_is=True)

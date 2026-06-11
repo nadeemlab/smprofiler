@@ -30,7 +30,7 @@ class CompressedMatrixHandling:
 
     def __init__(self, database_config_file: str | None) -> None:
         self.database_config_file = cast(str, database_config_file)
-        self.cache_store = get_cache_store(database_config_file)
+        self.cache_store = get_cache_store(database_config_file, cleanup_connection_on_exit=False)
 
     def write_feature_order(self, study: str, feature_names: tuple[str, ...]) -> None:
         feature_names_str_bytes = json.dumps(list(feature_names)).encode('utf-8')
@@ -41,6 +41,9 @@ class CompressedMatrixHandling:
 
     def blob_exists(self, study: str, specimen: str, blob_type: str) -> bool:
         return self.cache_store.blob_exists(study, specimen, blob_type)
+
+    def cleanup(self) -> None:
+        self.cache_store.cleanup()
 
     @staticmethod
     def form_intensities_compressed_blob(

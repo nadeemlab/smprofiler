@@ -43,7 +43,7 @@ class FeatureMatrixRetrieval:
 
     def __init__(self, database_config_file: str | None) -> None:
         self.database_config_file = database_config_file
-        self.cache_store = get_cache_store(database_config_file)
+        self.cache_store = get_cache_store(database_config_file, cleanup_connection_on_exit=False)
 
     def extract(self,
         specimen: str | None,
@@ -206,4 +206,7 @@ class FeatureMatrixRetrieval:
 
     def feature_names(self, study: str) -> tuple[str, ...]:
         return tuple(json_loads(self.cache_store.get_blob(study, None, ORDERED_FEATURE_NAMES).decode('utf-8')))
+
+    def cleanup(self) -> None:
+        self.cache_store.cleanup()
 

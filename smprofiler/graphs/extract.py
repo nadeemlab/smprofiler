@@ -52,6 +52,7 @@ def extract(
         specimen: data.dataframe
         for specimen, data in extractor.extract(None, study=study, composite_phenotypes=True).items()
     })
+    extractor.cleanup()
     return df_cell, df_label, label_to_result_text
 
 

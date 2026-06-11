@@ -55,6 +55,9 @@ class CacheStore(Protocol):
     ) -> bool:
         ...
 
+    def cleanup(self) -> None:
+        ...
+
 class DatabaseCacheStore:
     connection: DBConnection
 
@@ -213,6 +216,9 @@ class S3CacheStore:
                 return False
             raise e
         return True
+
+    def cleanup(self) -> None:
+        pass
 
     def _build_key(self, study: str | None, specimen: str | None, blob_type: str) -> str:
         study_name = _sanitize_path_component(study or "unknown_study")
