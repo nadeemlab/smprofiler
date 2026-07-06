@@ -1,13 +1,13 @@
 [build-system]
 requires = [
-    "setuptools>=63",
+    "setuptools>=82",
     "wheel"
 ]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "smprofiler"
-version = "1.0.70"
+version = "1.0.73"
 authors = [
     { name = "James Mathews", email = "mathewj2@mskcc.org" }
 ]
@@ -54,6 +54,7 @@ all = [
     "cryptography",
     "dask[dataframe]",
     "dask-expr",
+    "dask-image>=2025.11.0",
     "fastapi",
     "h5py",
     "jinja2",
@@ -69,7 +70,7 @@ all = [
     "pyshp",
     "pytz",
     "requests",
-    "secure",
+    "secure==1.0.1",
     "setuptools>=82",
     "scipy",
     "scikit-learn",
@@ -99,7 +100,7 @@ apiserver = [
     "pytz",
     "requests",
     "scipy",
-    "secure",
+    "secure==1.0.1",
     "sqlalchemy",
     "uvicorn",
     "zstandard",
@@ -217,7 +218,6 @@ packages = [
 ]
 "smprofiler.ondemand.scripts" = [
     "read_expression_dump_file.py",
-    "assess_recreate_cache.py",
     "start.py",
 ]
 "smprofiler.db.scripts" = [
@@ -233,7 +233,6 @@ packages = [
     "interactive_uploader.py",
     "load_testing.py",
     "sync_annotations.py",
-    "count_cells.py",
     "cache_subsample.py",
 ]
 "smprofiler.db.data_model" = [

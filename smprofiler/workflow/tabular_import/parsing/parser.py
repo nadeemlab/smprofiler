@@ -6,25 +6,18 @@ import re
 from psycopg import sql
 from pandas import read_csv as pandas_read_csv
 
-from smprofiler.workflow.tabular_import.parsing.cell_manifests import \
-    CellManifestsParser
-from smprofiler.workflow.tabular_import.parsing.channels import \
-    ChannelsPhenotypesParser
-from smprofiler.workflow.tabular_import.parsing.cell_manifest_set import \
-    CellManifestSetParser
+from smprofiler.workflow.tabular_import.parsing.cell_manifests import CellManifestsParser
+from smprofiler.workflow.tabular_import.parsing.channels import ChannelsPhenotypesParser
+from smprofiler.workflow.tabular_import.parsing.cell_manifest_set import CellManifestSetParser
 from smprofiler.workflow.tabular_import.parsing.samples import SamplesParser
 from smprofiler.workflow.tabular_import.parsing.subjects import SubjectsParser
-from smprofiler.workflow.tabular_import.parsing.sample_stratification import \
-    SampleStratificationCreator
-from smprofiler.workflow.tabular_import.parsing.interventions import \
-    InterventionsParser
+from smprofiler.workflow.tabular_import.parsing.sample_stratification import SampleStratificationCreator
+from smprofiler.workflow.tabular_import.parsing.interventions import InterventionsParser
 from smprofiler.workflow.tabular_import.parsing.diagnosis import DiagnosisParser
 from smprofiler.workflow.tabular_import.parsing.study import StudyParser
 from smprofiler.db.database_connection import DBConnection
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.database_connection import create_dataset_area
-from smprofiler.db.modify_constraints import DBConstraintsToggling
-from smprofiler.db.modify_constraints import toggle_constraints
 from smprofiler.db.schema_infuser import SchemaInfuser
 from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.db.exchange_data_formats.study import StudyHandle
@@ -34,7 +27,7 @@ from smprofiler.standalone_utilities.log_formats import colorized_logger
 logger = colorized_logger(__name__)
 
 
-class DataSkimmer:
+class Parser:
     """Orchestration of source file parsing into single cell ADI schema database
     for a bundle of source files.
     """
@@ -122,16 +115,9 @@ class DataSkimmer:
         study_name = self._register_study(_files['study'])
         with as_file(files('adiscstudies').joinpath('fields.tsv')) as path:
             fields = pandas_read_csv(path, sep='\t', na_filter=False)
-
-        toggle_constraints(
-            self.database_config_file,
-            study_name,
-            state=DBConstraintsToggling.DROP,
-        )
-
         with DBConnection(database_config_file=self.database_config_file, study=study_name) as connection:
             self._cache_all_record_counts(connection, fields)
-            StudyParser(fields).parse(connection, _files['study'])
+            _, scale_denominator = StudyParser(fields).parse(connection, _files['study'])
             SubjectsParser(fields).parse(connection, _files['subjects'])
             DiagnosisParser(fields).parse(connection, _files['diagnosis'])
             InterventionsParser(fields).parse(connection, _files['interventions'])
@@ -143,20 +129,21 @@ class DataSkimmer:
                 _files['phenotypes'],
                 study_name,
             )
-            CellManifestsParser(fields, channels_file=_files['channels']).parse(
+            CellManifestsParser(
+                fields,
+                channels_file=_files['channels'],
+                study_name=study_name,
+                database_config_file=self.database_config_file,
+            ).parse(
                 connection,
                 _files['file manifest'],
                 chemical_species_identifiers_by_symbol,
+                scale_denominator,
             )
             pcd = 'permanent condition diagnosis'
             cl = 'condition lack'
-            if pcd in _files and cl in _files:
+            if pcd in _files and cl in _files and _files[pcd] is not None and _files[cl] is not None:
                 TableTranscriber((_files[pcd], _files[cl]), connection).transcribe()
             SampleStratificationCreator.create_sample_stratification(connection)
             self._report_record_count_changes(connection, fields)
 
-        toggle_constraints(
-            self.database_config_file,
-            study_name,
-            state=DBConstraintsToggling.RECREATE,
-        )

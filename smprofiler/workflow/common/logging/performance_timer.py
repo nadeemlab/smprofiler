@@ -1,4 +1,5 @@
-"""A convenience reporter of time performance. Keeps track of time used by specific named processes
+"""
+A convenience reporter of time performance. Keeps track of time used by specific named processes
 and reports an aggregation as a text table.
 """
 
@@ -42,7 +43,7 @@ class PerformanceTimer:
             self.times[(message, self.previous_message)].append(diff)
         self.previous_time = now
         self.previous_message = message
-        if not message in self.message_order:
+        if message not in self.message_order:
             number = len(self.message_order)
             self.message_order[message] = number
 
@@ -65,7 +66,7 @@ class PerformanceTimer:
                 'fraction': total / all_totals,
             })
         df = pd.DataFrame(records)
-        if organize_by in get_args(ReportOrganization):
+        if organize_by in get_args(ReportOrganization) and organize_by in df.columns:
             df.sort_values(by=organize_by, inplace=True, ascending=False)
         return df
 
@@ -77,17 +78,22 @@ class PerformanceTimer:
 class PerformanceTimerReporter:
     """Logger/reporter of performance timer results."""
     timer: PerformanceTimer
+    verbose: bool
 
-    def __init__(self, performance_report_file: str, logger):
+    def __init__(self, performance_report_file: str, logger, verbose: bool=False):
         self.performance_report_file = performance_report_file
         self.logger = logger
         self.timer = PerformanceTimer()
+        self.verbose = verbose
 
     def record_timepoint(self, moment_name: str):
         self.timer.record_timepoint(moment_name)
 
-    def wrap_up_timer(self):
+    def wrap_up_timer(self, verbose: bool=False):
         """Concludes low-level performance metric collection."""
         df = self.timer.report(organize_by='fraction')
         self.logger.info('Report to: %s', self.performance_report_file)
         df.to_csv(self.performance_report_file, index=False)
+        if self.verbose:
+            self.logger.info('\n' + df.to_string())
+

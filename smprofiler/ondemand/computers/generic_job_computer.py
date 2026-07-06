@@ -1,22 +1,24 @@
 from os import environ as os_environ
 from abc import ABC
 from abc import abstractmethod
-from typing import Literal
 
 from numpy import asarray
-from numpy import uint64 as np_int64
-
+from numpy import uint64 as np_uint64
+from brotli import decompress as brotli_decompress
 from psycopg.errors import UniqueViolation
 
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.ondemand.computers.cell_data_arrays import CellDataArrays
-from smprofiler.db.accessors.cells import CellsAccess
+from smprofiler.db.accessors.feature_names import get_ordered_feature_names_abstract
+from smprofiler.ondemand.cache_store import get_cache_store
+from smprofiler.ondemand.compressed_matrix_handling import CompressedMatrixHandling
+from smprofiler.ondemand.compressed_matrix_handling import filter_on_ids
 from smprofiler.ondemand.add_feature_value import add_feature_value
+from smprofiler.ondemand.defaults import LOCATION_PHENOTYPE_BROTLI
 from smprofiler.ondemand.job_reference import ComputationJobReference
 from smprofiler.apiserver.request_scheduling.counts_scheduler import CountsScheduler
 from smprofiler.apiserver.request_scheduling.computation_scheduler import GenericComputationScheduler
-from smprofiler.workflow.common.export_features import \
-    ADIFeatureSpecificationUploader
+from smprofiler.workflow.common.export_features import ADIFeatureSpecificationUploader
 from smprofiler.ondemand.providers.study_component_extraction import ComponentGetter
 from smprofiler.db.exchange_data_formats.metrics import PhenotypeCriteria
 from smprofiler.db.database_connection import DBConnection
@@ -40,50 +42,37 @@ class GenericJobComputer(ABC):
         raise NotImplementedError
 
     def get_cell_data_arrays(self) -> CellDataArrays:
+        """
+        Somewhat low-level access to binary cell data payloads. This is separate
+        from FeatureMatrixRetrieval in order to allow slightly more optimized
+        iteration over phenotype data (the signature/bytes logical operations).
+        """
         study = self.job.study
         sample = self.job.sample
         cell_identifiers = self._get_cells_selected()
         if len(cell_identifiers) == 0 and self.cache.has(study, sample):
             raw, feature_names = self.cache.retrieve(study, sample)
         else:
-            with DBCursor(connection=self.connection, study=study) as cursor:
-                access = CellsAccess(cursor)
-                raw, _ = access.get_cells_data(sample, cell_identifiers=cell_identifiers)
-                feature_names = access.get_ordered_feature_names()
-            if len(cell_identifiers) == 0:
-                self.cache.consider_insertion(study, sample, (raw, feature_names))
-        number_cells = int.from_bytes(raw[0:4])
-        if number_cells == 0:
-            return CellDataArrays(None, None, feature_names, None)  # type: ignore
-        location = asarray((self._get_parts(4, 8, raw), self._get_parts(8, 12, raw)))
-        self._expect_number(location.shape[1], number_cells)
-        phenotype = asarray(self._get_parts(12, 20, raw, byteorder='little'))
-        self._expect_number(phenotype.shape[0], number_cells)
-        identifiers = asarray(self._get_parts(0, 4, raw))
-        self._expect_number(identifiers.shape[0], number_cells)
-        return CellDataArrays(location, phenotype, feature_names, identifiers)
+            cache_store = get_cache_store(None, cleanup_connection_on_exit=False)
+            feature_names = get_ordered_feature_names_abstract(study, cache_store)
+            raw = brotli_decompress(cache_store.get_blob(study, sample, LOCATION_PHENOTYPE_BROTLI))
+            cache_store.cleanup()
+        if len(cell_identifiers) == 0:
+            self.cache.consider_insertion(study, sample, (raw, feature_names))
+        rows = CompressedMatrixHandling.parse_rows_location_phenotype(raw, len(feature_names.names), phenotype_mask_as_is=True)
+        if cell_identifiers != ():
+            rows = filter_on_ids(cell_identifiers, rows)
+        a = asarray(rows)
+        location = a[:,1:3]
+        identifiers = a[:,0]
+        phenotype = asarray([row[3] for row in rows])
+        return CellDataArrays(location.transpose(), phenotype, feature_names, identifiers)
 
     def _get_cells_selected(self) -> tuple[int, ...]:
         with DBCursor(connection=self.connection, study=self.job.study) as cursor:
             query = 'SELECT histological_structure FROM cell_set_cache WHERE feature=%s ;'
             cursor.execute(query, (str(self.job.feature_specification),))
             return tuple(map(lambda row: int(row[0]), cursor.fetchall()))
-
-    @staticmethod
-    def _get_parts(
-        start: int, end: int, raw: bytes, byteorder: Literal['big', 'little']='big',
-    ) -> tuple[np_int64, ...]:
-        offset = 20
-        period = 20
-        return tuple(map(
-            lambda batch: np_int64(int.from_bytes(batch[start:end], byteorder=byteorder)),
-            CellsAccess._batched(raw[offset:], period),
-        ))
-
-    @staticmethod
-    def _expect_number(got: int, expected: int) -> None:
-        if got != expected:
-            raise ValueError(f'Unexpected number of cells, got {got}, expected {expected}.')
 
     def handle_insert_value(self, value: float | None, allow_null: bool=True) -> None:
         if value is not None:
@@ -182,3 +171,4 @@ class GenericJobComputer(ABC):
             )
             study = tuple(cursor.fetchall())[0][0]
         return study, specifiers
+

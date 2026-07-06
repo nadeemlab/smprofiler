@@ -36,5 +36,5 @@ Subjects file	subjects.tsv		Manifest of subjects	Melanoma CyTOF ICI
 Study file	study.json		Project-level data	Melanoma CyTOF ICI
 Diagnosis file	diagnosis.tsv		List of subject diagnoses	Melanoma CyTOF ICI
 Interventions file	interventions.tsv		List of subject intervention events	Melanoma CyTOF ICI
-Permanent condition diagnosis file	permanent_condition_diagnosis.tsv	List of survival-type-data conditions
-Condition lack file	condition_lack.tsv	List of survival-type-data polarities
+Permanent condition diagnosis file	permanent_condition_diagnosis.tsv		List of survival-data-type events	Melanoma CyTOF ICI
+Condition lack file	condition_lack.tsv		List of survival-metadata-type polarities	Melanoma CyTOF ICI

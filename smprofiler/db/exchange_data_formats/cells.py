@@ -12,3 +12,6 @@ class BitMaskFeatureNames(BaseModel):
     cell's channel positivity/negativity assignments.
     """
     names: tuple[Channel, ...]
+
+
+

@@ -3,7 +3,7 @@
 from numpy import asarray
 from numpy.typing import NDArray
 
-from smprofiler.workflow.common.sparse_matrix_puller import SparseMatrixPuller
+from smprofiler.ondemand.compressed_matrix_handling import compress_bitwise_to_int
 from smprofiler.ondemand.computers.squidpy_computer import extract_binary
 
 def primitive_compress(vector: tuple[int, ...]) -> int:
@@ -18,13 +18,13 @@ def _test_roundtrip_vector(vector: tuple[int, ...]) -> None:
 
 
 def _test_roundtrip_array(array: NDArray) -> None:
-    compress = SparseMatrixPuller._compress_bitwise_to_int
+    compress = compress_bitwise_to_int
     length = len(array)
     assert (asarray(extract_binary(compress(array), length)) == array).all()
 
 
 def _test_roundtrip_int(integer: int) -> None:
-    compress = SparseMatrixPuller._compress_bitwise_to_int
+    compress = compress_bitwise_to_int
     lengths = (32, 64, 128, 101)
     for length in lengths:
         assert compress(asarray(extract_binary(integer, length))) == integer
