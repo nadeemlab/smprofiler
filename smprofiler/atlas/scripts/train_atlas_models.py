@@ -99,6 +99,15 @@ def parse_args() -> argparse.Namespace:
         help="Number of cross-validation folds",
     )
     parser.add_argument(
+        "--database-config-file",
+        default=None,
+        help=(
+            "Optional smprofiler database config file. If given, each trained model "
+            "(ONNX + metadata) is also stored in the 'atlas_model' table; otherwise "
+            "models are written as files only."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print the training plan without actually training any models",
@@ -133,6 +142,7 @@ def main(args: argparse.Namespace) -> None:
             study=args.study,
             cv_folds=args.cv_folds,
             dry_run=args.dry_run,
+            database_config_file=Path(args.database_config_file) if args.database_config_file else None,
         )
     except (FileNotFoundError, RuntimeError) as exception:
         logger.error("%s", exception)

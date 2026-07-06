@@ -41,6 +41,18 @@ DEFAULT_ANNOTATIONS_API_URL = "https://smprofiler.io/api"
 _SUMMARY_WIDTH = 70
 
 
+def _store_models_in_db(database_config_file: Path, records: list[dict]) -> None:
+    """Persist trained models to the metaschema ``atlas_model`` table (one connection)."""
+    # Imported lazily so the file-only training path carries no database dependency.
+    from smprofiler.db.database_connection import DBCursor
+    from smprofiler.db.accessors.atlas_models import store_atlas_model
+
+    logger.info("Storing %d trained model(s) to the 'atlas_model' database table…", len(records))
+    with DBCursor(database_config_file=str(database_config_file)) as cursor:
+        for record in records:
+            store_atlas_model(cursor, **record)
+
+
 def run(
     parquet_path: Path,
     mapping_path: Path,
@@ -52,6 +64,7 @@ def run(
     study: str | None = None,
     cv_folds: int = 5,
     dry_run: bool = False,
+    database_config_file: Path | None = None,
 ) -> None:
     """
     Train atlas-reference regression models.
@@ -71,6 +84,8 @@ def run(
         study: train only for this study; None discovers all studies.
         cv_folds: number of cross-validation folds.
         dry_run: print the training plan without training any models.
+        database_config_file: if given, also store each trained model (ONNX bytes
+            + metadata) in the metaschema ``atlas_model`` table; None writes files only.
 
     Raises:
         FileNotFoundError: if a required input file is missing.
@@ -82,7 +97,6 @@ def run(
     if not mapping_path.exists():
         raise FileNotFoundError(f"Channel mapping file not found: {mapping_path}")
 
-    # Step 1: Load channel annotations from the API (the source of truth).
     if not annotations_api_url:
         raise RuntimeError(
             "An annotations API URL is required — loading channel annotations from "
@@ -97,7 +111,6 @@ def run(
             f"Failed to load channel annotations from API {annotations_api_url}: {exc}"
         ) from exc
 
-    # Step 2: Discover per-study channel lists
     if study:
         study_list = [study]
     else:
@@ -113,8 +126,7 @@ def run(
     if not study_channels:
         raise RuntimeError("No studies with channel data found.")
 
-    # Step 3: Load the manual SPT-channel → atlas-gene mapping, keeping only
-    # channels whose atlas gene is actually present in the Parquet table.
+    # Keep only mapped channels whose atlas gene is actually present in the Parquet table.
     spt_to_atlas = load_channel_mapping(mapping_path)
     atlas_genes = set(load_atlas_gene_names(parquet_path))
     absent = {spt: gene for spt, gene in spt_to_atlas.items() if gene not in atlas_genes}
@@ -179,8 +191,9 @@ def run(
     run_start = time.monotonic()
     model_counter = 0
     summary_rows: list[dict] = []
+    model_records: list[dict] = []  # collected for optional database storage
 
-    # Step 5: For each study × functional_marker pair, train a model
+    # Train one model per (study, functional marker).
     for study_idx, p in enumerate(plan, 1):
         study_name = p["study"]
         id_in_atlas = p["identity"]
@@ -202,12 +215,11 @@ def run(
             max_cells=max_cells, rng=rng,
         )
 
-        # Build column index lookup
         col_idx = {name: i for i, name in enumerate(needed_spt)}
         X_identity = X_all[:, [col_idx[c] for c in id_in_atlas]]
 
-        # Sum-normalize by identity-channel row sums (removes overall scale effect)
-        row_sums = X_identity.sum(axis=1)           # shape (n_cells,)
+        # Sum-normalize by identity-channel row sums (removes overall scale effect).
+        row_sums = X_identity.sum(axis=1)
         valid_mask = row_sums > 1e-8
         n_zero_sum = int((~valid_mask).sum())
         if n_zero_sum:
@@ -242,14 +254,12 @@ def run(
             logger.info("  Target   : '%s' (norm; range %.4f – %.4f, mean %.4f)",
                         target_channel, float(y_norm.min()), float(y_norm.max()), float(y_norm.mean()))
 
-            # Train/test split on normalized data
             X_train, X_test, y_train, y_test = train_test_split(
                 X_identity_norm, y_norm, test_size=0.2, random_state=42
             )
             logger.info("  Split    : %s train / %s test",
                         f"{len(X_train):,}", f"{len(X_test):,}")
 
-            # Train all candidates, select best by CV R²
             logger.info("  Training %d model candidates with %d-fold CV …",
                         len(build_model_candidates()), cv_folds)
             t_train_start = time.monotonic()
@@ -257,7 +267,6 @@ def run(
                 X_train, y_train, cv_folds=cv_folds
             )
 
-            # Evaluate on held-out test set
             y_pred_mean, y_pred_std = predict_with_std(best_model, best_name, X_test)
             test_r2 = float(r2_score(y_test, y_pred_mean))
             test_mae = float(mean_absolute_error(y_test, y_pred_mean))
@@ -267,7 +276,8 @@ def run(
             # GaussianProcess only reproduces in double precision; others use float32.
             double_precision = best_name == "gaussian_process"
             onnx_input_dtype = "float64" if double_precision else "float32"
-            train_elapsed = format_elapsed(time.monotonic() - t_train_start)
+            train_seconds = time.monotonic() - t_train_start
+            train_elapsed = format_elapsed(train_seconds)
             logger.info(
                 "  Result   : model='%s'  test_R²=%.4f  test_MAE=%.4f"
                 "  std_method=%s  global_std=%.4f  [%s]",
@@ -281,22 +291,19 @@ def run(
             pkl_path = study_out_dir / f"{safe_target}.pkl"
             meta_path = study_out_dir / f"{safe_target}.meta.json"
 
-            # Export to ONNX
             export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path,
                            double_precision=double_precision)
 
-            # Validate ONNX output matches sklearn
             n_validate = min(500, X_test.shape[0])
             validate_onnx(onnx_path, best_model, X_test[:n_validate],
                           double_precision=double_precision)
 
-            # Save sklearn model pickle (for Python-side per-cell std computation)
+            # Keep the sklearn pickle too: per-cell std is computed in Python, not from ONNX.
             study_out_dir.mkdir(parents=True, exist_ok=True)
             with open(pkl_path, "wb") as pkl_f:
                 pickle.dump(best_model, pkl_f)
             logger.info("Pickle saved: %s (%.1f KB)", pkl_path, pkl_path.stat().st_size / 1024)
 
-            # Write metadata
             write_metadata(
                 meta_path,
                 study=study_name,
@@ -326,6 +333,27 @@ def run(
                 "test_MAE": test_mae,
                 "onnx_kb": onnx_path.stat().st_size // 1024,
             })
+
+            if database_config_file is not None:
+                model_records.append({
+                    "study": study_name,
+                    "target_channel": target_channel,
+                    "input_channels": id_in_atlas,
+                    "architecture_type": best_name,
+                    "std_method": std_method,
+                    "onnx_input_dtype": onnx_input_dtype,
+                    "atlas_version": ATLAS_VERSION,
+                    "cv_r2": cv_r2,
+                    "test_r2": test_r2,
+                    "test_mae": test_mae,
+                    "n_train": len(X_train),
+                    "n_test": len(X_test),
+                    "training_time_seconds": train_seconds,
+                    "onnx_bytes": onnx_path.read_bytes(),
+                })
+
+    if model_records:
+        _store_models_in_db(database_config_file, model_records)
 
     # ── Final summary ────────────────────────────────────────────────────────
     total_elapsed = format_elapsed(time.monotonic() - run_start)

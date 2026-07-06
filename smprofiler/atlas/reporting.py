@@ -17,7 +17,8 @@ import logging
 # Width of visual separator lines.
 _SEP_WIDTH = 70
 
-# Third-party libraries that log verbosely during ONNX conversion / inference.
+# ONNX-ecosystem loggers clamped to WARNING by suppress_third_party_logging
+# (defensive — these are usually quiet, but stay silent across library versions).
 _NOISY_LOGGERS = ('skl2onnx', 'onnx', 'onnxruntime')
 
 
