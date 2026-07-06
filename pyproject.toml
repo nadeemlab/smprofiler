@@ -105,6 +105,19 @@ apiserver = [
     "uvicorn",
     "zstandard",
 ]
+atlas = [
+    "anndata>=0.10",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "scikit-learn>=1.3",
+    "onnx>=1.15",
+    "skl2onnx>=0.15",
+    "onnxmltools>=1.12",
+    "onnxruntime>=1.17",
+    "xgboost>=2.0",
+    "tqdm>=4.65",
+]
 graphs = [
     "bokeh",
     "h5py",
@@ -152,6 +165,8 @@ packages = [
     "smprofiler.apiserver.app",
     "smprofiler.apiserver.request_scheduling",
     "smprofiler.apiserver.scripts",
+    "smprofiler.atlas",
+    "smprofiler.atlas.scripts",
     "smprofiler.graphs",
     "smprofiler.graphs.scripts",
     "smprofiler.ondemand",
@@ -215,6 +230,9 @@ packages = [
 "smprofiler.workflow.tabular_import" = ["main.nf"]
 "smprofiler.apiserver.scripts" = [
     "dump_schema.py",
+]
+"smprofiler.atlas.scripts" = [
+    "train_atlas_models.py",
 ]
 "smprofiler.ondemand.scripts" = [
     "read_expression_dump_file.py",
