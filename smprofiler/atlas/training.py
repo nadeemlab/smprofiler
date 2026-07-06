@@ -25,6 +25,7 @@ from smprofiler.atlas.study_channels import discover_study_channels
 from smprofiler.atlas.atlas_data import load_atlas_gene_names
 from smprofiler.atlas.atlas_data import load_atlas_subset
 from smprofiler.atlas.atlas_data import load_channel_mapping
+from smprofiler.atlas.models import STD_METHODS
 from smprofiler.atlas.models import build_model_candidates
 from smprofiler.atlas.models import predict_with_std
 from smprofiler.atlas.models import train_and_select_best
@@ -262,12 +263,10 @@ def run(
             test_mae = float(mean_absolute_error(y_test, y_pred_mean))
             residuals = y_test - y_pred_mean
             global_std = float(residuals.std())
-            if best_name == "bayesian_ridge":
-                std_method = "bayesian_posterior"
-            elif best_name in ("random_forest", "extra_trees"):
-                std_method = "tree_variance"
-            else:
-                std_method = "global_residual_std"
+            std_method = STD_METHODS[best_name]
+            # GaussianProcess only reproduces in double precision; others use float32.
+            double_precision = best_name == "gaussian_process"
+            onnx_input_dtype = "float64" if double_precision else "float32"
             train_elapsed = format_elapsed(time.monotonic() - t_train_start)
             logger.info(
                 "  Result   : model='%s'  test_R²=%.4f  test_MAE=%.4f"
@@ -283,11 +282,13 @@ def run(
             meta_path = study_out_dir / f"{safe_target}.meta.json"
 
             # Export to ONNX
-            export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path)
+            export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path,
+                           double_precision=double_precision)
 
             # Validate ONNX output matches sklearn
             n_validate = min(500, X_test.shape[0])
-            validate_onnx(onnx_path, best_model, X_test[:n_validate])
+            validate_onnx(onnx_path, best_model, X_test[:n_validate],
+                          double_precision=double_precision)
 
             # Save sklearn model pickle (for Python-side per-cell std computation)
             study_out_dir.mkdir(parents=True, exist_ok=True)
@@ -312,6 +313,7 @@ def run(
                 sum_normalized=True,
                 std_method=std_method,
                 global_std=global_std,
+                onnx_input_dtype=onnx_input_dtype,
             )
 
             summary_rows.append({

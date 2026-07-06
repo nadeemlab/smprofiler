@@ -1,18 +1,28 @@
 """Regression model candidates, cross-validated selection, and prediction.
 
-Defines the pool of candidate estimators, picks the best by k-fold CV R²,
-and computes per-sample predictive std where the winning model supports it
-(Bayesian posterior or tree-ensemble variance).
+Only architectures whose predictive standard deviation genuinely depends on the
+input ``x`` are considered — so that the per-cell "atlas-relative" call can use a
+context-aware uncertainty, not a single global residual std. Concretely:
+
+- ``bayesian_ridge`` — Bayesian posterior predictive std,
+- ``gaussian_process`` — GP posterior predictive std,
+- ``random_forest`` / ``extra_trees`` — spread across the individual trees.
+
+Purely-mean regressors (ridge, elastic net, huber, gradient boosting) are
+excluded because they offer only an input-independent residual std.
+``predict_with_std`` raises for any model outside this set, keeping the invariant
+enforced in code.
 """
 import time
 
 import numpy as np
 from sklearn.ensemble import ExtraTreesRegressor, RandomForestRegressor
-from sklearn.linear_model import BayesianRidge, ElasticNet, HuberRegressor, Ridge
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel, WhiteKernel
+from sklearn.linear_model import BayesianRidge
 from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from xgboost import XGBRegressor
 from tqdm import tqdm
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -20,9 +30,26 @@ from smprofiler.atlas.reporting import format_elapsed
 
 logger = colorized_logger(__name__)
 
+# GaussianProcessRegressor is O(n^3) in training-set size; fit it on at most this
+# many (randomly sampled) cells. Other candidates train on the full set.
+MAX_GP_TRAIN_SAMPLES = 2000
+
+# Models whose predictive std depends on x (see module docstring).
+STD_METHODS = {
+    "bayesian_ridge": "bayesian_posterior",
+    "gaussian_process": "gaussian_posterior",
+    "random_forest": "tree_variance",
+    "extra_trees": "tree_variance",
+}
+
 
 def build_model_candidates() -> list[tuple[str, object]]:
-    """Return list of (name, sklearn_estimator) for all candidate models."""
+    """Return list of (name, sklearn_estimator) for all candidate models.
+
+    Every candidate exposes an input-dependent predictive std via
+    :func:`predict_with_std`; see the module docstring.
+    """
+    gp_kernel = ConstantKernel(1.0) * RBF(length_scale=1.0) + WhiteKernel(noise_level=1.0)
     return [
         (
             "extra_trees",
@@ -43,27 +70,6 @@ def build_model_candidates() -> list[tuple[str, object]]:
             ),
         ),
         (
-            "ridge",
-            Pipeline([
-                ("scaler", StandardScaler()),
-                ("ridge", Ridge(alpha=1.0)),
-            ]),
-        ),
-        (
-            "elastic_net",
-            Pipeline([
-                ("scaler", StandardScaler()),
-                ("enet", ElasticNet(alpha=0.01, l1_ratio=0.5, max_iter=2000)),
-            ]),
-        ),
-        (
-            "huber",
-            Pipeline([
-                ("scaler", StandardScaler()),
-                ("huber", HuberRegressor(epsilon=1.35, max_iter=200)),
-            ]),
-        ),
-        (
             "bayesian_ridge",
             Pipeline([
                 ("scaler", StandardScaler()),
@@ -71,20 +77,30 @@ def build_model_candidates() -> list[tuple[str, object]]:
             ]),
         ),
         (
-            "xgboost",
-            XGBRegressor(
-                n_estimators=200,
-                max_depth=5,
-                learning_rate=0.1,
-                subsample=0.8,
-                colsample_bytree=0.8,
-                tree_method="hist",
-                n_jobs=-1,
-                random_state=42,
-                verbosity=0,
-            ),
+            "gaussian_process",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("gaussian_process", GaussianProcessRegressor(
+                    kernel=gp_kernel,
+                    normalize_y=True,
+                    random_state=42,
+                )),
+            ]),
         ),
     ]
+
+
+def _training_data_for(
+    name: str,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Bound the Gaussian Process training set; pass others through unchanged."""
+    if name == "gaussian_process" and len(X_train) > MAX_GP_TRAIN_SAMPLES:
+        rng = np.random.default_rng(42)
+        idx = rng.choice(len(X_train), size=MAX_GP_TRAIN_SAMPLES, replace=False)
+        return X_train[idx], y_train[idx]
+    return X_train, y_train
 
 
 def train_and_select_best(
@@ -107,8 +123,9 @@ def train_and_select_best(
     for name, model in tqdm(candidates, desc="  CV candidates", leave=False,
                             bar_format="  {desc}: {n_fmt}/{total_fmt} [{bar}] {postfix}"):
         t0 = time.monotonic()
+        X_cv, y_cv = _training_data_for(name, X_train, y_train)
         scores = cross_val_score(
-            model, X_train, y_train,
+            model, X_cv, y_cv,
             cv=cv_folds, scoring="r2", n_jobs=-1,
         )
         mean_r2 = float(scores.mean())
@@ -124,10 +141,11 @@ def train_and_select_best(
             best_name = name
             best_model = model
 
-    # Refit best model on full training set
+    # Refit best model on the full training set (subsampled for GP).
     logger.info("  → Refitting winner '%s' on full train set…", best_name)
     t0 = time.monotonic()
-    best_model.fit(X_train, y_train)
+    X_fit, y_fit = _training_data_for(best_name, X_train, y_train)
+    best_model.fit(X_fit, y_fit)
     logger.info("  → Done in %s  (CV R²=%.4f ± %.4f)",
                 format_elapsed(time.monotonic() - t0), best_r2, best_std)
     return best_name, best_model, best_r2, best_std
@@ -137,21 +155,23 @@ def predict_with_std(
     model,
     model_name: str,
     X_norm: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray | None]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Return (y_mean, y_std) for a fitted model evaluated on normalized inputs.
 
-    y_std is per-sample predictive std where available, otherwise None
-    (caller falls back to global_residual_std stored in metadata).
+    y_std is a per-sample predictive std that depends on the input.
 
     Dispatch rules:
-        bayesian_ridge  → posterior predictive std from BayesianRidge.predict()
+        bayesian_ridge   → posterior predictive std from BayesianRidge.predict()
+        gaussian_process → posterior predictive std from GaussianProcessRegressor
         random_forest / extra_trees → std across individual tree predictions
-        all others      → (predictions, None)
+
+    Raises:
+        ValueError: for any model whose std would not depend on the input.
     """
-    if model_name == "bayesian_ridge":
+    if model_name in ("bayesian_ridge", "gaussian_process"):
         X_scaled = model.named_steps["scaler"].transform(X_norm)
-        inner = model.named_steps["bayesian_ridge"]
+        inner = model.named_steps[model_name]
         y_mean, y_std = inner.predict(X_scaled, return_std=True)
         return y_mean, y_std
 
@@ -161,4 +181,7 @@ def predict_with_std(
         )  # (n_trees, n_samples)
         return tree_preds.mean(axis=0), tree_preds.std(axis=0)
 
-    return model.predict(X_norm), None
+    raise ValueError(
+        f"Model '{model_name}' has no input-dependent predictive std; only "
+        f"{sorted(STD_METHODS)} are supported."
+    )

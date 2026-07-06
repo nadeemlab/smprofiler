@@ -114,9 +114,7 @@ atlas = [
     "scikit-learn>=1.3",
     "onnx>=1.15",
     "skl2onnx>=0.15",
-    "onnxmltools>=1.12",
     "onnxruntime>=1.17",
-    "xgboost>=2.0",
     "tqdm>=4.65",
 ]
 graphs = [
