@@ -1,36 +1,24 @@
 """Progress reporting and logging helpers for atlas model training.
 
-These are presentation concerns kept apart from the training logic: section
-dividers printed straight to stdout (so they read cleanly alongside tqdm
-progress bars), an elapsed-time formatter, a file-descriptor silencer for
-noisy C-extension output, and helpers to tune log verbosity.
+Per-module log messages use the codebase-standard ``colorized_logger``. This
+module holds the few shared extras that pattern doesn't cover:
+
+- ``section`` / ``subsection``: visual dividers for the CLI's human-facing
+  progress output, printed (not logged) so they stand out from timestamped log
+  lines and align with the final summary table (see ``training.run``). Printing
+  such output matches the codebase (e.g. ``entry_point/cli.py``,
+  ``db/scripts/status.py``).
+- ``format_elapsed``: shared elapsed-time formatting, used across modules.
+- ``suppress_third_party_logging`` / ``set_atlas_log_level``: standard-logging
+  level tweaks for the ONNX libraries and the ``--verbose`` flag.
 """
-import contextlib
 import logging
-import os
 
 # Width of visual separator lines.
 _SEP_WIDTH = 70
 
 # Third-party libraries that log verbosely during ONNX conversion / inference.
 _NOISY_LOGGERS = ('skl2onnx', 'onnx', 'onnxruntime')
-
-
-@contextlib.contextmanager
-def silence_output():
-    """Redirect OS-level stdout/stderr to /dev/null (suppresses C-ext prints)."""
-    devnull = os.open(os.devnull, os.O_WRONLY)
-    saved_out, saved_err = os.dup(1), os.dup(2)
-    try:
-        os.dup2(devnull, 1)
-        os.dup2(devnull, 2)
-        yield
-    finally:
-        os.dup2(saved_out, 1)
-        os.dup2(saved_err, 2)
-        os.close(saved_out)
-        os.close(saved_err)
-        os.close(devnull)
 
 
 def section(title: str) -> None:

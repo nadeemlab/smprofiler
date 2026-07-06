@@ -1,185 +1,127 @@
-"""Atlas file access and atlas ↔ SPT channel mapping.
+"""Access to the aggregated atlas artifacts.
 
-Reads the Allen Institute atlas h5ad file (index-only or a column/row subset)
-and reconciles atlas marker names with canonical SPT channel names through a
-tiered manual / alias / case-insensitive / HGNC-symbol resolution.
+Reads the two files produced by the atlas aggregation step (in smprofiler-data):
+
+- ``cell_atlas_small.parquet`` — a cell × gene expression table restricted to
+  the atlas genes relevant to SPT channels.
+- ``smprofiler_channels_to_atlas.tsv`` — the manual mapping from SPT channel
+  names to atlas gene (column) names.
+
+The aggregation step subselects and joins the per-cell-type atlas downloads and
+applies the manually curated ``channel_proxies.json``; this module simply
+consumes its Parquet/TSV output. (The heuristic fallback mapping lives in
+:mod:`smprofiler.atlas.automatic_channel_mapping`.)
 """
 import time
 from pathlib import Path
 
-import anndata as ad
 import numpy as np
-from scipy import sparse
+import pandas as pd
+import pyarrow.parquet as pq
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
-from smprofiler.atlas.channel_annotations import normalize_name
-from smprofiler.atlas.hgnc_normalization import normalize_names_to_hgnc
 from smprofiler.atlas.reporting import format_elapsed
 
 logger = colorized_logger(__name__)
 
-
-def load_atlas_var_names(atlas_path: Path) -> list[str]:
-    """Return var_names from the atlas without loading the expression matrix."""
-    size_gb = atlas_path.stat().st_size / 1024 ** 3
-    logger.info("Opening atlas (%.1f GB): %s", size_gb, atlas_path)
-    t0 = time.monotonic()
-    adata = ad.read_h5ad(atlas_path, backed="r")
-    var_names = list(adata.var_names)
-    n_obs = adata.n_obs
-    adata.file.close()
-    logger.info(
-        "Atlas index loaded in %s — %s cells × %d markers",
-        format_elapsed(time.monotonic() - t0), f"{n_obs:,}", len(var_names),
-    )
-    return var_names
+# Column headers in smprofiler_channels_to_atlas.tsv
+_SPT_COLUMN = "SMProfiler channel name"
+_ATLAS_COLUMN = "Atlas gene name"
 
 
-def build_atlas_channel_map(
-    atlas_var_names: list[str],
-    spt_channels: set,
-    aliases: dict,
-    extra_mapping: dict | None = None,
-    hgnc_cache_path: Path | None = None,
-) -> dict[str, str]:
+def load_channel_mapping(mapping_path: Path) -> dict[str, str]:
     """
-    Build a mapping: atlas_var_name → canonical SPT channel name.
+    Load the manual SPT-channel → atlas-gene mapping from the aggregation TSV.
 
-    Resolution order:
-    1. Extra manual mapping (channel_name_mapping.json)
-    2. Alias lookup (e.g. atlas has 'CD8A', SPT has 'CD8' via alias CD8A→CD8)
-    3. Exact case-insensitive match
-    4. HGNC normalization: both atlas name and SPT name normalized to the HGNC
-       approved symbol; match on that shared canonical form. Only fires if
-       hgnc_cache_path is provided.
+    The TSV has columns ``"SMProfiler channel name"`` and ``"Atlas gene name"``.
+    Several SPT channels may map to the same atlas gene (e.g. CD45, CD45RA and
+    CD45RO all map to PTPRC), so the returned dict is many-to-one.
 
-    Returns dict of {atlas_var_name: spt_canonical_name} for matched entries only.
+    Returns:
+        dict mapping spt_channel_name → atlas_gene_name.
     """
-    extra = extra_mapping or {}
-
-    # Build case-insensitive SPT lookup for tier 3
-    spt_channels_upper = {c.upper(): c for c in spt_channels}
-
-    # Tier 4: HGNC normalization pre-computation
-    # hgnc_spt_map:     approved_hgnc_symbol → spt_canonical
-    # hgnc_atlas_lookup: atlas_name → approved_hgnc_symbol
-    hgnc_spt_map: dict[str, str] = {}
-    hgnc_atlas_lookup: dict[str, str] = {}
-    if hgnc_cache_path is not None:
-        all_names_for_hgnc = list(atlas_var_names) + list(spt_channels)
-        hgnc_norm = normalize_names_to_hgnc(all_names_for_hgnc, hgnc_cache_path)
-        # Build reverse: HGNC symbol → SPT canonical (first mapping wins)
-        for spt_ch in spt_channels:
-            h = hgnc_norm.get(spt_ch, spt_ch)
-            if h not in hgnc_spt_map:
-                hgnc_spt_map[h] = spt_ch
-        # Build atlas → HGNC lookup
-        for atlas_name in atlas_var_names:
-            hgnc_atlas_lookup[atlas_name] = hgnc_norm.get(atlas_name, atlas_name)
-
-    atlas_to_spt: dict[str, str] = {}
-    hgnc_match_count = 0
-    for atlas_name in atlas_var_names:
-        # 1. Manual mapping
-        if atlas_name in extra:
-            canonical = extra[atlas_name]
-            if canonical in spt_channels:
-                atlas_to_spt[atlas_name] = canonical
-                continue
-
-        # 2. The atlas name itself might be an alias
-        canonical = normalize_name(atlas_name, aliases)
-        if canonical in spt_channels:
-            atlas_to_spt[atlas_name] = canonical
-            continue
-
-        # 3. Case-insensitive exact match
-        upper = atlas_name.upper()
-        if upper in spt_channels_upper:
-            atlas_to_spt[atlas_name] = spt_channels_upper[upper]
-            continue
-
-        # 4. HGNC normalization: atlas_name → HGNC symbol → SPT canonical
-        if hgnc_spt_map:
-            atlas_hgnc = hgnc_atlas_lookup.get(atlas_name, atlas_name)
-            if atlas_hgnc in hgnc_spt_map:
-                spt_ch = hgnc_spt_map[atlas_hgnc]
-                atlas_to_spt[atlas_name] = spt_ch
-                hgnc_match_count += 1
-                logger.debug(
-                    "  HGNC match: atlas '%s' → HGNC '%s' → SPT '%s'",
-                    atlas_name, atlas_hgnc, spt_ch,
-                )
-                continue
-
-    # Reverse: which SPT channels have no atlas match?
-    matched_spt = set(atlas_to_spt.values())
-    unmatched = spt_channels - matched_spt
-    if unmatched:
-        logger.warning("SPT channels with NO atlas match: %s", sorted(unmatched))
-
-    if hgnc_cache_path is not None and hgnc_match_count > 0:
-        logger.info(
-            "HGNC normalization contributed %d additional matches "
-            "(beyond manual/alias/case-insensitive tiers)",
-            hgnc_match_count,
+    df = pd.read_csv(mapping_path, sep="\t")
+    missing = {_SPT_COLUMN, _ATLAS_COLUMN} - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"Channel mapping {mapping_path} is missing column(s) {sorted(missing)}; "
+            f"found {list(df.columns)}"
         )
+    spt_to_atlas = {
+        str(spt).strip(): str(atlas).strip()
+        for spt, atlas in zip(df[_SPT_COLUMN], df[_ATLAS_COLUMN])
+        if pd.notna(spt) and pd.notna(atlas)
+    }
     logger.info(
-        "Atlas ↔ SPT mapping: %d matched (out of %d SPT channels)",
-        len(matched_spt), len(spt_channels),
+        "Channel mapping: %d SPT channels → %d atlas genes (from %s)",
+        len(spt_to_atlas), len(set(spt_to_atlas.values())), mapping_path,
     )
-    return atlas_to_spt
+    return spt_to_atlas
+
+
+def load_atlas_gene_names(parquet_path: Path) -> list[str]:
+    """Return the gene (column) names of the atlas Parquet table, without loading data."""
+    size_mb = parquet_path.stat().st_size / 1024 ** 2
+    schema = pq.read_schema(parquet_path)
+    names = list(schema.names)
+    n_rows = pq.ParquetFile(parquet_path).metadata.num_rows
+    logger.info(
+        "Atlas parquet (%.1f MB): %s cells × %d genes — %s",
+        size_mb, f"{n_rows:,}", len(names), parquet_path,
+    )
+    return names
 
 
 def load_atlas_subset(
-    atlas_path: Path,
+    parquet_path: Path,
     atlas_columns: list[str],
     spt_names: list[str],
     max_cells: int | None = None,
     rng: np.random.Generator | None = None,
 ) -> tuple[np.ndarray, list[str]]:
     """
-    Load specific columns from the atlas h5ad file into memory.
+    Load specific gene columns from the atlas Parquet table into memory.
 
     Args:
-        atlas_path: path to the h5ad file
-        atlas_columns: atlas var_names to load (must exist in the file)
-        spt_names: corresponding SPT canonical names (same length as atlas_columns)
+        parquet_path: path to cell_atlas_small.parquet
+        atlas_columns: atlas gene names to load (may contain duplicates when
+            several SPT channels share one atlas gene; each entry becomes its
+            own output column)
+        spt_names: corresponding SPT channel names (same length as atlas_columns)
         max_cells: if set, randomly sample this many cells
         rng: random number generator for sampling
 
     Returns:
-        (X, spt_names_present) where X has shape (n_cells, len(atlas_columns))
+        (X, spt_names) where X has shape (n_cells, len(atlas_columns)).
     """
-    logger.info("Loading %d atlas columns: %s", len(atlas_columns), atlas_columns)
+    logger.info("Loading %d atlas columns from parquet: %s", len(atlas_columns), atlas_columns)
     t0 = time.monotonic()
-    adata = ad.read_h5ad(atlas_path, backed="r")
-    n_total = adata.n_obs
 
-    # Determine row indices to load
+    # Read each distinct gene column once; duplicate SPT→gene entries are
+    # expanded back out when assembling X below.
+    unique_columns = list(dict.fromkeys(atlas_columns))
+    parquet_file = pq.ParquetFile(parquet_path)
+    n_total = parquet_file.metadata.num_rows
+    table = parquet_file.read(columns=unique_columns)
+
     if max_cells and n_total > max_cells:
         if rng is None:
             rng = np.random.default_rng(42)
-        idx = rng.choice(n_total, size=max_cells, replace=False)
-        idx.sort()
+        idx = np.sort(rng.choice(n_total, size=max_cells, replace=False))
+        table = table.take(idx)
         logger.info(
             "Sampling %s / %s cells from atlas (%.1f%%)…",
             f"{max_cells:,}", f"{n_total:,}", 100 * max_cells / n_total,
         )
     else:
-        idx = slice(None)
         logger.info("Loading all %s cells from atlas…", f"{n_total:,}")
 
-    subset = adata[idx, atlas_columns]
-    X = subset.X
-    if sparse.issparse(X):
-        X = X.toarray()
-    else:
-        X = np.asarray(X)
+    column_values = {
+        name: table.column(name).to_numpy(zero_copy_only=False).astype(np.float32)
+        for name in unique_columns
+    }
+    X = np.column_stack([column_values[name] for name in atlas_columns]).astype(np.float32)
 
-    adata.file.close()
-
-    X = X.astype(np.float32)
     logger.info(
         "Atlas data loaded in %s — shape %s (%.1f MB)",
         format_elapsed(time.monotonic() - t0),

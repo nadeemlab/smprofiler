@@ -1,12 +1,16 @@
 """Channel annotation loading and alias normalization.
 
-Provides the identity/functional channel classification (from a local JSON
-file or the smprofiler API) and alias resolution used to reconcile marker
-names between SPT studies and the atlas. HGNC-symbol normalization lives in
+Provides the identity/functional channel classification and alias resolution
+used to reconcile marker names between SPT studies and the atlas. The smprofiler
+API (:func:`load_channel_annotations_from_api`) is the source of truth; loading
+from a local JSON file (:func:`load_channel_annotations`) is deprecated, so that
+training never runs against annotations that are stale relative to the live
+service. HGNC-symbol normalization lives in
 :mod:`smprofiler.atlas.hgnc_normalization`.
 """
 import json
 import urllib.request
+import warnings
 from pathlib import Path
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -18,11 +22,23 @@ def load_channel_annotations(annotations_path: Path) -> tuple[set, set, dict]:
     """
     Parse channel_annotations.json.
 
+    .. deprecated::
+        Load channel annotations from the smprofiler API via
+        :func:`load_channel_annotations_from_api` instead. A local file can be
+        stale relative to the live service, causing training to run against
+        annotations that no longer match production.
+
     Returns:
         identity_channels: set of canonical identity channel names
         functional_channels: set of canonical functional channel names
         aliases: dict mapping alias → canonical name (for channels only)
     """
+    warnings.warn(
+        "load_channel_annotations (local file) is deprecated; load channel "
+        "annotations from the smprofiler API via load_channel_annotations_from_api.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     with open(annotations_path) as f:
         data = json.load(f)
 

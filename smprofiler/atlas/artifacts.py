@@ -16,7 +16,6 @@ from skl2onnx.common.data_types import FloatTensorType
 from onnxruntime import InferenceSession, SessionOptions
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
-from smprofiler.atlas.reporting import silence_output
 
 logger = colorized_logger(__name__)
 
@@ -24,13 +23,12 @@ logger = colorized_logger(__name__)
 def export_to_onnx(model, n_features: int, output_path: Path) -> None:
     """Convert a fitted sklearn estimator / pipeline to ONNX and save."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with silence_output():
-        if isinstance(model, XGBRegressor):
-            initial_type = [("X", XGBFloatTensorType([None, n_features]))]
-            onnx_model = convert_xgboost(model, initial_types=initial_type)
-        else:
-            initial_type = [("X", FloatTensorType([None, n_features]))]
-            onnx_model = convert_sklearn(model, initial_types=initial_type)
+    if isinstance(model, XGBRegressor):
+        initial_type = [("X", XGBFloatTensorType([None, n_features]))]
+        onnx_model = convert_xgboost(model, initial_types=initial_type)
+    else:
+        initial_type = [("X", FloatTensorType([None, n_features]))]
+        onnx_model = convert_sklearn(model, initial_types=initial_type)
     with open(output_path, "wb") as f:
         f.write(onnx_model.SerializeToString())
     size_kb = output_path.stat().st_size / 1024
@@ -43,9 +41,8 @@ def validate_onnx(onnx_path: Path, sklearn_model, X_sample: np.ndarray) -> bool:
     Returns True if outputs match within tolerance.
     """
     ort_opts = SessionOptions()
-    ort_opts.log_severity_level = 3  # 0=VERBOSE … 3=ERROR
-    with silence_output():
-        sess = InferenceSession(str(onnx_path), sess_options=ort_opts)
+    ort_opts.log_severity_level = 3  # 0=VERBOSE … 3=ERROR (onnxruntime's own C-level control)
+    sess = InferenceSession(str(onnx_path), sess_options=ort_opts)
     X_f32 = X_sample.astype(np.float32)
     onnx_pred = sess.run(None, {"X": X_f32})[0].flatten()
     sklearn_pred = sklearn_model.predict(X_sample)

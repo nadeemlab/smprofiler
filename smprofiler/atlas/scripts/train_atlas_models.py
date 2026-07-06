@@ -2,14 +2,19 @@
 """Command line entry point for atlas-reference model training.
 
 For each (study, functional_marker) pair, trains a regression model on the
-Allen Institute Human Immune Health Atlas that predicts functional marker
-intensity from identity marker values, and exports it to ONNX. See
-``smprofiler.atlas`` for the library implementation.
+aggregated Allen Institute Human Immune Health Atlas expression table that
+predicts functional marker intensity from identity marker values, and exports
+it to ONNX. The atlas expression table (Parquet) and the SPT-channel → atlas-
+gene mapping (TSV) are produced by the atlas aggregation step in
+smprofiler-data. See ``smprofiler.atlas`` for the library implementation.
+
+Channel annotations are fetched from the smprofiler API (the source of truth);
+loading them from a local file is deprecated and no longer supported here.
 
 Example:
     smprofiler atlas train-atlas-models \\
-        --atlas /path/to/human_immune_health_atlas_full.h5ad \\
-        --annotations /path/to/annotations/channel_annotations.json \\
+        --atlas-parquet /path/to/cell_atlas_small.parquet \\
+        --channel-mapping /path/to/smprofiler_channels_to_atlas.tsv \\
         --datasets-dir /path/to/datasets \\
         --output-dir models \\
         [--max-cells 500000] [--study luad_progression] [--dry-run]
@@ -48,14 +53,14 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--atlas",
-        default=str(data_dir / "human_immune_health_atlas_full.h5ad"),
-        help="Path to the Allen Institute Human Immune Health Atlas h5ad file",
+        "--atlas-parquet",
+        default=str(data_dir / "cell_atlas_small.parquet"),
+        help="Path to the aggregated atlas expression table (cell_atlas_small.parquet)",
     )
     parser.add_argument(
-        "--annotations",
-        default=str(data_dir / "annotations" / "channel_annotations.json"),
-        help="Path to channel_annotations.json",
+        "--channel-mapping",
+        default=str(data_dir / "smprofiler_channels_to_atlas.tsv"),
+        help="Path to the SPT-channel → atlas-gene mapping (smprofiler_channels_to_atlas.tsv)",
     )
     parser.add_argument(
         "--datasets-dir",
@@ -68,27 +73,12 @@ def parse_args() -> argparse.Namespace:
         help="Output directory for ONNX models and metadata",
     )
     parser.add_argument(
-        "--atlas-mapping",
-        default=None,
-        help="Optional JSON file with extra atlas_var_name → spt_channel_name mappings",
-    )
-    parser.add_argument(
         "--annotations-api-url",
         default=DEFAULT_ANNOTATIONS_API_URL,
         help=(
-            "Base URL for the smprofiler API used to fetch channel annotations. "
-            "Used as the primary source; falls back to --annotations local file on failure. "
-            "Pass an empty string to skip the API and use only the local file."
-        ),
-    )
-    parser.add_argument(
-        "--hgnc-cache",
-        default=str(data_dir / "hgnc_symbol_cache.json"),
-        help=(
-            "Path to the HGNC symbol normalization cache (JSON). "
-            "Created on first run via mygene.info + HGNC REST API; "
-            "subsequent runs use only the cached data (fully offline). "
-            "Pass an empty string to disable HGNC normalization entirely."
+            "Base URL for the smprofiler API used to fetch channel annotations "
+            "(the sole source; loading from a local file is deprecated). The run "
+            "fails if the API is unreachable."
         ),
     )
     parser.add_argument(
@@ -134,13 +124,11 @@ def main(args: argparse.Namespace) -> None:
 
     try:
         training.run(
-            Path(args.atlas),
-            Path(args.annotations),
+            Path(args.atlas_parquet),
+            Path(args.channel_mapping),
             Path(args.datasets_dir),
             Path(args.output_dir),
-            atlas_mapping=Path(args.atlas_mapping) if args.atlas_mapping else None,
             annotations_api_url=args.annotations_api_url,
-            hgnc_cache=Path(args.hgnc_cache) if args.hgnc_cache else None,
             max_cells=args.max_cells,
             study=args.study,
             cv_folds=args.cv_folds,

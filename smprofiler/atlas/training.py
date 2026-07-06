@@ -1,14 +1,15 @@
 """Atlas-reference model training pipeline.
 
 Orchestrates the end-to-end run: load channel annotations, discover per-study
-identity/functional channels, map them onto atlas columns, then train and
-export one regression model per (study, functional_marker) pair.
+identity/functional channels, map SPT channels onto atlas genes (via the manual
+mapping produced by the aggregation step), then read the aggregated atlas
+expression table (Parquet) and train and export one regression model per
+(study, functional_marker) pair.
 
 ``run`` is plain library code — it takes explicit arguments and raises on
 error. The command line adapter lives in
 ``smprofiler.atlas.scripts.train_atlas_models``.
 """
-import json
 import pickle
 import time
 from pathlib import Path
@@ -19,12 +20,11 @@ from sklearn.model_selection import train_test_split
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.atlas.reporting import format_elapsed, section, subsection
-from smprofiler.atlas.channel_annotations import load_channel_annotations
 from smprofiler.atlas.channel_annotations import load_channel_annotations_from_api
 from smprofiler.atlas.study_channels import discover_study_channels
-from smprofiler.atlas.atlas_data import build_atlas_channel_map
+from smprofiler.atlas.atlas_data import load_atlas_gene_names
 from smprofiler.atlas.atlas_data import load_atlas_subset
-from smprofiler.atlas.atlas_data import load_atlas_var_names
+from smprofiler.atlas.atlas_data import load_channel_mapping
 from smprofiler.atlas.models import build_model_candidates
 from smprofiler.atlas.models import predict_with_std
 from smprofiler.atlas.models import train_and_select_best
@@ -41,14 +41,12 @@ _SUMMARY_WIDTH = 70
 
 
 def run(
-    atlas_path: Path,
-    annotations_path: Path,
+    parquet_path: Path,
+    mapping_path: Path,
     datasets_dir: Path,
     output_dir: Path,
     *,
-    atlas_mapping: Path | None = None,
     annotations_api_url: str = DEFAULT_ANNOTATIONS_API_URL,
-    hgnc_cache: Path | None = None,
     max_cells: int | None = None,
     study: str | None = None,
     cv_folds: int = 5,
@@ -58,15 +56,16 @@ def run(
     Train atlas-reference regression models.
 
     Args:
-        atlas_path: path to the atlas h5ad file.
-        annotations_path: path to channel_annotations.json (local fallback).
+        parquet_path: path to the aggregated atlas expression table
+            (cell_atlas_small.parquet) — cells × atlas genes.
+        mapping_path: path to the manual SPT-channel → atlas-gene mapping
+            (smprofiler_channels_to_atlas.tsv).
         datasets_dir: root directory containing per-study dataset folders.
         output_dir: directory for ONNX models, pickles, and metadata.
-        atlas_mapping: optional JSON of extra atlas_var_name → spt_channel_name.
-        annotations_api_url: smprofiler API base URL (primary annotation source);
-            pass an empty string to use only the local file.
-        hgnc_cache: HGNC symbol normalization cache path; None disables HGNC
-            normalization entirely.
+        annotations_api_url: smprofiler API base URL — the sole source of channel
+            annotations. Loading annotations from a local file is deprecated, so
+            this must be set; if the API is unreachable the run fails rather than
+            silently falling back to a possibly-stale file.
         max_cells: max atlas cells to use (random sample); None uses all cells.
         study: train only for this study; None discovers all studies.
         cv_folds: number of cross-validation folds.
@@ -74,40 +73,28 @@ def run(
 
     Raises:
         FileNotFoundError: if a required input file is missing.
-        RuntimeError: if no studies with usable channel data are found.
+        RuntimeError: if annotations cannot be loaded from the API, or if no
+            studies with usable channel data are found.
     """
-    if not atlas_path.exists():
-        raise FileNotFoundError(f"Atlas file not found: {atlas_path}")
-    if not annotations_api_url and not annotations_path.exists():
-        raise FileNotFoundError(
-            f"Annotations file not found and no API URL configured: {annotations_path}"
+    if not parquet_path.exists():
+        raise FileNotFoundError(f"Atlas parquet file not found: {parquet_path}")
+    if not mapping_path.exists():
+        raise FileNotFoundError(f"Channel mapping file not found: {mapping_path}")
+
+    # Step 1: Load channel annotations from the API (the source of truth).
+    if not annotations_api_url:
+        raise RuntimeError(
+            "An annotations API URL is required — loading channel annotations from "
+            "a local file is deprecated. Set annotations_api_url."
         )
-
-    # Load extra atlas→SPT name mapping if provided
-    extra_mapping: dict = {}
-    if atlas_mapping and atlas_mapping.exists():
-        with open(atlas_mapping) as f:
-            extra_mapping = json.load(f)
-        logger.info("Loaded %d entries from extra atlas mapping", len(extra_mapping))
-
-    # Step 1: Load channel annotations (API primary, local file fallback)
-    annotations_loaded = False
-    if annotations_api_url:
-        try:
-            identity_channels, functional_channels, aliases = load_channel_annotations_from_api(
-                annotations_api_url
-            )
-            annotations_loaded = True
-        except Exception as exc:
-            logger.warning(
-                "Failed to load annotations from API (%s): %s — falling back to local file",
-                annotations_api_url, exc,
-            )
-    if not annotations_loaded:
-        if not annotations_path.exists():
-            raise FileNotFoundError(f"Annotations file not found: {annotations_path}")
-        identity_channels, functional_channels, aliases = load_channel_annotations(annotations_path)
-    all_channels = identity_channels | functional_channels
+    try:
+        identity_channels, functional_channels, aliases = load_channel_annotations_from_api(
+            annotations_api_url
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to load channel annotations from API {annotations_api_url}: {exc}"
+        ) from exc
 
     # Step 2: Discover per-study channel lists
     if study:
@@ -125,18 +112,20 @@ def run(
     if not study_channels:
         raise RuntimeError("No studies with channel data found.")
 
-    # Step 3: Load atlas var_names (backed, fast)
-    atlas_var_names = load_atlas_var_names(atlas_path)
-
-    # Step 4: Build atlas ↔ SPT mapping
-    atlas_to_spt = build_atlas_channel_map(
-        atlas_var_names, all_channels, aliases, extra_mapping, hgnc_cache
-    )
-    # Reverse map: SPT canonical → atlas var_name
-    spt_to_atlas = {spt: atl for atl, spt in atlas_to_spt.items()}
+    # Step 3: Load the manual SPT-channel → atlas-gene mapping, keeping only
+    # channels whose atlas gene is actually present in the Parquet table.
+    spt_to_atlas = load_channel_mapping(mapping_path)
+    atlas_genes = set(load_atlas_gene_names(parquet_path))
+    absent = {spt: gene for spt, gene in spt_to_atlas.items() if gene not in atlas_genes}
+    if absent:
+        logger.warning(
+            "%d mapped channels dropped — atlas gene absent from parquet: %s",
+            len(absent), sorted(absent.items()),
+        )
+        spt_to_atlas = {spt: gene for spt, gene in spt_to_atlas.items() if gene in atlas_genes}
     logger.info(
-        "Atlas feature summary: %d total atlas genes, %d SPT channels with atlas match",
-        len(atlas_var_names), len(atlas_to_spt),
+        "Atlas feature summary: %d atlas genes in parquet, %d SPT channels mapped",
+        len(atlas_genes), len(spt_to_atlas),
     )
 
     # ── Compute training plan up-front ──────────────────────────────────────
@@ -208,7 +197,7 @@ def run(
         needed_atlas = [spt_to_atlas[c] for c in needed_spt]
 
         X_all, _ = load_atlas_subset(
-            atlas_path, needed_atlas, needed_spt,
+            parquet_path, needed_atlas, needed_spt,
             max_cells=max_cells, rng=rng,
         )
 
