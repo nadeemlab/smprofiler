@@ -72,15 +72,18 @@ import * as ort from 'onnxruntime-web';
 
 // 1. Fetch the model + the metadata needed to run it.
 const study = 'LUAD progression', channel = 'FOXP3';
+const metadata = await fetch(
+    `/api/atlas-models/?study=${encodeURIComponent(study)}&target_channel=${encodeURIComponent(channel)}`
+).json();
+const inputDtype = metadata.onnx_input_dtype;
+const inputChannels = metadata.input_channels;
 const response = await fetch(
   `/api/atlas-model/?study=${encodeURIComponent(study)}&target_channel=${encodeURIComponent(channel)}`
 );
-const inputDtype = response.headers.get('X-Onnx-Input-Dtype');        // 'float32' | 'float64'
-const inputChannels = response.headers.get('X-Input-Channels').split(',');
 const session = await ort.InferenceSession.create(new Uint8Array(await response.arrayBuffer()));
 
 // 2. Score one cell. `cellIdentity` is raw intensities in `inputChannels` order.
-async function atlasRelativePositive(cellIdentity, measuredFunctional) {
+async function atlasRelativeLevel(cellIdentity, measuredFunctional) {
   const rowSum = cellIdentity.reduce((a, b) => a + b, 0);
   if (rowSum <= 0) return false;                                      // no reference
   const normalized = cellIdentity.map(v => v / rowSum);              // match training
@@ -91,9 +94,10 @@ async function atlasRelativePositive(cellIdentity, measuredFunctional) {
   const outputs = await session.run({ [session.inputNames[0]]: input });   // input name is 'X'
   const predictedNormalized = outputs[session.outputNames[0]].data[0];
   const expected = predictedNormalized * rowSum;                     // back to raw scale
-  return measuredFunctional > expected;
+  const standard_deviation = ... ; 
+  return (measuredFunctional - expected) / standard_deviation;
 }
 ```
 
-For a whole slide, batch the cells into one `(n_cells, n_identity)` tensor rather than
+For a whole slide, batch the cells into one `(number_cells, number_identity_markers)` matrix rather than
 looping per cell.
