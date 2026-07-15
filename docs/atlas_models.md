@@ -10,13 +10,12 @@ Models are small [ONNX](https://onnx.ai) regressors, one per `(study, target_cha
 **use** them; for how they are trained see [`smprofiler.atlas`](/smprofiler/atlas).
 
 Every model:
-- takes one input tensor named `X`, shape `(n_cells, n_identity)`, columns in the order
-  of the model's `input_channels`;
-- expects inputs **sum-normalized** by each cell's identity-marker row sum (the helpers
-  below do this for you);
-- returns the expected functional intensity on that same normalized scale;
-- uses input dtype `float32`, except Gaussian-Process models which use `float64` (given
-  by `onnx_input_dtype` in the metadata / the `X-Onnx-Input-Dtype` header).
+- Takes an input matrix of shape `(number_cells, number_identity_markers)`, with columns
+  in the order of the model's `input_channels`, and the functional marker column vector
+  of size `number_cells`.
+- Expects inputs **sum-normalized** by each cell's identity-marker row sum (the helpers
+  below do this for you).
+- Returns the standard deviate of the functional marker values relative to expectation.
 
 ## API
 
