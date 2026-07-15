@@ -4,16 +4,12 @@ from pydantic import BaseModel
 
 
 class AtlasModelMetadata(BaseModel):
-    """Description of one trained atlas-reference model (without the ONNX bytes).
-
-    Returned by the ``/atlas-models/`` endpoint. Download the model itself from
-    ``/atlas-model/`` using ``id`` (or by ``study`` + ``target_channel``). To run
-    it, feed inputs of dtype ``onnx_input_dtype`` in ``input_channels`` order.
-    """
+    """Description of one trained atlas-reference model (without the ONNX itself). """
     id: int
     study: str | None
     target_channel: str
     input_channels: list[str]
+    reference_dataset: str
     architecture_type: str
     std_method: str
     onnx_input_dtype: str

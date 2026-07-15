@@ -28,19 +28,15 @@ curl "https://smprofiler.io/api/atlas-models/?study=LUAD%20progression"
 curl "https://smprofiler.io/api/atlas-models/?study=LUAD%20progression&target_channel=FOXP3"
 ```
 
-Each item is `AtlasModelMetadata`: `id`, `study`, `target_channel`, `input_channels`,
-`architecture_type`, `std_method`, `onnx_input_dtype`, metrics (`cv_r2`, `test_r2`,
-`test_mae`, `n_train`, `n_test`), `training_time_seconds`, `size_bytes`, `created`.
+Each item is [`AtlasModelMetadata`](/smprofiler/db/exchange_data_formats/atlas_models.py).
 
-Download the ONNX bytes for the latest model (or a specific `model_id`):
+Download the ONNX model itself for the latest model (or a specific `model_id`):
 
 ```sh
 curl -OJ "https://smprofiler.io/api/atlas-model/?study=LUAD%20progression&target_channel=FOXP3"
 ```
 
-The body is the ONNX model (`application/octet-stream`). Response headers describe how to
-run it: `X-Model-Id`, `X-Onnx-Input-Dtype`, `X-Input-Channels` (comma-separated, in input
-order), `X-Architecture-Type`, `X-Std-Method`.
+The body is the ONNX model file.
 
 ## Python
 
