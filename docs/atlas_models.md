@@ -87,15 +87,15 @@ async function atlasRelativeLevel(cellIdentity, measuredFunctional) {
   const rowSum = cellIdentity.reduce((a, b) => a + b, 0);
   if (rowSum <= 0) return false;                                      // no reference
   const normalized = cellIdentity.map(v => v / rowSum);              // match training
+  const measuredNormalized = measuredFunctional / rowSum;
 
   const ArrayType = inputDtype === 'float64' ? Float64Array : Float32Array;
   const input = new ort.Tensor(inputDtype, ArrayType.from(normalized), [1, normalized.length]);
 
   const outputs = await session.run({ [session.inputNames[0]]: input });   // input name is 'X'
   const predictedNormalized = outputs[session.outputNames[0]].data[0];
-  const expected = predictedNormalized * rowSum;                     // back to raw scale
   const standard_deviation = ... ; 
-  return (measuredFunctional - expected) / standard_deviation;
+  return (measuredNormalized - predictedNormalized) / standard_deviation;
 }
 ```
 
