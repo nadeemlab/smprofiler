@@ -1,13 +1,13 @@
 # Atlas-reference models: usage
 
 Atlas-reference models predict the intensity a **functional** marker would have in a
-"normal" cell with a given **identity**-marker profile (trained on the Allen Institute
-Human Immune Health Atlas). A cell is **atlas-relative positive** for that marker when
-its measured intensity exceeds the model's expectation.
+"normal" cell with a given **identity**-marker profile, with respect to a reference
+normal dataset. A cell is **atlas-relative positive** for that marker when its
+measured intensity exceeds the model's expectation.
 
-Models are small ONNX regressors, one per `(study, target_channel)`, stored in the
+Models are small [ONNX](https://onnx.ai) regressors, one per `(study, target_channel)`, stored in the
 `atlas_model` database table (with metadata and versions). This page documents how to
-**use** them; for how they are trained see `smprofiler.atlas`.
+**use** them; for how they are trained see [`smprofiler.atlas`](/smprofiler/atlas).
 
 Every model:
 - takes one input tensor named `X`, shape `(n_cells, n_identity)`, columns in the order
