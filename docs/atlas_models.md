@@ -10,8 +10,8 @@ Models are small [ONNX](https://onnx.ai) regressors, one per `(study, target_cha
 **use** them; for how they are trained see [`smprofiler.atlas`](/smprofiler/atlas).
 
 Every model:
-- Takes an input matrix of shape `(number_cells, number_identity_markers)`, with columns
-  in the order of the model's `input_channels`, and the functional marker column vector
+- Takes (i) an input matrix of shape `(number_cells, number_identity_markers)`, with columns
+  in the order of the model's `input_channels`, and (ii) the functional marker column vector
   of size `number_cells`.
 - Expects inputs **sum-normalized** by each cell's identity-marker row sum (the helpers
   below do this for you).
