@@ -93,6 +93,68 @@ def _is_available(study: str, collection: str | None, base_url: str) -> bool:
     studies = list(entry['handle'] for entry in data)
     return study in studies
 
+def _report_plan(plan: tuple[TrainingScenario, ...]) -> None:
+    section('DRY RUN — Training plan')
+    total_models = sum(len(p.channels.functional) for p in plan)
+    for p in plan:
+        subsection(f'Study: {p.study_handle}')
+        identity = p.channels.identity
+        logger.info(
+            '  Identity features (%d): %s', len(identity), identity
+        )
+        for fc in p.channels.functional:
+            logger.info('  → model: target="%s"  features=%s', fc.study_specific, list(map(lambda c: c.study_specific, identity)))
+    print(f'\nTotal: {len(plan)} studies, {total_models} models to train.', flush=True)
+
+def _check_files_exist(parquet_atlas_path: Path, channel_mapping_path: Path) -> str:
+    if not parquet_atlas_path.exists():
+        raise FileNotFoundError(f'Atlas parquet file not found: {parquet_atlas_path}')
+    if not channel_mapping_path.exists():
+        raise FileNotFoundError(f'Channel mapping file not found: {channel_mapping_path}')
+
+def _form_plan_training_scenarios(
+    parquet_atlas_path: Path,
+    channel_mapping_path: Path,
+    annotations_api_url: str,
+    datasets_dir: Path,
+    study: str | None,
+) -> tuple[TrainingScenario, ...]:
+    if not annotations_api_url:
+        raise RuntimeError(
+            'An annotations API URL is required — loading channel annotations from '
+            'a local file is deprecated. Set annotations_api_url.'
+        )
+    try:
+        identity_channels, aliases = load_channel_annotations_from_api(annotations_api_url)
+    except Exception as exc:
+        raise RuntimeError(
+            f'Failed to load channel annotations from API {annotations_api_url}: {exc}'
+        ) from exc
+
+    if study:
+        study_handles = (study,)
+    else:
+        study_handles = tuple(
+            d.name for d in sorted(datasets_dir.iterdir())
+            if d.is_dir() and d.name != 'template'
+        )
+    study_handles, study_names = _retrieve_full_study_names(datasets_dir, study_handles)
+    study_handles, study_names = _filter_by_availability(study_handles, study_names, base_url=annotations_api_url)
+
+    smprofiler_to_atlas = load_channel_mapping(channel_mapping_path)
+    report_parquet_attributes(parquet_atlas_path, smprofiler_to_atlas)
+    study_channels = retrieve_all_study_channels_from_api(
+        study_names, identity_channels, aliases, smprofiler_to_atlas, base_url=annotations_api_url
+    )
+
+    def _form_scenario(args) -> TrainingScenario:
+        return TrainingScenario(*args)
+    def _non_trivial(ts: TrainingScenario) -> bool:
+        return len(ts.channels.identity)*len(ts.channels.functional) > 0
+    plan = tuple(filter(_non_trivial, map(_form_scenario, zip(study_handles, study_names, study_channels))))
+    return plan
+
+
 def run(
     parquet_atlas_path: Path,
     channel_mapping_path: Path,
@@ -130,60 +192,19 @@ def run(
         RuntimeError if annotations cannot be loaded from the API, or if no
             studies with usable channel data are found.
     """
-    if not parquet_atlas_path.exists():
-        raise FileNotFoundError(f'Atlas parquet file not found: {parquet_atlas_path}')
-    if not channel_mapping_path.exists():
-        raise FileNotFoundError(f'Channel mapping file not found: {channel_mapping_path}')
-
-    if not annotations_api_url:
-        raise RuntimeError(
-            'An annotations API URL is required — loading channel annotations from '
-            'a local file is deprecated. Set annotations_api_url.'
-        )
-    try:
-        identity_channels, aliases = load_channel_annotations_from_api(annotations_api_url)
-    except Exception as exc:
-        raise RuntimeError(
-            f'Failed to load channel annotations from API {annotations_api_url}: {exc}'
-        ) from exc
-
-    if study:
-        study_handles = (study,)
-    else:
-        study_handles = tuple(
-            d.name for d in sorted(datasets_dir.iterdir())
-            if d.is_dir() and d.name != 'template'
-        )
-    study_handles, study_names = _retrieve_full_study_names(datasets_dir, study_handles)
-    study_handles, study_names = _filter_by_availability(study_handles, study_names, base_url=annotations_api_url)
-
-    smprofiler_to_atlas = load_channel_mapping(channel_mapping_path)
-    report_parquet_attributes(parquet_atlas_path, smprofiler_to_atlas)
-    study_channels = retrieve_all_study_channels_from_api(
-        study_names, identity_channels, aliases, smprofiler_to_atlas, base_url=annotations_api_url
+    _check_files_exist(parquet_atlas_path, channel_mapping_path)
+    plan = _form_plan_training_scenarios(
+        parquet_atlas_path,
+        channel_mapping_path,
+        annotations_api_url,
+        datasets_dir,
+        study,
     )
-
-    def _form_scenario(args) -> TrainingScenario:
-        return TrainingScenario(*args)
-    def _non_trivial(ts: TrainingScenario) -> bool:
-        return len(ts.channels.identity)*len(ts.channels.functional) > 0
-    plan = tuple(filter(_non_trivial, map(_form_scenario, zip(study_handles, study_names, study_channels))))
-
-    total_models = sum(len(p.channels.functional) for p in plan)
-
     if dry_run:
-        section('DRY RUN — Training plan')
-        for p in plan:
-            subsection(f'Study: {p.study_handle}')
-            identity = p.channels.identity
-            logger.info(
-                '  Identity features (%d): %s', len(identity), identity
-            )
-            for fc in p.channels.functional:
-                logger.info('  → model: target="%s"  features=%s', fc.study_specific, identity.study_specific))
-        print(f'\nTotal: {len(plan)} studies, {total_models} models to train.', flush=True)
+        _report_plan(plan)
         return
 
+    total_models = sum(len(p.channels.functional) for p in plan)
     section(
         f'Atlas-reference model training — '
         f'{len(plan)} studies, {total_models} models total'
