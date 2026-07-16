@@ -5,14 +5,22 @@ splits the discovered channels into identity / functional lists according to
 the global channel annotation groups.
 """
 from pathlib import Path
+from urllib import request
+from urllib.parse import quote_plus
 
 import pandas as pd
+from attrs import define
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.atlas.channel_annotations import normalize_name
+from smprofiler.db.exchange_data_formats.metrics import Channel
 
 logger = colorized_logger(__name__)
 
+@define
+class StudyOrderedChannels:
+    identity: tuple[str, ...]
+    functional: tuple[str, ...]
 
 def _read_channel_names_from_file(path: Path, aliases: dict) -> list[str]:
     """
@@ -47,11 +55,39 @@ def _read_channel_names_from_file(path: Path, aliases: dict) -> list[str]:
     return names
 
 
+def _retrieve_study_channels_from_api(
+    study: str,
+    identity_channels: tuple[str, ...],
+    aliases: dict[str, str],
+    base_url: str,
+    timeout: int = 30,
+) -> StudyOrderedChannels:
+    base = base_url.rstrip('/')
+    url = f'{base}/channels/?study={quote_plus(study)}'
+    r = request.Request(url, headers={'Accept': 'application/json'})
+    with request.urlopen(r, timeout=timeout) as response:
+        data: list[Channel] = response.read().decode()
+    names = tuple(map(lambda c: normalize_name(c.symbol, aliases), data))
+    identity = tuple(filter(lambda n: n in identity_channels, names))
+    functional = tuple(filter(lambda n: n not in identity_channels, names))
+    return StudyOrderedChannels(identity, functional)
+
+
+def retrieve_all_study_channels_from_api(
+    studies: tuple[str, ...],
+    *args,
+    **kwargs,
+) -> tuple[StudyOrderedChannels, ...]:
+    return tuple(map(
+        lambda study: _retrieve_study_channels_from_api(study, *args, **kwargs),
+        studies,
+    ))
+
+
 def discover_study_channels(
     datasets_dir: Path,
     studies: list[str],
     identity_channels: set,
-    functional_channels: set,
     aliases: dict,
 ) -> dict[str, dict]:
     """
@@ -64,13 +100,6 @@ def discover_study_channels(
             "functional": [channel, ...],
         }
     """
-    # File name patterns to search, in priority order:
-    # overlay files use 'Symbol' column; others use 'Name' column
-    candidates_patterns = [
-        "**/elementary_phenotypes_overlay*.csv",
-        "**/elementary_phenotypes.csv",
-        "**/channels.tsv",
-    ]
 
     results = {}
     for study_name in studies:
@@ -80,13 +109,13 @@ def discover_study_channels(
             continue
 
         all_names: list[str] = []
-        for pattern in candidates_patterns:
-            files = sorted(study_dir.glob(pattern))
-            for f in files:
-                names = _read_channel_names_from_file(f, aliases)
-                all_names.extend(names)
-            if all_names:
-                break  # stop searching once we found something
+        pattern = '**/generated_artifacts/elementary_phenotypes.csv'
+        files = sorted(study_dir.glob(pattern))
+        for f in files:
+            names = _read_channel_names_from_file(f, aliases)
+            all_names.extend(names)
+        if all_names:
+            break  # stop searching once we found something
 
         if not all_names:
             logger.warning("No channel files found for study '%s' – skipping", study_name)

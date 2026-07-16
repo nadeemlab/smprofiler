@@ -7,6 +7,7 @@ versioned snapshot: multiple rows may share a (study, target_channel), ordered b
 """
 from psycopg import Cursor as PsycopgCursor
 
+from smprofiler.db.database_connection import DBCursor
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
@@ -27,6 +28,12 @@ INSERT INTO atlas_model (
 RETURNING id ;
 """
 
+def store_models_in_db(database_config_file: Path, model_records: list[dict]) -> None:
+    """Persist trained models to the ``atlas_model`` table."""
+    logger.info('Storing %d trained model(s) to the "atlas_model" database table…', len(model_records))
+    with DBCursor(database_config_file=str(database_config_file)) as cursor:
+        for record in model_records:
+            store_atlas_model(cursor, **record)
 
 def store_atlas_model(
     cursor: PsycopgCursor,

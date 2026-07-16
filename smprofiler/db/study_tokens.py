@@ -1,6 +1,7 @@
 """Deal with naming related to study collection/aggregation tags."""
 import re
 import json
+from pathlib import Path
 
 from smprofiler.db.exchange_data_formats.study import StudyHandle
 
@@ -56,7 +57,7 @@ class StudyCollectionNaming:
         return re.search(fr'^{cls.tag_pattern()}$', tag) is not None
 
     @classmethod
-    def extract_study_from_file(cls, study_json: str) -> str:
+    def extract_study_from_file(cls, study_json: str | Path) -> str:
         with open(study_json, 'rt', encoding='utf-8') as file:
             study = json.loads(file.read())
             study_name = study['Study name']

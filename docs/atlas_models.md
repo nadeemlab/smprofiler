@@ -94,8 +94,8 @@ async function atlasRelativeLevel(cellIdentity, measuredFunctional) {
 
   const outputs = await session.run({ [session.inputNames[0]]: input });   // input name is 'X'
   const predictedNormalized = outputs[session.outputNames[0]].data[0];
-  const standard_deviation = ... ; 
-  return (measuredNormalized - predictedNormalized) / standard_deviation;
+  const standardDeviation = ... ; 
+  return (measuredNormalized - predictedNormalized) / standardDeviation;
 }
 ```
 
