@@ -10,10 +10,15 @@ Orchestrates the end-to-end run:
 The command line adapter for ``run`` lives in ``smprofiler.atlas.scripts.train_atlas_models``.
 """
 import pickle
+import json
 import time
 from pathlib import Path
-from json import read as json_read
+from itertools import chain
+from urllib.request import Request
+from urllib.request import urlopen
+from urllib.parse import quote_plus
 
+from attrs import define
 import numpy as np
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
@@ -23,7 +28,8 @@ from smprofiler.db.study_tokens import StudyCollectionNaming
 from smprofiler.atlas.reporting import format_elapsed, section, subsection
 from smprofiler.atlas.channel_annotations import load_channel_annotations_from_api
 from smprofiler.atlas.study_channels import retrieve_all_study_channels_from_api
-from smprofiler.atlas.atlas_data import load_atlas_gene_names
+from smprofiler.atlas.study_channels import StudyOrderedChannels
+from smprofiler.atlas.atlas_data import report_parquet_attributes
 from smprofiler.atlas.atlas_data import load_atlas_subset
 from smprofiler.atlas.atlas_data import load_channel_mapping
 from smprofiler.atlas.models import STD_METHODS
@@ -38,15 +44,58 @@ ATLAS_VERSION = 'allen-human-immune-health-atlas-2025'
 DEFAULT_ANNOTATIONS_API_URL = 'https://smprofiler.io/api'
 _SUMMARY_WIDTH = 70
 
+@define
+class TrainingScenario:
+    study_handle: str
+    study_name: str
+    channels: StudyOrderedChannels
+
 def _store_models_in_db(database_config_file: Path, model_records: list[dict]) -> None:
     # Imported lazily so the file-only training path carries no database dependency.
     from smprofiler.db.accessors.atlas_models import store_models_in_db
     store_models_in_db(database_config_file, model_records) 
 
+def _retrieve_full_study_names(datasets_dir: Path, study_handles: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    _study_handles = []
+    _study_names = []
+    for handle in study_handles:
+        study_json = datasets_dir / handle / 'generated_artifacts' / 'study.json'
+        if not study_json.exists():
+            logger.warning("Dataset metadata not found for: %s", handle)
+            continue
+        _study_handles.append(handle)
+        _study_names.append(StudyCollectionNaming.extract_study_from_file(study_json))
+    return tuple(_study_handles), tuple(_study_names)
+
+def _filter_by_availability(
+    study_handles: tuple[str, ...],
+    study_names: tuple[str, ...],
+    base_url: str,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    handles, names = [], []
+    for h, n in zip(study_handles, study_names):
+        if _is_available(n, StudyCollectionNaming.strip_token(n)[1], base_url):
+            handles.append(h)
+            names.append(n)
+        else:
+            logger.warning('Study data for %s (%s) is not live.', h, n)
+    return tuple(handles), tuple(names)
+
+def _is_available(study: str, collection: str | None, base_url: str) -> bool:
+    base = base_url.rstrip('/')
+    if collection is not None:
+        url = f'{base}/study-names/?collection={quote_plus(collection)}'
+    else:
+        url = f'{base}/study-names/'
+    request = Request(url, headers={'Accept': 'application/json'})
+    with urlopen(request, timeout=30) as response:
+        data = json.load(response)
+    studies = list(entry['handle'] for entry in data)
+    return study in studies
 
 def run(
     parquet_atlas_path: Path,
-    mapping_path: Path,
+    channel_mapping_path: Path,
     datasets_dir: Path,
     output_dir: Path,
     *,
@@ -63,14 +112,14 @@ def run(
     Args:
         parquet_atlas_path: path to the aggregated atlas expression table
             (file cell_atlas_small.parquet) is cells × atlas genes.
-        mapping_path: path to the manual SMProfiler-channel → atlas-gene mapping
+        channel_mapping_path: path to the manual SMProfiler-channel → atlas-gene mapping
             (smprofiler_channels_to_atlas.tsv).
         datasets_dir: root directory containing per-study dataset folders.
         output_dir: directory for ONNX models, pickles, and metadata.
         annotations_api_url: smprofiler API base URL - the source of channel
             annotations.
         max_cells: max atlas cells to use (random sample); None uses all cells.
-        study: train only for this study; None discovers all studies.
+        study: train only for this study (path fragment handle string); None discovers all studies.
         cv_folds: number of cross-validation folds.
         dry_run: print the training plan without training any models.
         database_config_file: if given, also store each trained model (ONNX model
@@ -83,8 +132,8 @@ def run(
     """
     if not parquet_atlas_path.exists():
         raise FileNotFoundError(f'Atlas parquet file not found: {parquet_atlas_path}')
-    if not mapping_path.exists():
-        raise FileNotFoundError(f'Channel mapping file not found: {mapping_path}')
+    if not channel_mapping_path.exists():
+        raise FileNotFoundError(f'Channel mapping file not found: {channel_mapping_path}')
 
     if not annotations_api_url:
         raise RuntimeError(
@@ -92,82 +141,46 @@ def run(
             'a local file is deprecated. Set annotations_api_url.'
         )
     try:
-        identity_channels, aliases = load_channel_annotations_from_api(
-            annotations_api_url
-        )
+        identity_channels, aliases = load_channel_annotations_from_api(annotations_api_url)
     except Exception as exc:
         raise RuntimeError(
             f'Failed to load channel annotations from API {annotations_api_url}: {exc}'
         ) from exc
 
     if study:
-        study_handles = [study]
+        study_handles = (study,)
     else:
-        study_handles = [
+        study_handles = tuple(
             d.name for d in sorted(datasets_dir.iterdir())
             if d.is_dir() and d.name != 'template'
-        ]
+        )
+    study_handles, study_names = _retrieve_full_study_names(datasets_dir, study_handles)
+    study_handles, study_names = _filter_by_availability(study_handles, study_names, base_url=annotations_api_url)
 
-    _study_names = []
-    for handle in study_handles:
-        study_json = datasets_dir / handle / 'generated_artifacts' / 'study.json'
-        if not study_json.exists():
-            logger.warning("Dataset metadata not found for: %s", handle)
-            continue
-        _study_names.append(StudyCollectionNaming.extract_study_from_file(study_json))
-    study_names = tuple(_study_names)
-
+    smprofiler_to_atlas = load_channel_mapping(channel_mapping_path)
+    report_parquet_attributes(parquet_atlas_path, smprofiler_to_atlas)
     study_channels = retrieve_all_study_channels_from_api(
-        study_names, identity_channels, aliases, base_url=annotations_api_url
+        study_names, identity_channels, aliases, smprofiler_to_atlas, base_url=annotations_api_url
     )
 
-    # Keep only mapped channels whose atlas gene is actually present in the Parquet table.
-    spt_to_atlas = load_channel_mapping(mapping_path)
-    atlas_genes = set(load_atlas_gene_names(parquet_atlas_path))
-    absent = {spt: gene for spt, gene in spt_to_atlas.items() if gene not in atlas_genes}
-    if absent:
-        logger.warning(
-            '%d mapped channels dropped — atlas gene absent from parquet: %s',
-            len(absent), sorted(absent.items()),
-        )
-        spt_to_atlas = {spt: gene for spt, gene in spt_to_atlas.items() if gene in atlas_genes}
-    logger.info(
-        'Atlas feature summary: %d atlas genes in parquet, %d SPT channels mapped',
-        len(atlas_genes), len(spt_to_atlas),
-    )
+    def _form_scenario(args) -> TrainingScenario:
+        return TrainingScenario(*args)
+    def _non_trivial(ts: TrainingScenario) -> bool:
+        return len(ts.channels.identity)*len(ts.channels.functional) > 0
+    plan = tuple(filter(_non_trivial, map(_form_scenario, zip(study_handles, study_names, study_channels))))
 
-    # ── Compute training plan up-front ──────────────────────────────────────
-    plan: list[dict] = []
-    for study_name, channels in study_channels.items():
-        id_in_atlas = [c for c in channels['identity'] if c in spt_to_atlas]
-        fn_in_atlas = [c for c in channels['functional'] if c in spt_to_atlas]
-        logger.info(
-            'Study "%s": %d dataset channels → %d atlas-matched '
-            '(identity %d/%d, functional %d/%d)',
-            study_name,
-            len(channels['identity']) + len(channels['functional']),
-            len(id_in_atlas) + len(fn_in_atlas),
-            len(id_in_atlas), len(channels['identity']),
-            len(fn_in_atlas), len(channels['functional']),
-        )
-        if id_in_atlas and fn_in_atlas:
-            plan.append({
-                'study': study_name,
-                'identity': id_in_atlas,
-                'functional': fn_in_atlas,
-            })
-
-    total_models = sum(len(p['functional']) for p in plan)
+    total_models = sum(len(p.channels.functional) for p in plan)
 
     if dry_run:
         section('DRY RUN — Training plan')
         for p in plan:
-            subsection(f'Study: {p["study"]}')
+            subsection(f'Study: {p.study_handle}')
+            identity = p.channels.identity
             logger.info(
-                '  Identity features (%d): %s', len(p['identity']), p['identity']
+                '  Identity features (%d): %s', len(identity), identity
             )
-            for fc in p['functional']:
-                logger.info('  → model: target="%s"  features=%s', fc, p['identity'])
+            for fc in p.channels.functional:
+                logger.info('  → model: target="%s"  features=%s', fc.study_specific, identity.study_specific))
         print(f'\nTotal: {len(plan)} studies, {total_models} models to train.', flush=True)
         return
 
@@ -367,4 +380,5 @@ def run(
                 flush=True,
             )
     print(f'\nModels saved to: {output_dir.resolve()}', flush=True)
+
 

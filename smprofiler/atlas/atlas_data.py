@@ -21,57 +21,43 @@ import pyarrow.parquet as pq
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.atlas.reporting import format_elapsed
+from smprofiler.atlas.channel_annotations import normalize_name
 
 logger = colorized_logger(__name__)
-
-# Column headers in smprofiler_channels_to_atlas.tsv
-_SPT_COLUMN = "SMProfiler channel name"
-_ATLAS_COLUMN = "Atlas gene name"
 
 
 def load_channel_mapping(mapping_path: Path) -> dict[str, str]:
     """
-    Load the manual SPT-channel → atlas-gene mapping from the aggregation TSV.
+    Load the manual SMProfiler-channel → atlas-gene mapping.
 
-    The TSV has columns ``"SMProfiler channel name"`` and ``"Atlas gene name"``.
-    Several SPT channels may map to the same atlas gene (e.g. CD45, CD45RA and
+    The source TSV has columns ``SMProfiler channel name`` and ``Atlas gene name``.
+    Several SMProfiler channels may map to the same atlas gene (e.g. CD45, CD45RA and
     CD45RO all map to PTPRC), so the returned dict is many-to-one.
 
     Returns:
-        dict mapping spt_channel_name → atlas_gene_name.
+        dict mapping smprofiler_channel_name → atlas_gene_name.
     """
     df = pd.read_csv(mapping_path, sep="\t")
-    missing = {_SPT_COLUMN, _ATLAS_COLUMN} - set(df.columns)
-    if missing:
-        raise ValueError(
-            f"Channel mapping {mapping_path} is missing column(s) {sorted(missing)}; "
-            f"found {list(df.columns)}"
-        )
-    spt_to_atlas = {
-        str(spt).strip(): str(atlas).strip()
-        for spt, atlas in zip(df[_SPT_COLUMN], df[_ATLAS_COLUMN])
-        if pd.notna(spt) and pd.notna(atlas)
-    }
-    logger.info(
-        "Channel mapping: %d SPT channels → %d atlas genes (from %s)",
-        len(spt_to_atlas), len(set(spt_to_atlas.values())), mapping_path,
-    )
-    return spt_to_atlas
+    columns = ('SMProfiler channel name', 'Atlas gene name')
+    if tuple(df.columns) != columns:
+        raise ValueError(f'Wrong columns: {columns}')
+    return dict(df.itertuples(index=False))
 
-
-def load_atlas_gene_names(parquet_path: Path) -> list[str]:
-    """Return the gene (column) names of the atlas Parquet table, without loading data."""
-    size_mb = parquet_path.stat().st_size / 1024 ** 2
-    schema = pq.read_schema(parquet_path)
+def report_parquet_attributes(path: Path, smprofiler_to_atlas: dict[str, str]) -> None:
+    size_mb = path.stat().st_size / 1024 ** 2
+    schema = pq.read_schema(path)
     names = list(schema.names)
-    n_rows = pq.ParquetFile(parquet_path).metadata.num_rows
+    n_rows = pq.ParquetFile(path).metadata.num_rows
     logger.info(
         "Atlas parquet (%.1f MB): %s cells × %d genes — %s",
-        size_mb, f"{n_rows:,}", len(names), parquet_path,
+        size_mb, f"{n_rows:,}", len(names), path,
     )
-    return names
-
-
+    missing = set(smprofiler_to_atlas.values()).difference(names)
+    if len(missing) > 0:
+        logger.error('Atlas does not actually contain: %s', missing)
+    else:
+        logger.info('All manually-mapped-to atlas gene names are actually in atlas.')
+ 
 def load_atlas_subset(
     parquet_path: Path,
     atlas_columns: list[str],

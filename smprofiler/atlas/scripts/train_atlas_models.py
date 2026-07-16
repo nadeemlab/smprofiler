@@ -1,16 +1,6 @@
 #!/usr/bin/env python3
 """Command line entry point for atlas-reference model training.
 
-For each (study, functional_marker) pair, trains a regression model on the
-aggregated Allen Institute Human Immune Health Atlas expression table that
-predicts functional marker intensity from identity marker values, and exports
-it to ONNX. The atlas expression table (Parquet) and the SPT-channel → atlas-
-gene mapping (TSV) are produced by the atlas aggregation step in
-smprofiler-data. See ``smprofiler.atlas`` for the library implementation.
-
-Channel annotations are fetched from the smprofiler API (the source of truth);
-loading them from a local file is deprecated and no longer supported here.
-
 Example:
     smprofiler atlas train-atlas-models \\
         --atlas-parquet /path/to/cell_atlas_small.parquet \\
@@ -21,6 +11,7 @@ Example:
 """
 import argparse
 import os
+import sys
 from pathlib import Path
 
 from smprofiler.standalone_utilities.module_load_error import SuggestExtrasException
@@ -49,7 +40,7 @@ def parse_args() -> argparse.Namespace:
 
     parser = argparse.ArgumentParser(
         prog='smprofiler atlas train-atlas-models',
-        description="Train atlas-reference regression models for SPT",
+        description="Train atlas-reference regression models for SMProfiler",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -60,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--channel-mapping",
         default=str(data_dir / "smprofiler_channels_to_atlas.tsv"),
-        help="Path to the SPT-channel → atlas-gene mapping (smprofiler_channels_to_atlas.tsv)",
+        help="Path to the SMProfiler-channel → atlas-gene mapping (smprofiler_channels_to_atlas.tsv)",
     )
     parser.add_argument(
         "--datasets-dir",
@@ -75,11 +66,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--annotations-api-url",
         default=DEFAULT_ANNOTATIONS_API_URL,
-        help=(
-            "Base URL for the smprofiler API used to fetch channel annotations "
-            "(the sole source; loading from a local file is deprecated). The run "
-            "fails if the API is unreachable."
-        ),
+        help="Base URL for the smprofiler API used to fetch channel annotations",
     )
     parser.add_argument(
         "--max-cells",
@@ -127,6 +114,7 @@ def main(args: argparse.Namespace) -> None:
         from smprofiler.atlas.reporting import suppress_third_party_logging
     except ModuleNotFoundError as exception:
         SuggestExtrasException(exception, 'atlas')
+        raise exception
 
     suppress_third_party_logging()
     set_atlas_log_level(args.verbose)
@@ -145,9 +133,10 @@ def main(args: argparse.Namespace) -> None:
             database_config_file=Path(args.database_config_file) if args.database_config_file else None,
         )
     except (FileNotFoundError, RuntimeError) as exception:
-        logger.error("%s", exception)
-        raise SystemExit(1) from exception
+        logger.error('%s', exception)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     main(parse_args())
+
