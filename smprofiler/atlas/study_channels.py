@@ -9,6 +9,7 @@ import json
 from attrs import define
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
+from smprofiler.atlas.cache import StandaloneSQLiteHTTPCache
 from smprofiler.atlas.channel_annotations import normalize_name
 from smprofiler.db.exchange_data_formats.metrics import Channel
 
@@ -35,10 +36,14 @@ def _retrieve_study_channels_from_api(
 ) -> StudyOrderedChannels:
     base = base_url.rstrip('/')
     url = f'{base}/channels/?study={quote_plus(study)}'
-    r = request.Request(url, headers={'Accept': 'application/json'})
-    with request.urlopen(r, timeout=timeout) as response:
-        x = json.load(response)
-        data: list[Channel] = [Channel.model_validate_json(json.dumps(item)) for item in x]
+    response_body = StandaloneSQLiteHTTPCache.retrieve_response(url)
+    if response_body is None:
+        r = request.Request(url, headers={'Accept': 'application/json'})
+        with request.urlopen(r, timeout=timeout) as response:
+            response_body = response.read()
+            StandaloneSQLiteHTTPCache.cache_response(url, response_body)
+    x = json.loads(response_body.decode())
+    data: list[Channel] = [Channel.model_validate_json(json.dumps(item)) for item in x]
     channels = []
     for c in data:
         study_specific = c.symbol

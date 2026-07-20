@@ -13,18 +13,21 @@ import pickle
 import json
 import time
 from pathlib import Path
-from itertools import chain
 from urllib.request import Request
 from urllib.request import urlopen
 from urllib.parse import quote_plus
 
 from attrs import define
-import numpy as np
+from numpy.random import default_rng
+from numpy.random import Generator as RandomNumberGenerator
+from numpy import newaxis as np_newaxis
+
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.db.study_tokens import StudyCollectionNaming
+from smprofiler.atlas.cache import StandaloneSQLiteHTTPCache
 from smprofiler.atlas.reporting import format_elapsed, section, subsection
 from smprofiler.atlas.channel_annotations import load_channel_annotations_from_api
 from smprofiler.atlas.study_channels import retrieve_all_study_channels_from_api
@@ -45,115 +48,18 @@ DEFAULT_ANNOTATIONS_API_URL = 'https://smprofiler.io/api'
 _SUMMARY_WIDTH = 70
 
 @define
-class TrainingScenario:
+class TrainingScenarioStudy:
     study_handle: str
     study_name: str
     channels: StudyOrderedChannels
 
-def _store_models_in_db(database_config_file: Path, model_records: list[dict]) -> None:
-    # Imported lazily so the file-only training path carries no database dependency.
-    from smprofiler.db.accessors.atlas_models import store_models_in_db
-    store_models_in_db(database_config_file, model_records) 
-
-def _retrieve_full_study_names(datasets_dir: Path, study_handles: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    _study_handles = []
-    _study_names = []
-    for handle in study_handles:
-        study_json = datasets_dir / handle / 'generated_artifacts' / 'study.json'
-        if not study_json.exists():
-            logger.warning("Dataset metadata not found for: %s", handle)
-            continue
-        _study_handles.append(handle)
-        _study_names.append(StudyCollectionNaming.extract_study_from_file(study_json))
-    return tuple(_study_handles), tuple(_study_names)
-
-def _filter_by_availability(
-    study_handles: tuple[str, ...],
-    study_names: tuple[str, ...],
-    base_url: str,
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    handles, names = [], []
-    for h, n in zip(study_handles, study_names):
-        if _is_available(n, StudyCollectionNaming.strip_token(n)[1], base_url):
-            handles.append(h)
-            names.append(n)
-        else:
-            logger.warning('Study data for %s (%s) is not live.', h, n)
-    return tuple(handles), tuple(names)
-
-def _is_available(study: str, collection: str | None, base_url: str) -> bool:
-    base = base_url.rstrip('/')
-    if collection is not None:
-        url = f'{base}/study-names/?collection={quote_plus(collection)}'
-    else:
-        url = f'{base}/study-names/'
-    request = Request(url, headers={'Accept': 'application/json'})
-    with urlopen(request, timeout=30) as response:
-        data = json.load(response)
-    studies = list(entry['handle'] for entry in data)
-    return study in studies
-
-def _report_plan(plan: tuple[TrainingScenario, ...]) -> None:
-    section('DRY RUN — Training plan')
-    total_models = sum(len(p.channels.functional) for p in plan)
-    for p in plan:
-        subsection(f'Study: {p.study_handle}')
-        identity = p.channels.identity
-        logger.info(
-            '  Identity features (%d): %s', len(identity), identity
-        )
-        for fc in p.channels.functional:
-            logger.info('  → model: target="%s"  features=%s', fc.study_specific, list(map(lambda c: c.study_specific, identity)))
-    print(f'\nTotal: {len(plan)} studies, {total_models} models to train.', flush=True)
-
-def _check_files_exist(parquet_atlas_path: Path, channel_mapping_path: Path) -> str:
-    if not parquet_atlas_path.exists():
-        raise FileNotFoundError(f'Atlas parquet file not found: {parquet_atlas_path}')
-    if not channel_mapping_path.exists():
-        raise FileNotFoundError(f'Channel mapping file not found: {channel_mapping_path}')
-
-def _form_plan_training_scenarios(
-    parquet_atlas_path: Path,
-    channel_mapping_path: Path,
-    annotations_api_url: str,
-    datasets_dir: Path,
-    study: str | None,
-) -> tuple[TrainingScenario, ...]:
-    if not annotations_api_url:
-        raise RuntimeError(
-            'An annotations API URL is required — loading channel annotations from '
-            'a local file is deprecated. Set annotations_api_url.'
-        )
-    try:
-        identity_channels, aliases = load_channel_annotations_from_api(annotations_api_url)
-    except Exception as exc:
-        raise RuntimeError(
-            f'Failed to load channel annotations from API {annotations_api_url}: {exc}'
-        ) from exc
-
-    if study:
-        study_handles = (study,)
-    else:
-        study_handles = tuple(
-            d.name for d in sorted(datasets_dir.iterdir())
-            if d.is_dir() and d.name != 'template'
-        )
-    study_handles, study_names = _retrieve_full_study_names(datasets_dir, study_handles)
-    study_handles, study_names = _filter_by_availability(study_handles, study_names, base_url=annotations_api_url)
-
-    smprofiler_to_atlas = load_channel_mapping(channel_mapping_path)
-    report_parquet_attributes(parquet_atlas_path, smprofiler_to_atlas)
-    study_channels = retrieve_all_study_channels_from_api(
-        study_names, identity_channels, aliases, smprofiler_to_atlas, base_url=annotations_api_url
-    )
-
-    def _form_scenario(args) -> TrainingScenario:
-        return TrainingScenario(*args)
-    def _non_trivial(ts: TrainingScenario) -> bool:
-        return len(ts.channels.identity)*len(ts.channels.functional) > 0
-    plan = tuple(filter(_non_trivial, map(_form_scenario, zip(study_handles, study_names, study_channels))))
-    return plan
-
+@define
+class TrainingOptions:
+    output_dir: Path
+    max_cells: int | None
+    cv_folds: int
+    database_config_file: Path | None
+    parquet_atlas_path: Path
 
 def run(
     parquet_atlas_path: Path,
@@ -203,190 +109,41 @@ def run(
     if dry_run:
         _report_plan(plan)
         return
+    options = TrainingOptions(output_dir, max_cells, cv_folds, database_config_file, parquet_atlas_path)
+    _execute_plan(plan, options)
 
+def _execute_plan(plan: tuple[TrainingScenarioStudy, ...], options: TrainingOptions) -> None:
+    _report_plan_options(plan, options)
+
+    random_number_generator = default_rng(42)
+    run_start = time.monotonic()
+    model_counter = 0
+    summary_rows: list[dict] = []
+    model_records: list[dict] = []  # collected for optional database storage
+    total_models = sum(len(p.channels.functional) for p in plan)
+    for study_index, scenario in enumerate(plan, 1):
+        number_new_models = _train_models_for_study(scenario, options, total_models, len(plan), random_number_generator, summary_rows, model_records, study_index, model_counter)
+        model_counter += number_new_models
+
+    _store_models_in_db(options.database_config_file, model_records)
+    _report_execution_summary(options, run_start, model_counter, summary_rows)
+
+def _report_plan_options(plan: tuple[TrainingScenarioStudy, ...], options: TrainingOptions) -> None:
     total_models = sum(len(p.channels.functional) for p in plan)
     section(
         f'Atlas-reference model training — '
         f'{len(plan)} studies, {total_models} models total'
     )
-    logger.info('Output directory: %s', output_dir.resolve())
-    if max_cells:
-        logger.info('Max atlas cells per study: %s', f'{max_cells:,}')
+    logger.info('Output directory: %s', options.output_dir.resolve())
+    if options.max_cells:
+        logger.info('Max atlas cells per study: %s', f'{options.max_cells:,}')
     else:
         logger.info('Using full atlas (no cell limit)')
-    logger.info('Cross-validation folds: %d', cv_folds)
+    logger.info('Cross-validation folds: %d', options.cv_folds)
 
-    rng = np.random.default_rng(42)
-    run_start = time.monotonic()
-    model_counter = 0
-    summary_rows: list[dict] = []
-    model_records: list[dict] = []  # collected for optional database storage
-
-    # Train one model per (study, functional marker).
-    for study_idx, p in enumerate(plan, 1):
-        study_name = p['study']
-        id_in_atlas = p['identity']
-        fn_in_atlas = p['functional']
-
-        section(
-            f'[{study_idx}/{len(plan)}] Study: {study_name}  '
-            f'({len(fn_in_atlas)} models to train)'
-        )
-        logger.info('  Identity features : %s', id_in_atlas)
-        logger.info('  Functional targets: %s', fn_in_atlas)
-
-        # Load all needed atlas columns in one shot (identity + all functional targets)
-        needed_spt = id_in_atlas + [f for f in fn_in_atlas if f not in id_in_atlas]
-        needed_atlas = [spt_to_atlas[c] for c in needed_spt]
-
-        X_all, _ = load_atlas_subset(
-            parquet_atlas_path, needed_atlas, needed_spt,
-            max_cells=max_cells, rng=rng,
-        )
-
-        col_idx = {name: i for i, name in enumerate(needed_spt)}
-        X_identity = X_all[:, [col_idx[c] for c in id_in_atlas]]
-
-        # Sum-normalize by identity-channel row sums (removes overall scale effect).
-        row_sums = X_identity.sum(axis=1)
-        valid_mask = row_sums > 1e-8
-        n_zero_sum = int((~valid_mask).sum())
-        if n_zero_sum:
-            logger.info('  Removed %d cells with zero identity-channel sum', n_zero_sum)
-        X_identity_norm = X_identity[valid_mask] / row_sums[valid_mask, np.newaxis]
-        X_all_filtered = X_all[valid_mask]
-        S_valid = row_sums[valid_mask]
-        logger.info(
-            '  Normalized: %s cells retained  (%.2f%% of loaded)',
-            f'{X_identity_norm.shape[0]:,}',
-            100.0 * X_identity_norm.shape[0] / X_all.shape[0],
-        )
-
-        for target_idx_local, target_channel in enumerate(fn_in_atlas, 1):
-            model_counter += 1
-            subsection(
-                f'Model [{model_counter}/{total_models}]  '
-                f'study="{study_name}"  target="{target_channel}"  '
-                f'({target_idx_local}/{len(fn_in_atlas)} in study)'
-            )
-
-            target_col = col_idx[target_channel]
-            y_norm = X_all_filtered[:, target_col] / S_valid
-
-            # Skip if target has zero variance after normalization (uninformative)
-            if y_norm.std() < 1e-6:
-                logger.warning("Skipping: target '%s' has near-zero variance", target_channel)
-                continue
-
-            logger.info('  Features : %d identity markers, %s cells (after S>0 filter)',
-                        X_identity_norm.shape[1], f'{X_identity_norm.shape[0]:,}')
-            logger.info('  Target   : "%s" (norm; range %.4f – %.4f, mean %.4f)',
-                        target_channel, float(y_norm.min()), float(y_norm.max()), float(y_norm.mean()))
-
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_identity_norm, y_norm, test_size=0.2, random_state=42
-            )
-            logger.info('  Split    : %s train / %s test',
-                        f'{len(X_train):,}', f'{len(X_test):,}')
-
-            logger.info('  Training %d model candidates with %d-fold CV …',
-                        len(build_model_candidates()), cv_folds)
-            t_train_start = time.monotonic()
-            best_name, best_model, cv_r2, cv_r2_std = train_and_select_best(
-                X_train, y_train, cv_folds=cv_folds
-            )
-
-            y_pred_mean, y_pred_std = predict_with_std(best_model, best_name, X_test)
-            test_r2 = float(r2_score(y_test, y_pred_mean))
-            test_mae = float(mean_absolute_error(y_test, y_pred_mean))
-            residuals = y_test - y_pred_mean
-            global_std = float(residuals.std())
-            std_method = STD_METHODS[best_name]
-            # GaussianProcess only reproduces in double precision; others use float32.
-            double_precision = best_name == 'gaussian_process'
-            onnx_input_dtype = 'float64' if double_precision else 'float32'
-            train_seconds = time.monotonic() - t_train_start
-            train_elapsed = format_elapsed(train_seconds)
-            logger.info(
-                '  Result   : model="%s"  test_R²=%.4f  test_MAE=%.4f'
-                '  std_method=%s  global_std=%.4f  [%s]',
-                best_name, test_r2, test_mae, std_method, global_std, train_elapsed,
-            )
-
-            # Sanitize channel name for filesystem
-            safe_target = target_channel.replace('/', '_').replace(' ', '_')
-            study_out_dir = output_dir / study_name
-            onnx_path = study_out_dir / f'{safe_target}.onnx'
-            pkl_path = study_out_dir / f'{safe_target}.pkl'
-            meta_path = study_out_dir / f'{safe_target}.meta.json'
-
-            export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path,
-                           double_precision=double_precision)
-
-            n_validate = min(500, X_test.shape[0])
-            validate_onnx(onnx_path, best_model, X_test[:n_validate],
-                          double_precision=double_precision)
-
-            # Keep the sklearn pickle too: per-cell std is computed in Python, not from ONNX.
-            study_out_dir.mkdir(parents=True, exist_ok=True)
-            with open(pkl_path, 'wb') as pkl_f:
-                pickle.dump(best_model, pkl_f)
-            logger.info('Pickle saved: %s (%.1f KB)', pkl_path, pkl_path.stat().st_size / 1024)
-
-            write_metadata(
-                meta_path,
-                study=study_name,
-                target_channel=target_channel,
-                input_channels=id_in_atlas,
-                model_type=best_name,
-                cv_r2=cv_r2,
-                cv_r2_std=cv_r2_std,
-                test_r2=test_r2,
-                test_mae=test_mae,
-                n_train=len(X_train),
-                n_test=len(X_test),
-                atlas_version=ATLAS_VERSION,
-                sum_normalized=True,
-                std_method=std_method,
-                global_std=global_std,
-                onnx_input_dtype=onnx_input_dtype,
-            )
-
-            summary_rows.append({
-                'study': study_name,
-                'target': target_channel,
-                'model': best_name,
-                'std_method': std_method,
-                'cv_R²': cv_r2,
-                'test_R²': test_r2,
-                'test_MAE': test_mae,
-                'onnx_kb': onnx_path.stat().st_size // 1024,
-            })
-
-            if database_config_file is not None:
-                model_records.append({
-                    'study': study_name,
-                    'target_channel': target_channel,
-                    'input_channels': id_in_atlas,
-                    'architecture_type': best_name,
-                    'std_method': std_method,
-                    'onnx_input_dtype': onnx_input_dtype,
-                    'atlas_version': ATLAS_VERSION,
-                    'cv_r2': cv_r2,
-                    'test_r2': test_r2,
-                    'test_mae': test_mae,
-                    'n_train': len(X_train),
-                    'n_test': len(X_test),
-                    'training_time_seconds': train_seconds,
-                    'onnx_bytes': onnx_path.read_bytes(),
-                })
-
-    if model_records:
-        _store_models_in_db(database_config_file, model_records)
-
-    # ── Final summary ────────────────────────────────────────────────────────
+def _report_execution_summary(options: TrainingOptions, run_start, number_models: int, summary_rows: list):
     total_elapsed = format_elapsed(time.monotonic() - run_start)
-    section(f'Training complete — {model_counter} models in {total_elapsed}')
+    section(f'Training complete — {number_models} models in {total_elapsed}')
     if summary_rows:
         header = (f'  {"Study":<24}  {"Target":<16}  {"Model":<24}  {"Std method":<22}'
                   f'  {"cv_R²":>8}  {"test_R²":>8}  {"test_MAE":>10}  {"KB":>6}')
@@ -400,6 +157,304 @@ def run(
                 f'  {row["test_MAE"]:>10.4f}  {row["onnx_kb"]:>6}',
                 flush=True,
             )
-    print(f'\nModels saved to: {output_dir.resolve()}', flush=True)
+    print(f'\nModels saved to: {options.output_dir.resolve()}', flush=True)
 
+def _store_models_in_db(database_config_file: Path | None, model_records: list[dict] | None) -> None:
+    if database_config_file is None or model_records is None or len(model_records) == 0:
+        logger.info('Not storing models in database.')
+        return
+    # Imported lazily so the file-only training path carries no database dependency.
+    from smprofiler.db.accessors.atlas_models import store_models_in_db
+    store_models_in_db(database_config_file, model_records) 
+
+def _retrieve_full_study_names(datasets_dir: Path, study_handles: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    _study_handles = []
+    _study_names = []
+    for handle in study_handles:
+        study_json = datasets_dir / handle / 'generated_artifacts' / 'study.json'
+        if not study_json.exists():
+            logger.warning("Dataset metadata not found for: %s", handle)
+            continue
+        _study_handles.append(handle)
+        _study_names.append(StudyCollectionNaming.extract_study_from_file(study_json))
+    return tuple(_study_handles), tuple(_study_names)
+
+def _filter_by_availability(
+    study_handles: tuple[str, ...],
+    study_names: tuple[str, ...],
+    base_url: str,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    handles, names = [], []
+    for h, n in zip(study_handles, study_names):
+        if _is_available(n, StudyCollectionNaming.strip_token(n)[1], base_url):
+            handles.append(h)
+            names.append(n)
+        else:
+            logger.warning('Study data for %s (%s) is not live.', h, n)
+    return tuple(handles), tuple(names)
+
+def _is_available(study: str, collection: str | None, base_url: str) -> bool:
+    base = base_url.rstrip('/')
+    if collection is not None:
+        url = f'{base}/study-names/?collection={quote_plus(collection)}'
+    else:
+        url = f'{base}/study-names/'
+    response_body = StandaloneSQLiteHTTPCache.retrieve_response(url) 
+    if response_body is None:
+        request = Request(url, headers={'Accept': 'application/json'})
+        with urlopen(request, timeout=30) as response:
+            response_body = response.read()
+            StandaloneSQLiteHTTPCache.cache_response(url, response_body)
+    data = json.loads(response_body.decode())
+    studies = list(entry['handle'] for entry in data)
+    return study in studies
+
+def _report_plan(plan: tuple[TrainingScenarioStudy, ...]) -> None:
+    section('DRY RUN — Training plan')
+    total_models = sum(len(p.channels.functional) for p in plan)
+    for p in plan:
+        subsection(f'Study: {p.study_handle}')
+        identity = p.channels.identity
+        logger.info(
+            '  Identity features (%d): %s', len(identity), identity
+        )
+        for fc in p.channels.functional:
+            logger.info('  → model: target="%s"  features=%s', fc.study_specific, list(map(lambda c: c.study_specific, identity)))
+    print(f'\nTotal: {len(plan)} studies, {total_models} models to train.', flush=True)
+
+def _check_files_exist(parquet_atlas_path: Path, channel_mapping_path: Path) -> str:
+    if not parquet_atlas_path.exists():
+        raise FileNotFoundError(f'Atlas parquet file not found: {parquet_atlas_path}')
+    if not channel_mapping_path.exists():
+        raise FileNotFoundError(f'Channel mapping file not found: {channel_mapping_path}')
+
+def _form_plan_training_scenarios(
+    parquet_atlas_path: Path,
+    channel_mapping_path: Path,
+    annotations_api_url: str,
+    datasets_dir: Path,
+    study: str | None,
+) -> tuple[TrainingScenarioStudy, ...]:
+    if not annotations_api_url:
+        raise RuntimeError(
+            'An annotations API URL is required — loading channel annotations from '
+            'a local file is deprecated. Set annotations_api_url.'
+        )
+    try:
+        identity_channels, aliases = load_channel_annotations_from_api(annotations_api_url)
+    except Exception as exc:
+        raise RuntimeError(
+            f'Failed to load channel annotations from API {annotations_api_url}: {exc}'
+        ) from exc
+
+    if study:
+        study_handles = (study,)
+    else:
+        study_handles = tuple(
+            d.name for d in sorted(datasets_dir.iterdir())
+            if d.is_dir() and d.name != 'template'
+        )
+    study_handles, study_names = _retrieve_full_study_names(datasets_dir, study_handles)
+    study_handles, study_names = _filter_by_availability(study_handles, study_names, base_url=annotations_api_url)
+
+    smprofiler_to_atlas = load_channel_mapping(channel_mapping_path)
+    report_parquet_attributes(parquet_atlas_path, smprofiler_to_atlas)
+    study_channels = retrieve_all_study_channels_from_api(
+        study_names, identity_channels, aliases, smprofiler_to_atlas, base_url=annotations_api_url
+    )
+
+    def _form_scenario(args) -> TrainingScenarioStudy:
+        return TrainingScenarioStudy(*args)
+    def _non_trivial(ts: TrainingScenarioStudy) -> bool:
+        return len(ts.channels.identity)*len(ts.channels.functional) > 0
+    plan = tuple(filter(_non_trivial, map(_form_scenario, zip(study_handles, study_names, study_channels))))
+    return plan
+
+def _train_models_for_study(
+    scenario: TrainingScenarioStudy,
+    options: TrainingOptions, 
+    total_models: int,
+    total_studies: int,
+    random_number_generator: RandomNumberGenerator,
+    summary_rows: list[dict],
+    model_records: list[dict],
+    plan_step: int,
+    number_trained: int,
+) -> int:
+    study_name = scenario.study_handle
+    id_in_atlas = list(c.atlas_specific for c in scenario.channels.identity)
+    fn_in_atlas = list(c.atlas_specific for c in scenario.channels.functional)
+
+    section(
+        f'[{plan_step}/{total_studies}] Study: {study_name}  '
+        f'({len(fn_in_atlas)} models to train)'
+    )
+    logger.info('  Identity features : %s', id_in_atlas)
+    logger.info('  Functional targets: %s', fn_in_atlas)
+
+    # Load all needed atlas columns in one shot (identity + all functional targets)
+    #needed_spt = id_in_atlas + [f for f in fn_in_atlas if f not in id_in_atlas]
+    #needed_atlas = [spt_to_atlas[c] for c in needed_spt]
+
+    if len(set(id_in_atlas).intersection(fn_in_atlas)) > 0:
+        raise ValueError(f'Functional markers overlap with identity markers: {fn_in_atlas}; {id_in_atlas}')
+    atlas_channels_for_training = id_in_atlas + fn_in_atlas
+
+    X_all = load_atlas_subset(
+        options.parquet_atlas_path,
+        atlas_channels_for_training,
+        max_cells=options.max_cells,
+        rng=random_number_generator,
+    )
+
+    # the below will pick out only one column fo reach name... if name is duplicated, it's dropped. That's wrong right?
+    #col_idx = {name: i for i, name in enumerate(atlas_channels_for_training)}
+    #X_identity = X_all[:, [col_idx[c] for c in id_in_atlas]]
+
+    #col_idx = {name: i for i, name in enumerate(atlas_channels_for_training)}
+    X_identity = X_all[:, [i for i, name in enumerate(atlas_channels_for_training) if name in id_in_atlas]]
+
+
+    # Sum-normalize by identity-channel row sums (removes overall scale effect).
+    row_sums = X_identity.sum(axis=1)
+    valid_mask = row_sums > 1e-8
+    n_zero_sum = int((~valid_mask).sum())
+    if n_zero_sum:
+        logger.info('  Removed %d cells with zero identity-channel sum', n_zero_sum)
+    X_identity_norm = X_identity[valid_mask] / row_sums[valid_mask, np_newaxis]
+    X_all_filtered = X_all[valid_mask]
+    S_valid = row_sums[valid_mask]
+    logger.info(
+        '  Normalized: %s cells retained  (%.2f%% of loaded)',
+        f'{X_identity_norm.shape[0]:,}',
+        100.0 * X_identity_norm.shape[0] / X_all.shape[0],
+    )
+
+    model_counter = 0
+#    for target_idx_local, target_channel in enumerate(fn_in_atlas, 1):
+    def _is_functional_column(index_channel: tuple[int, str]) -> bool:
+        _, atlas_channel = index_channel
+        return atlas_channel in fn_in_atlas
+    targets = tuple(filter(_is_functional_column, enumerate(atlas_channels_for_training)))
+    for target_index_local, (column_index, atlas_channel) in enumerate(targets, 1):
+        model_counter += 1
+        subsection(
+            f'Model [{model_counter + number_trained}/{total_models}]  '
+            f'study="{study_name}"  target="{atlas_channel}"  '
+            f'({target_index_local}/{len(fn_in_atlas)} in study)'
+        )
+
+        #target_col = col_idx[target_channel]
+        target_channel = atlas_channel
+        target_col = column_index
+        y_norm = X_all_filtered[:, target_col] / S_valid
+
+        # Skip if target has zero variance after normalization (uninformative)
+        if y_norm.std() < 1e-6:
+            logger.warning("Skipping: target '%s' has near-zero variance", target_channel)
+            continue
+
+        logger.info('  Features : %d identity markers, %s cells (after S>0 filter)',
+                    X_identity_norm.shape[1], f'{X_identity_norm.shape[0]:,}')
+        logger.info('  Target   : "%s" (norm; range %.4f – %.4f, mean %.4f)',
+                    target_channel, float(y_norm.min()), float(y_norm.max()), float(y_norm.mean()))
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X_identity_norm, y_norm, test_size=0.2, random_state=42
+        )
+        logger.info('  Split    : %s train / %s test',
+                    f'{len(X_train):,}', f'{len(X_test):,}')
+
+        logger.info('  Training %d model candidates with %d-fold CV …',
+                    len(build_model_candidates()), options.cv_folds)
+        t_train_start = time.monotonic()
+        best_name, best_model, cv_r2, cv_r2_std = train_and_select_best(
+            X_train, y_train, cv_folds=options.cv_folds
+        )
+
+        y_pred_mean, y_pred_std = predict_with_std(best_model, best_name, X_test)
+        test_r2 = float(r2_score(y_test, y_pred_mean))
+        test_mae = float(mean_absolute_error(y_test, y_pred_mean))
+        residuals = y_test - y_pred_mean
+        global_std = float(residuals.std())
+        std_method = STD_METHODS[best_name]
+        # GaussianProcess only reproduces in double precision; others use float32.
+        double_precision = best_name == 'gaussian_process'
+        onnx_input_dtype = 'float64' if double_precision else 'float32'
+        train_seconds = time.monotonic() - t_train_start
+        train_elapsed = format_elapsed(train_seconds)
+        logger.info(
+            '  Result   : model="%s"  test_R²=%.4f  test_MAE=%.4f'
+            '  std_method=%s  global_std=%.4f  [%s]',
+            best_name, test_r2, test_mae, std_method, global_std, train_elapsed,
+        )
+
+        # Sanitize channel name for filesystem
+        safe_target = target_channel.replace('/', '_').replace(' ', '_')
+        study_out_dir = options.output_dir / study_name
+        onnx_path = study_out_dir / f'{safe_target}.onnx'
+        pkl_path = study_out_dir / f'{safe_target}.pkl'
+        meta_path = study_out_dir / f'{safe_target}.meta.json'
+
+        export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path,
+                       double_precision=double_precision)
+
+        n_validate = min(500, X_test.shape[0])
+        validate_onnx(onnx_path, best_model, X_test[:n_validate],
+                      double_precision=double_precision)
+
+        # Keep the sklearn pickle too: per-cell std is computed in Python, not from ONNX.
+        study_out_dir.mkdir(parents=True, exist_ok=True)
+        with open(pkl_path, 'wb') as pkl_f:
+            pickle.dump(best_model, pkl_f)
+        logger.info('Pickle saved: %s (%.1f KB)', pkl_path, pkl_path.stat().st_size / 1024)
+
+        write_metadata(
+            meta_path,
+            study=study_name,
+            target_channel=target_channel,
+            input_channels=id_in_atlas,
+            model_type=best_name,
+            cv_r2=cv_r2,
+            cv_r2_std=cv_r2_std,
+            test_r2=test_r2,
+            test_mae=test_mae,
+            n_train=len(X_train),
+            n_test=len(X_test),
+            atlas_version=ATLAS_VERSION,
+            sum_normalized=True,
+            std_method=std_method,
+            global_std=global_std,
+            onnx_input_dtype=onnx_input_dtype,
+        )
+
+        summary_rows.append({
+            'study': study_name,
+            'target': target_channel,
+            'model': best_name,
+            'std_method': std_method,
+            'cv_R²': cv_r2,
+            'test_R²': test_r2,
+            'test_MAE': test_mae,
+            'onnx_kb': onnx_path.stat().st_size // 1024,
+        })
+
+        if options.database_config_file is not None:
+            model_records.append({
+                'study': study_name,
+                'target_channel': target_channel,
+                'input_channels': id_in_atlas,
+                'architecture_type': best_name,
+                'std_method': std_method,
+                'onnx_input_dtype': onnx_input_dtype,
+                'atlas_version': ATLAS_VERSION,
+                'cv_r2': cv_r2,
+                'test_r2': test_r2,
+                'test_mae': test_mae,
+                'n_train': len(X_train),
+                'n_test': len(X_test),
+                'training_time_seconds': train_seconds,
+                'onnx_bytes': onnx_path.read_bytes(),
+            })
+    return model_counter
 

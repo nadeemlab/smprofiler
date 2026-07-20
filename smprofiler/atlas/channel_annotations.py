@@ -18,6 +18,7 @@ from pathlib import Path
 from io import StringIO
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
+from smprofiler.atlas.cache import StandaloneSQLiteHTTPCache
 
 logger = colorized_logger(__name__)
 
@@ -75,10 +76,14 @@ def load_channel_annotations_from_api(
     return load_channel_annotations_from_files(annotations_file, aliases_file)
 
 def _get_and_fill_buffer(url: str, timeout: int) -> StringIO:
+    response_body = StandaloneSQLiteHTTPCache.retrieve_response(url)
+    if not response_body:
+        request = urllib.request.Request(url, headers={'Accept': 'application/json'})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            response_body = response.read()
+            StandaloneSQLiteHTTPCache.cache_response(url, response_body)
     f = StringIO()
-    request = urllib.request.Request(url, headers={'Accept': 'application/json'})
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        f.write(response.read().decode())
+    f.write(response_body.decode())
     f.seek(0)
     return f
 

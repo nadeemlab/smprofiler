@@ -61,10 +61,9 @@ def report_parquet_attributes(path: Path, smprofiler_to_atlas: dict[str, str]) -
 def load_atlas_subset(
     parquet_path: Path,
     atlas_columns: list[str],
-    spt_names: list[str],
     max_cells: int | None = None,
     rng: np.random.Generator | None = None,
-) -> tuple[np.ndarray, list[str]]:
+) -> np.ndarray:
     """
     Load specific gene columns from the atlas Parquet table into memory.
 
@@ -73,12 +72,11 @@ def load_atlas_subset(
         atlas_columns: atlas gene names to load (may contain duplicates when
             several SPT channels share one atlas gene; each entry becomes its
             own output column)
-        spt_names: corresponding SPT channel names (same length as atlas_columns)
         max_cells: if set, randomly sample this many cells
         rng: random number generator for sampling
 
     Returns:
-        (X, spt_names) where X has shape (n_cells, len(atlas_columns)).
+        X where X has shape (n_cells, len(atlas_columns)).
     """
     logger.info("Loading %d atlas columns from parquet: %s", len(atlas_columns), atlas_columns)
     t0 = time.monotonic()
@@ -114,4 +112,5 @@ def load_atlas_subset(
         X.shape,
         X.nbytes / 1024 ** 2,
     )
-    return X, spt_names
+    return X
+

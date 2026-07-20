@@ -5,6 +5,8 @@ The table lives in the shared metaschema, so use a metaschema cursor
 versioned snapshot: multiple rows may share a (study, target_channel), ordered by
 ``created``.
 """
+from pathlib import Path
+
 from psycopg import Cursor as PsycopgCursor
 
 from smprofiler.db.database_connection import DBCursor
