@@ -10,8 +10,8 @@ from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
-from sklearn import GaussianProcessRegressor
-from sklearn import BayesianRidge
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.linear_model import BayesianRidge
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import DoubleTensorType
 from skl2onnx.common.data_types import FloatTensorType

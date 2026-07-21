@@ -9,7 +9,7 @@ Orchestrates the end-to-end run:
 
 The command line adapter for ``run`` lives in ``smprofiler.atlas.scripts.train_atlas_models``.
 """
-import pickle
+from typing import cast
 import json
 import time
 from pathlib import Path
@@ -21,6 +21,7 @@ from attrs import define
 from numpy.random import default_rng
 from numpy.random import Generator as RandomNumberGenerator
 from numpy import newaxis as np_newaxis
+from numpy.typing import NDArray
 
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
@@ -149,7 +150,7 @@ def _report_plan_options(plan: tuple[TrainingScenarioStudy, ...], options: Train
         logger.info('Using full atlas (no cell limit)')
     logger.info('Cross-validation folds: %d', options.cv_folds)
 
-def _report_execution_summary(options: TrainingOptions, run_start, number_models: int, summary_rows: list):
+def _report_execution_summary(options: TrainingOptions, run_start, number_models: int, summary_rows: list[dict]):
     total_elapsed = format_elapsed(time.monotonic() - run_start)
     section(f'Training complete — {number_models} models in {total_elapsed}')
     if summary_rows:
@@ -341,109 +342,124 @@ def _train_models_for_study(
             f'study="{study_name}"  target="{atlas_channel}"  '
             f'({counter}/{len(targets)} in study)'
         )
-
-        target_channel = atlas_channel
-        target_col = column_index
-        y = X_unscaled[:, target_col] / sums
-
-        if y.std() < 1e-6:
-            logger.warning("Skipping: target '%s' has near-zero variance", target_channel)
-            continue
-
-        logger.info('  Features : %d identity markers, %s cells (after S>0 filter)',
-                    X_identity.shape[1], f'{X_identity.shape[0]:,}')
-        logger.info('  Target   : "%s" (norm; range %.4f – %.4f, mean %.4f)',
-                    target_channel, float(y.min()), float(y.max()), float(y.mean()))
-
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_identity, y, test_size=0.2, random_state=42
+        _train_model_one_marker(
+            column_index,
+            smprofiler_channel,
+            final_channel_names,
+            X_unscaled,
+            sums,
+            X_identity,
+            options,
+            scenario,
+            summary_rows,
+            model_records,
         )
-        logger.info('  Split    : %s train / %s test', '{len(X_train):,}', f'{len(X_test):,}')
-        logger.info('  Training %d model candidates with %d-fold CV …', len(build_model_candidates()), options.cv_folds)
-        t_train_start = time.monotonic()
-        best_name, best_model, cv_r2, cv_r2_std = train_and_select_best(
-            X_train, y_train, cv_folds=options.cv_folds
-        )
-
-        y_pred_mean, y_pred_std = best_model.predict(X_test, return_std=True)
-        test_r2 = float(r2_score(y_test, y_pred_mean))
-        test_mae = float(mean_absolute_error(y_test, y_pred_mean))
-        residuals = y_test - y_pred_mean
-        global_std = float(residuals.std())
-        std_method = 'return_std keyword arg in sklearn or "std" output in onnx'
-        double_precision = best_name == 'gaussian_process'
-        onnx_input_dtype = 'float64' if double_precision else 'float32'
-        train_seconds = time.monotonic() - t_train_start
-        train_elapsed = format_elapsed(train_seconds)
-        logger.info(
-            '  Result   : model="%s"  test_R²=%.4f  test_MAE=%.4f'
-            '  std_method=%s  global_std=%.4f  [%s]',
-            best_name, test_r2, test_mae, std_method, global_std, train_elapsed,
-        )
-
-        # Sanitize channel name for filesystem
-        safe_target = target_channel.replace('/', '_').replace(' ', '_')
-        study_out_dir = options.output_dir / study_name
-        onnx_path = study_out_dir / f'{safe_target}.onnx'
-        meta_path = study_out_dir / f'{safe_target}.meta.json'
-
-        export_to_onnx(best_model, X_identity.shape[1], onnx_path, double_precision=double_precision)
-
-        n_validate = min(500, X_test.shape[0])
-        validate_onnx(onnx_path, best_model, X_test[:n_validate], double_precision=double_precision)
-
-        # Keep the sklearn pickle too: per-cell std is computed in Python, not from ONNX.
-        study_out_dir.mkdir(parents=True, exist_ok=True)
-        with open(pkl_path, 'wb') as pkl_f:
-            pickle.dump(best_model, pkl_f)
-        logger.info('Pickle saved: %s (%.1f KB)', pkl_path, pkl_path.stat().st_size / 1024)
-
-        write_metadata_to_file(
-            meta_path,
-            study=study_name,
-            target_channel=target_channel,
-            input_channels=id_in_atlas,
-            model_type=best_name,
-            cv_r2=cv_r2,
-            cv_r2_std=cv_r2_std,
-            test_r2=test_r2,
-            test_mae=test_mae,
-            n_train=len(X_train),
-            n_test=len(X_test),
-            atlas_version=ATLAS_VERSION,
-            sum_normalized=True,
-            std_method=std_method,
-            global_std=global_std,
-            onnx_input_dtype=onnx_input_dtype,
-        )
-
-        summary_rows.append({
-            'study': study_name,
-            'target': target_channel,
-            'model': best_name,
-            'std_method': std_method,
-            'cv_R²': cv_r2,
-            'test_R²': test_r2,
-            'test_MAE': test_mae,
-            'onnx_kb': onnx_path.stat().st_size // 1024,
-        })
-
-        if options.database_config_file is not None:
-            model_records.append({
-                'study': study_name,
-                'target_channel': target_channel,
-                'input_channels': id_in_atlas,
-                'architecture_type': best_name,
-                'std_method': std_method,
-                'onnx_input_dtype': onnx_input_dtype,
-                'atlas_version': ATLAS_VERSION,
-                'cv_r2': cv_r2,
-                'test_r2': test_r2,
-                'test_mae': test_mae,
-                'n_train': len(X_train),
-                'n_test': len(X_test),
-                'training_time_seconds': train_seconds,
-                'onnx_bytes': onnx_path.read_bytes(),
-            })
     return model_counter
+
+def _train_model_one_marker(
+    column_index: int,
+    smprofiler_channel: str,
+    final_channel_names: list[str],
+    X_unscaled: NDArray,
+    sums: NDArray,
+    X_identity: NDArray,
+    options: TrainingOptions,
+    scenario: TrainingScenarioStudy,
+    summary_rows: list[dict],
+    model_records: list[dict],
+) -> None:
+    target_channel = smprofiler_channel
+    target_col = column_index
+    y = X_unscaled[:, target_col] / sums
+
+    if y.std() < 1e-6:
+        logger.warning("Skipping: target '%s' has near-zero variance", target_channel)
+        return
+
+    logger.info('  Features : %d identity markers, %s cells (after S>0 filter)', X_identity.shape[1], f'{X_identity.shape[0]:,}')
+    logger.info('  Target   : "%s" (norm; range %.4f – %.4f, mean %.4f)', target_channel, float(y.min()), float(y.max()), float(y.mean()))
+
+    X_train, X_test, y_train, y_test = cast(tuple[NDArray, NDArray, NDArray, NDArray], train_test_split(
+        X_identity, y, test_size=0.2, random_state=42
+    ))
+    logger.info('  Split    : %s train / %s test', '{len(X_train):,}', f'{len(X_test):,}')
+    logger.info('  Training %d model candidates with %d-fold CV …', len(build_model_candidates()), options.cv_folds)
+    t_train_start = time.monotonic()
+    best_name, best_model, cv_r2, cv_r2_std = train_and_select_best(
+        X_train, y_train, cv_folds=options.cv_folds
+    )
+
+    y_pred_mean, y_pred_std = best_model.predict(X_test, return_std=True)
+    test_r2 = float(r2_score(y_test, y_pred_mean))
+    test_mae = float(mean_absolute_error(y_test, y_pred_mean))
+    residuals = y_test - y_pred_mean
+    global_std = float(residuals.std())
+    std_method = 'return_std keyword arg in sklearn or "std" output in onnx'
+    double_precision = best_name == 'gaussian_process'
+    onnx_input_dtype = 'float64' if double_precision else 'float32'
+    train_seconds = time.monotonic() - t_train_start
+    train_elapsed = format_elapsed(train_seconds)
+    logger.info(
+        '  Result   : model="%s"  test_R²=%.4f  test_MAE=%.4f'
+        '  std_method=%s  global_std=%.4f  [%s]',
+        best_name, test_r2, test_mae, std_method, global_std, train_elapsed,
+    )
+
+    safe_target = target_channel.replace('/', '_').replace(' ', '_')
+    study_out_dir = options.output_dir / scenario.study_handle
+    onnx_path = study_out_dir / f'{safe_target}.onnx'
+    meta_path = study_out_dir / f'{safe_target}.meta.json'
+
+    export_to_onnx(best_model, X_identity.shape[1], onnx_path, double_precision=double_precision)
+
+    n_validate = min(500, X_test.shape[0])
+    validate_onnx(onnx_path, best_model, X_test[:n_validate], double_precision=double_precision)
+
+    write_metadata_to_file(
+        meta_path,
+        study=scenario.study_handle,
+        target_channel=target_channel,
+        input_channels=final_channel_names,
+        model_type=best_name,
+        cv_r2=cv_r2,
+        cv_r2_std=cv_r2_std,
+        test_r2=test_r2,
+        test_mae=test_mae,
+        n_train=len(X_train),
+        n_test=len(X_test),
+        atlas_version=ATLAS_VERSION,
+        sum_normalized=True,
+        std_method=std_method,
+        global_std=global_std,
+        onnx_input_dtype=onnx_input_dtype,
+    )
+
+    summary_rows.append({
+        'study': scenario.study_handle,
+        'target': target_channel,
+        'model': best_name,
+        'std_method': std_method,
+        'cv_R²': cv_r2,
+        'test_R²': test_r2,
+        'test_MAE': test_mae,
+        'onnx_kb': onnx_path.stat().st_size // 1024,
+    })
+
+    if options.database_config_file is not None:
+        model_records.append({
+            'study': scenario.study_handle,
+            'target_channel': smprofiler_channel,
+            'input_channels': final_channel_names,
+            'architecture_type': best_name,
+            'std_method': std_method,
+            'onnx_input_dtype': onnx_input_dtype,
+            'atlas_version': ATLAS_VERSION,
+            'cv_r2': cv_r2,
+            'test_r2': test_r2,
+            'test_mae': test_mae,
+            'n_train': len(X_train),
+            'n_test': len(X_test),
+            'training_time_seconds': train_seconds,
+            'onnx_bytes': onnx_path.read_bytes(),
+        })
 

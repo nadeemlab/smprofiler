@@ -1,17 +1,4 @@
 """Run a trained atlas-reference model to determine per-cell "atlas-relative" z-scores.
-
-Typical usage — starting from ONNX model (e.g. the ``/atlas-model/`` API
-endpoint, or local file)::
-
-    from smprofiler.atlas.inference import load_model, atlas_relative_positive
-
-    session = load_model(onnx_bytes)
-    # identity_intensities: shape (n_cells, n_identity), columns in the order of the
-    # model's `input_channels` metadata; measured_functional: shape (n_cells,).
-    z_score = atlas_relative_z_score(session, identity_intensities, measured_functional)
-
-Pass **raw** intensities: identity intensities are sum-normalized internally to
-match how the model was trained.
 """
 from typing import cast
 
@@ -68,16 +55,7 @@ def atlas_relative_positive(
     measured_functional,
 ) -> np.ndarray:
     """Boolean per cell: is the measured intensity above the atlas expectation?
-
-    Args:
-        session: session from :func:`load_model`.
-        identity_intensities: see :func:`predict_expected_intensity`.
-        measured_functional: array of shape ``(n_cells,)`` — the measured raw
-            intensity of the model's target (functional) channel.
-
-    Returns:
-        Boolean array of shape ``(n_cells,)``. Cells with no reference (zero
-        identity sum) are ``False``.
+    See ``compute_marker_z_score``.
     """
     z_score = compute_marker_z_score(session, identity_intensities, measured_functional)
     with np.errstate(invalid='ignore'):
