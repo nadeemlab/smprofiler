@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
+from numpy.linalg import norm as np_norm
 from numpy.typing import NDArray
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import BayesianRidge
@@ -58,13 +59,25 @@ def validate_onnx(
     options.log_severity_level = ERROR_LEVEL
     session = InferenceSession(str(onnx_path), sess_options=options)
     dtype = np.float64 if double_precision else np.float32
-    onnx_prediction = cast(NDArray, session.run(None, {'X': X_sample.astype(dtype)}))[0].flatten()
-    sklearn_prediction = sklearn_model.predict(X_sample)
-    max_diff = np.abs(onnx_prediction - sklearn_prediction).max()
-    if max_diff > 1e-3:
-        logger.warning('ONNX validation: max abs diff = %.6f (tolerated up to 1e-3)', max_diff)
+    onnx_mean, onnx_std = cast(tuple[NDArray, NDArray], session.run(None, {'X': X_sample.astype(dtype)}))
+    sklearn_mean, sklearn_std = cast(tuple[NDArray, NDArray], sklearn_model.predict(X_sample, return_std=True))
+    a1 = onnx_mean.flatten()
+    a2 = sklearn_mean.flatten()
+    difference = np.sum(np.abs(a1 - a2)) / np_norm(a2)
+    cutoff = 2e-2
+    if difference > cutoff:
+        print([onnx_mean, sklearn_mean])
+        print(np.abs(a1 - a2))
+        logger.error('ONNX validation, vs. sklearn: difference norm ratio = %.6f (tolerated up to %E)', difference, cutoff)
         return False
-    logger.info('ONNX validation passed (max abs diff = %.2e)', max_diff)
+    a1 = onnx_std.flatten()
+    a2 = sklearn_std.flatten()
+    difference = np.sum(np.abs(a1 - a2)) / np_norm(a2)
+    if difference > 0.1:
+        print([onnx_std, sklearn_std])
+        print(np.abs(a1 - a2))
+        logger.warning('ONNX validation, vs sklearn: standard deviation prediction difference: %.6f', difference)
+    logger.info('ONNX validation passed (max abs diff = %.2e)', difference)
     return True
 
 

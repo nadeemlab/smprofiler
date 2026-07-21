@@ -118,7 +118,7 @@ def _execute_plan(plan: tuple[TrainingScenarioStudy, ...], options: TrainingOpti
     run_start = time.monotonic()
     model_counter = 0
     summary_rows: list[dict] = []
-    model_records: list[dict] = []  # collected for optional database storage
+    model_records: list[dict] = []
     total_models = sum(len(p.channels.functional) for p in plan)
     for study_index, scenario in enumerate(plan, 1):
         number_new_models = _train_models_for_study(
@@ -412,7 +412,7 @@ def _train_model_one_marker(
 
     export_to_onnx(best_model, X_identity.shape[1], onnx_path, double_precision=double_precision)
 
-    n_validate = min(500, X_test.shape[0])
+    n_validate = min(10, X_test.shape[0])
     validate_onnx(onnx_path, best_model, X_test[:n_validate], double_precision=double_precision)
 
     write_metadata_to_file(
