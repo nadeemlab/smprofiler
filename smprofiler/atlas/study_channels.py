@@ -50,6 +50,9 @@ def _retrieve_study_channels_from_api(
         smprofiler_normalized = normalize_name(study_specific, aliases)
         atlas_specific = smprofiler_to_atlas.get(smprofiler_normalized, None)
         if atlas_specific is None:
+            logger.warning(
+                f'Could not resolve study_specific="{study_specific}" or smprofiler_normalized={smprofiler_normalized} to atlas name.'
+            )
             continue
         channels.append(StudyChannel(study_specific, smprofiler_normalized, atlas_specific))
     identity = tuple(filter(lambda c: c.smprofiler_normalized in identity_channels, channels))

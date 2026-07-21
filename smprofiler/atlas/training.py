@@ -37,7 +37,7 @@ from smprofiler.atlas.atlas_data import load_atlas_subset
 from smprofiler.atlas.atlas_data import load_channel_mapping
 from smprofiler.atlas.model_selection_fitting import build_model_candidates
 from smprofiler.atlas.model_selection_fitting import train_and_select_best
-from smprofiler.atlas.artifacts import export_to_onnx, validate_onnx, write_metadata
+from smprofiler.atlas.artifacts import export_to_onnx, validate_onnx, write_metadata_to_file
 
 logger = colorized_logger(__name__)
 
@@ -120,7 +120,17 @@ def _execute_plan(plan: tuple[TrainingScenarioStudy, ...], options: TrainingOpti
     model_records: list[dict] = []  # collected for optional database storage
     total_models = sum(len(p.channels.functional) for p in plan)
     for study_index, scenario in enumerate(plan, 1):
-        number_new_models = _train_models_for_study(scenario, options, total_models, len(plan), random_number_generator, summary_rows, model_records, study_index, model_counter)
+        number_new_models = _train_models_for_study(
+            scenario,
+            options,
+            total_models,
+            len(plan),
+            random_number_generator,
+            summary_rows,
+            model_records,
+            study_index,
+            model_counter,
+        )
         model_counter += number_new_models
 
     _store_models_in_db(options.database_config_file, model_records)
@@ -290,47 +300,34 @@ def _train_models_for_study(
     logger.info('  Identity features : %s', id_in_atlas)
     logger.info('  Functional targets: %s', fn_in_atlas)
 
-    # Load all needed atlas columns in one shot (identity + all functional targets)
-    #needed_spt = id_in_atlas + [f for f in fn_in_atlas if f not in id_in_atlas]
-    #needed_atlas = [spt_to_atlas[c] for c in needed_spt]
-
     if len(set(id_in_atlas).intersection(fn_in_atlas)) > 0:
         raise ValueError(f'Functional markers overlap with identity markers: {fn_in_atlas}; {id_in_atlas}')
     atlas_channels_for_training = id_in_atlas + fn_in_atlas
 
-    X_all = load_atlas_subset(
+    X_unfiltered_unscaled = load_atlas_subset(
         options.parquet_atlas_path,
         atlas_channels_for_training,
         max_cells=options.max_cells,
         rng=random_number_generator,
     )
-
-    # the below will pick out only one column fo reach name... if name is duplicated, it's dropped. That's wrong right?
-    #col_idx = {name: i for i, name in enumerate(atlas_channels_for_training)}
-    #X_identity = X_all[:, [col_idx[c] for c in id_in_atlas]]
-
-    #col_idx = {name: i for i, name in enumerate(atlas_channels_for_training)}
-    X_identity = X_all[:, [i for i, name in enumerate(atlas_channels_for_training) if name in id_in_atlas]]
+    X_identity_unscaled = X_unfiltered_unscaled[:, [i for i, name in enumerate(atlas_channels_for_training) if name in id_in_atlas]]
 
 
-    # TODO: below filtering needs to happen before subselection
-    # Sum-normalize by identity-channel row sums (removes overall scale effect).
-    row_sums = X_identity.sum(axis=1)
-    valid_mask = row_sums > 1e-8
+    row_sums_all = X_identity_unscaled.sum(axis=1)
+    valid_mask = row_sums_all > 1e-8
     n_zero_sum = int((~valid_mask).sum())
     if n_zero_sum:
         logger.info('  Removed %d cells with zero identity-channel sum', n_zero_sum)
-    X_identity_norm = X_identity[valid_mask] / row_sums[valid_mask, np_newaxis]
-    X_all_filtered = X_all[valid_mask]
-    S_valid = row_sums[valid_mask]
+    X_identity = X_identity_unscaled[valid_mask] / row_sums_all[valid_mask, np_newaxis]
+    X_unscaled = X_unfiltered_unscaled[valid_mask]
+    sums = row_sums_all[valid_mask]
     logger.info(
         '  Normalized: %s cells retained  (%.2f%% of loaded)',
-        f'{X_identity_norm.shape[0]:,}',
-        100.0 * X_identity_norm.shape[0] / X_all.shape[0],
+        f'{X_identity.shape[0]:,}',
+        100.0 * X_identity.shape[0] / X_unfiltered_unscaled.shape[0],
     )
 
     model_counter = 0
-#    for target_idx_local, target_channel in enumerate(fn_in_atlas, 1):
     def _is_functional_column(index_channel: tuple[int, str]) -> bool:
         _, atlas_channel = index_channel
         return atlas_channel in fn_in_atlas
@@ -343,23 +340,21 @@ def _train_models_for_study(
             f'({target_index_local}/{len(fn_in_atlas)} in study)'
         )
 
-        #target_col = col_idx[target_channel]
         target_channel = atlas_channel
         target_col = column_index
-        y_norm = X_all_filtered[:, target_col] / S_valid
+        y = X_unscaled[:, target_col] / sums
 
-        # Skip if target has zero variance after normalization (uninformative)
-        if y_norm.std() < 1e-6:
+        if y.std() < 1e-6:
             logger.warning("Skipping: target '%s' has near-zero variance", target_channel)
             continue
 
         logger.info('  Features : %d identity markers, %s cells (after S>0 filter)',
-                    X_identity_norm.shape[1], f'{X_identity_norm.shape[0]:,}')
+                    X_identity.shape[1], f'{X_identity.shape[0]:,}')
         logger.info('  Target   : "%s" (norm; range %.4f – %.4f, mean %.4f)',
-                    target_channel, float(y_norm.min()), float(y_norm.max()), float(y_norm.mean()))
+                    target_channel, float(y.min()), float(y.max()), float(y.mean()))
 
         X_train, X_test, y_train, y_test = train_test_split(
-            X_identity_norm, y_norm, test_size=0.2, random_state=42
+            X_identity, y, test_size=0.2, random_state=42
         )
         logger.info('  Split    : %s train / %s test',
                     f'{len(X_train):,}', f'{len(X_test):,}')
@@ -376,8 +371,7 @@ def _train_models_for_study(
         test_mae = float(mean_absolute_error(y_test, y_pred_mean))
         residuals = y_test - y_pred_mean
         global_std = float(residuals.std())
-        std_method = STD_METHODS[best_name]
-        # GaussianProcess only reproduces in double precision; others use float32.
+        std_method = 'return_std keyword arg in sklearn or "std" output in onnx'
         double_precision = best_name == 'gaussian_process'
         onnx_input_dtype = 'float64' if double_precision else 'float32'
         train_seconds = time.monotonic() - t_train_start
@@ -395,7 +389,7 @@ def _train_models_for_study(
         pkl_path = study_out_dir / f'{safe_target}.pkl'
         meta_path = study_out_dir / f'{safe_target}.meta.json'
 
-        export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path,
+        export_to_onnx(best_model, X_identity.shape[1], onnx_path,
                        double_precision=double_precision)
 
         n_validate = min(500, X_test.shape[0])
@@ -408,7 +402,7 @@ def _train_models_for_study(
             pickle.dump(best_model, pkl_f)
         logger.info('Pickle saved: %s (%.1f KB)', pkl_path, pkl_path.stat().st_size / 1024)
 
-        write_metadata(
+        write_metadata_to_file(
             meta_path,
             study=study_name,
             target_channel=target_channel,
