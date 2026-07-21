@@ -48,11 +48,12 @@ def test_store_atlas_model_builds_insert_and_returns_id():
     assert len(cursor.calls) == 1
     sql, params = cursor.calls[0]
     assert "INSERT INTO atlas_model" in sql and "RETURNING id" in sql
-    assert len(params) == 15, params
+    assert len(params) == 16, params
     assert params[0] == "luad" and params[1] == "FOXP3"
     assert params[2] == ["CD4", "CD8"]        # input_channels stays a list (-> text[])
-    assert params[13] == len(onnx_bytes)      # size_bytes derived from the bytes
-    assert params[14] == onnx_bytes           # raw ONNX bytes last
+    assert params[6] is True                  # onnx_has_std defaults to True
+    assert params[14] == len(onnx_bytes)      # size_bytes derived from the bytes
+    assert params[15] == onnx_bytes           # raw ONNX bytes last
 
 
 def test_list_atlas_models_filters_and_orders():

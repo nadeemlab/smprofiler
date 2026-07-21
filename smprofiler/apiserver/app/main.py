@@ -962,6 +962,8 @@ async def get_atlas_model(
       single input tensor `X`
     - `X-Input-Channels`: comma-separated identity channels, in input order
     - `X-Architecture-Type`, `X-Std-Method`
+    - `X-Onnx-Has-Std`: `true` when the graph has a second output (per-sample std),
+      the input the z-score is computed from
 
     Run it with onnxruntime (Python or onnxruntime-web); usage examples are in
     [docs/atlas_models.md](https://github.com/nadeemlab/SMProfiler/blob/main/docs/atlas_models.md).
@@ -995,6 +997,7 @@ async def get_atlas_model(
             "X-Input-Channels": ",".join(metadata["input_channels"]),
             "X-Architecture-Type": metadata["architecture_type"],
             "X-Std-Method": metadata["std_method"],
+            "X-Onnx-Has-Std": str(metadata["onnx_has_std"]).lower(),
         },
     )
 

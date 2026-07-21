@@ -10,7 +10,6 @@ expression table (Parquet) and train and export one regression model per
 error. The command line adapter lives in
 ``smprofiler.atlas.scripts.train_atlas_models``.
 """
-import pickle
 import time
 from pathlib import Path
 
@@ -260,17 +259,26 @@ def run(
             logger.info("  Split    : %s train / %s test",
                         f"{len(X_train):,}", f"{len(X_test):,}")
 
+            # Mean-center the target: the Gaussian Process is fitted with a zero-mean
+            # prior (normalize_y=False, required for its return_std ONNX export), so it
+            # needs centered targets to fit well. The offset is baked back into the
+            # exported ONNX mean output; metrics below are on the centered scale but R²
+            # and MAE are shift-invariant, so they equal the raw-scale values.
+            y_offset = float(y_train.mean())
+            y_train_c = y_train - y_offset
+            y_test_c = y_test - y_offset
+
             logger.info("  Training %d model candidates with %d-fold CV …",
                         len(build_model_candidates()), cv_folds)
             t_train_start = time.monotonic()
             best_name, best_model, cv_r2, cv_r2_std = train_and_select_best(
-                X_train, y_train, cv_folds=cv_folds
+                X_train, y_train_c, cv_folds=cv_folds
             )
 
             y_pred_mean, y_pred_std = predict_with_std(best_model, best_name, X_test)
-            test_r2 = float(r2_score(y_test, y_pred_mean))
-            test_mae = float(mean_absolute_error(y_test, y_pred_mean))
-            residuals = y_test - y_pred_mean
+            test_r2 = float(r2_score(y_test_c, y_pred_mean))
+            test_mae = float(mean_absolute_error(y_test_c, y_pred_mean))
+            residuals = y_test_c - y_pred_mean
             global_std = float(residuals.std())
             std_method = STD_METHODS[best_name]
             # GaussianProcess only reproduces in double precision; others use float32.
@@ -288,21 +296,18 @@ def run(
             safe_target = target_channel.replace("/", "_").replace(" ", "_")
             study_out_dir = output_dir / study_name
             onnx_path = study_out_dir / f"{safe_target}.onnx"
-            pkl_path = study_out_dir / f"{safe_target}.pkl"
             meta_path = study_out_dir / f"{safe_target}.meta.json"
 
+            # Export with the per-sample std as a second output, and bake the
+            # centering offset back into the mean output.
             export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path,
-                           double_precision=double_precision)
+                           double_precision=double_precision,
+                           return_std=True, target_offset=y_offset)
 
             n_validate = min(500, X_test.shape[0])
             validate_onnx(onnx_path, best_model, X_test[:n_validate],
-                          double_precision=double_precision)
-
-            # Keep the sklearn pickle too: per-cell std is computed in Python, not from ONNX.
-            study_out_dir.mkdir(parents=True, exist_ok=True)
-            with open(pkl_path, "wb") as pkl_f:
-                pickle.dump(best_model, pkl_f)
-            logger.info("Pickle saved: %s (%.1f KB)", pkl_path, pkl_path.stat().st_size / 1024)
+                          double_precision=double_precision,
+                          target_offset=y_offset, expected_std=y_pred_std[:n_validate])
 
             write_metadata(
                 meta_path,
@@ -321,6 +326,8 @@ def run(
                 std_method=std_method,
                 global_std=global_std,
                 onnx_input_dtype=onnx_input_dtype,
+                onnx_has_std=True,
+                target_offset=y_offset,
             )
 
             summary_rows.append({
@@ -342,6 +349,7 @@ def run(
                     "architecture_type": best_name,
                     "std_method": std_method,
                     "onnx_input_dtype": onnx_input_dtype,
+                    "onnx_has_std": True,
                     "atlas_version": ATLAS_VERSION,
                     "cv_r2": cv_r2,
                     "test_r2": test_r2,

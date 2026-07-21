@@ -16,6 +16,7 @@ CREATE TABLE atlas_model (
     architecture_type VARCHAR NOT NULL,
     std_method VARCHAR NOT NULL,
     onnx_input_dtype VARCHAR NOT NULL,
+    onnx_has_std BOOLEAN NOT NULL DEFAULT true,
     atlas_version VARCHAR,
     cv_r2 DOUBLE PRECISION,
     test_r2 DOUBLE PRECISION,

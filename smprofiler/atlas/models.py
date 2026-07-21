@@ -1,22 +1,30 @@
 """Regression model candidates, cross-validated selection, and prediction.
 
 Only architectures whose predictive standard deviation genuinely depends on the
-input ``x`` are considered — so that the per-cell "atlas-relative" call can use a
-context-aware uncertainty, not a single global residual std. Concretely:
+input ``x`` **and** can be emitted as a native second ONNX output are considered,
+so the per-cell z-score computed at inference reads its uncertainty straight from
+the ONNX model — no separate Python/pickle path. Concretely:
 
 - ``bayesian_ridge`` — Bayesian posterior predictive std,
-- ``gaussian_process`` — GP posterior predictive std,
-- ``random_forest`` / ``extra_trees`` — spread across the individual trees.
+- ``gaussian_process`` — GP posterior predictive std.
 
-Purely-mean regressors (ridge, elastic net, huber, gradient boosting) are
-excluded because they offer only an input-independent residual std.
-``predict_with_std`` raises for any model outside this set, keeping the invariant
-enforced in code.
+Both convert with skl2onnx's ``options={<estimator>: {"return_std": True}}`` to a
+two-output graph (mean, std). Tree ensembles (random forest / extra trees) were
+dropped: their uncertainty is the spread across ``estimators_``, which the ONNX
+``TreeEnsembleRegressor`` op collapses and cannot expose. Purely-mean regressors
+(ridge, elastic net, huber, gradient boosting) are excluded because they offer
+only an input-independent residual std. ``predict_with_std`` raises for any model
+outside this set, keeping the invariant enforced in code.
+
+The Gaussian Process uses ``normalize_y=False`` because skl2onnx's ``return_std``
+converter crashes on the y-rescaling that ``normalize_y=True`` introduces. To keep
+GP fit quality with a zero-mean prior, callers train on **mean-centered** targets
+(see :mod:`smprofiler.atlas.training`) and the constant offset is baked back into
+the exported ONNX graph (see :func:`smprofiler.atlas.artifacts.export_to_onnx`).
 """
 import time
 
 import numpy as np
-from sklearn.ensemble import ExtraTreesRegressor, RandomForestRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel, WhiteKernel
 from sklearn.linear_model import BayesianRidge
@@ -34,12 +42,10 @@ logger = colorized_logger(__name__)
 # many (randomly sampled) cells. Other candidates train on the full set.
 MAX_GP_TRAIN_SAMPLES = 2000
 
-# Models whose predictive std depends on x (see module docstring).
+# Models whose predictive std depends on x and exports as a native ONNX output.
 STD_METHODS = {
     "bayesian_ridge": "bayesian_posterior",
     "gaussian_process": "gaussian_posterior",
-    "random_forest": "tree_variance",
-    "extra_trees": "tree_variance",
 }
 
 
@@ -47,28 +53,12 @@ def build_model_candidates() -> list[tuple[str, object]]:
     """Return list of (name, sklearn_estimator) for all candidate models.
 
     Every candidate exposes an input-dependent predictive std via
-    :func:`predict_with_std`; see the module docstring.
+    :func:`predict_with_std` and a native second ONNX output; see the module
+    docstring. The final estimator name in each pipeline matches the candidate
+    name so :func:`predict_with_std` can reach it via ``named_steps``.
     """
     gp_kernel = ConstantKernel(1.0) * RBF(length_scale=1.0) + WhiteKernel(noise_level=1.0)
     return [
-        (
-            "extra_trees",
-            ExtraTreesRegressor(
-                n_estimators=100,
-                max_depth=8,
-                n_jobs=-1,
-                random_state=42,
-            ),
-        ),
-        (
-            "random_forest",
-            RandomForestRegressor(
-                n_estimators=100,
-                max_depth=8,
-                n_jobs=-1,
-                random_state=42,
-            ),
-        ),
         (
             "bayesian_ridge",
             Pipeline([
@@ -82,7 +72,7 @@ def build_model_candidates() -> list[tuple[str, object]]:
                 ("scaler", StandardScaler()),
                 ("gaussian_process", GaussianProcessRegressor(
                     kernel=gp_kernel,
-                    normalize_y=True,
+                    normalize_y=False,  # see module docstring: keeps return_std ONNX export working
                     random_state=42,
                 )),
             ]),
@@ -161,25 +151,22 @@ def predict_with_std(
 
     y_std is a per-sample predictive std that depends on the input.
 
+    The returned mean/std are on whatever target scale ``model`` was fitted on —
+    for the Gaussian Process that is the mean-centered scale (see the module
+    docstring); the constant offset is reapplied only in the exported ONNX graph.
+
     Dispatch rules:
         bayesian_ridge   → posterior predictive std from BayesianRidge.predict()
         gaussian_process → posterior predictive std from GaussianProcessRegressor
-        random_forest / extra_trees → std across individual tree predictions
 
     Raises:
         ValueError: for any model whose std would not depend on the input.
     """
-    if model_name in ("bayesian_ridge", "gaussian_process"):
+    if model_name in STD_METHODS:
         X_scaled = model.named_steps["scaler"].transform(X_norm)
         inner = model.named_steps[model_name]
         y_mean, y_std = inner.predict(X_scaled, return_std=True)
         return y_mean, y_std
-
-    if model_name in ("random_forest", "extra_trees"):
-        tree_preds = np.stack(
-            [t.predict(X_norm) for t in model.estimators_], axis=0
-        )  # (n_trees, n_samples)
-        return tree_preds.mean(axis=0), tree_preds.std(axis=0)
 
     raise ValueError(
         f"Model '{model_name}' has no input-dependent predictive std; only "

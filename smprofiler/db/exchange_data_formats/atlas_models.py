@@ -8,7 +8,10 @@ class AtlasModelMetadata(BaseModel):
 
     Returned by the ``/atlas-models/`` endpoint. Download the model itself from
     ``/atlas-model/`` using ``id`` (or by ``study`` + ``target_channel``). To run
-    it, feed inputs of dtype ``onnx_input_dtype`` in ``input_channels`` order.
+    it, feed inputs of dtype ``onnx_input_dtype`` in ``input_channels`` order. When
+    ``onnx_has_std`` is true the ONNX graph has two outputs — the expected
+    intensity (index 0) and a per-sample predictive std (index 1) — which inference
+    combines into a z-score.
     """
     id: int
     study: str | None
@@ -17,6 +20,7 @@ class AtlasModelMetadata(BaseModel):
     architecture_type: str
     std_method: str
     onnx_input_dtype: str
+    onnx_has_std: bool
     atlas_version: str | None
     cv_r2: float | None
     test_r2: float | None
