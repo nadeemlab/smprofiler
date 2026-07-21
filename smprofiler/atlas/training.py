@@ -35,9 +35,8 @@ from smprofiler.atlas.study_channels import StudyOrderedChannels
 from smprofiler.atlas.atlas_data import report_parquet_attributes
 from smprofiler.atlas.atlas_data import load_atlas_subset
 from smprofiler.atlas.atlas_data import load_channel_mapping
-from smprofiler.atlas.models import STD_METHODS
-from smprofiler.atlas.models import build_model_candidates
-from smprofiler.atlas.models import train_and_select_best
+from smprofiler.atlas.model_selection_fitting import build_model_candidates
+from smprofiler.atlas.model_selection_fitting import train_and_select_best
 from smprofiler.atlas.artifacts import export_to_onnx, validate_onnx, write_metadata
 
 logger = colorized_logger(__name__)

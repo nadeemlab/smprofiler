@@ -33,8 +33,7 @@ def train_and_select_best(
     performances: list[tuple[float, float]] = []
     for name, model_architecture in tqdm(candidates, desc='  CV candidates', leave=False, bar_format=bar_format):
         mean_r2, std_r2, elapsed = _score_architecture_on_data(model_architecture, X_train, y_train, cv_folds)
-        marker = ' ★' if mean_r2 > best_r2 else ''
-        logger.info('    %-28s R²=%+.4f ± %.4f  [%s]%s', name, mean_r2, std_r2, elapsed, marker)
+        logger.info('    %-28s R²=%+.4f ± %.4f  [%s]%s', name, mean_r2, std_r2, elapsed)
         performances.append((mean_r2, std_r2))
     def key(item: tuple[tuple[str, Pipeline], tuple[float, float]]):
         return item[1][0]
@@ -42,15 +41,15 @@ def train_and_select_best(
     logger.info('  → Refitting winner "%s" on full train set…', best_name)
     t0 = time.monotonic()
     best_model.fit(X_train, y_train)
+    fitted_best_model = best_model
     elapsed = format_elapsed(time.monotonic() - t0)
     logger.info('  → Done in %s  (CV R²=%.4f ± %.4f)', elapsed, best_r2, best_std)
-    return best_name, best_model, best_r2, best_std
+    return best_name, fitted_best_model, best_r2, best_std
 
 
 def build_model_candidates() -> list[tuple[str, Pipeline]]:
     """
     Return list of (name, sklearn_estimator) for all candidate models.
-
     This should include available model architectures for which:
 
     1. Computational complexity is not prohibitive for sample sizes of order around 100k.
