@@ -37,7 +37,6 @@ from smprofiler.atlas.atlas_data import load_atlas_subset
 from smprofiler.atlas.atlas_data import load_channel_mapping
 from smprofiler.atlas.models import STD_METHODS
 from smprofiler.atlas.models import build_model_candidates
-from smprofiler.atlas.models import predict_with_std
 from smprofiler.atlas.models import train_and_select_best
 from smprofiler.atlas.artifacts import export_to_onnx, validate_onnx, write_metadata
 
@@ -315,6 +314,7 @@ def _train_models_for_study(
     X_identity = X_all[:, [i for i, name in enumerate(atlas_channels_for_training) if name in id_in_atlas]]
 
 
+    # TODO: below filtering needs to happen before subselection
     # Sum-normalize by identity-channel row sums (removes overall scale effect).
     row_sums = X_identity.sum(axis=1)
     valid_mask = row_sums > 1e-8
@@ -372,7 +372,7 @@ def _train_models_for_study(
             X_train, y_train, cv_folds=options.cv_folds
         )
 
-        y_pred_mean, y_pred_std = predict_with_std(best_model, best_name, X_test)
+        y_pred_mean, y_pred_std = best_model.predict(X_test, return_std=True)
         test_r2 = float(r2_score(y_test, y_pred_mean))
         test_mae = float(mean_absolute_error(y_test, y_pred_mean))
         residuals = y_test - y_pred_mean
