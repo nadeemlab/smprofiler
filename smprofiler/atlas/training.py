@@ -292,6 +292,8 @@ def _train_models_for_study(
     study_name = scenario.study_handle
     id_in_atlas = list(c.atlas_specific for c in scenario.channels.identity)
     fn_in_atlas = list(c.atlas_specific for c in scenario.channels.functional)
+    final_channel_names = list(c.study_specific for c in scenario.channels.identity)
+    final_target_channel_names = list(c.study_specific for c in scenario.channels.functional)
 
     section(
         f'[{plan_step}/{total_studies}] Study: {study_name}  '
@@ -303,6 +305,7 @@ def _train_models_for_study(
     if len(set(id_in_atlas).intersection(fn_in_atlas)) > 0:
         raise ValueError(f'Functional markers overlap with identity markers: {fn_in_atlas}; {id_in_atlas}')
     atlas_channels_for_training = id_in_atlas + fn_in_atlas
+    smprofiler_channels = final_channel_names + final_target_channel_names
 
     X_unfiltered_unscaled = load_atlas_subset(
         options.parquet_atlas_path,
@@ -311,7 +314,6 @@ def _train_models_for_study(
         rng=random_number_generator,
     )
     X_identity_unscaled = X_unfiltered_unscaled[:, [i for i, name in enumerate(atlas_channels_for_training) if name in id_in_atlas]]
-
 
     row_sums_all = X_identity_unscaled.sum(axis=1)
     valid_mask = row_sums_all > 1e-8
@@ -328,16 +330,16 @@ def _train_models_for_study(
     )
 
     model_counter = 0
-    def _is_functional_column(index_channel: tuple[int, str]) -> bool:
-        _, atlas_channel = index_channel
+    def _is_functional_column(index_channel: tuple[int, tuple[str, str]]) -> bool:
+        _, (atlas_channel, _) = index_channel
         return atlas_channel in fn_in_atlas
-    targets = tuple(filter(_is_functional_column, enumerate(atlas_channels_for_training)))
-    for target_index_local, (column_index, atlas_channel) in enumerate(targets, 1):
+    targets = tuple(filter(_is_functional_column, enumerate(zip(atlas_channels_for_training, smprofiler_channels))))
+    for counter, (column_index, (atlas_channel, smprofiler_channel)) in enumerate(targets, 1):
         model_counter += 1
         subsection(
             f'Model [{model_counter + number_trained}/{total_models}]  '
             f'study="{study_name}"  target="{atlas_channel}"  '
-            f'({target_index_local}/{len(fn_in_atlas)} in study)'
+            f'({counter}/{len(targets)} in study)'
         )
 
         target_channel = atlas_channel
@@ -356,11 +358,8 @@ def _train_models_for_study(
         X_train, X_test, y_train, y_test = train_test_split(
             X_identity, y, test_size=0.2, random_state=42
         )
-        logger.info('  Split    : %s train / %s test',
-                    f'{len(X_train):,}', f'{len(X_test):,}')
-
-        logger.info('  Training %d model candidates with %d-fold CV …',
-                    len(build_model_candidates()), options.cv_folds)
+        logger.info('  Split    : %s train / %s test', '{len(X_train):,}', f'{len(X_test):,}')
+        logger.info('  Training %d model candidates with %d-fold CV …', len(build_model_candidates()), options.cv_folds)
         t_train_start = time.monotonic()
         best_name, best_model, cv_r2, cv_r2_std = train_and_select_best(
             X_train, y_train, cv_folds=options.cv_folds
@@ -386,15 +385,12 @@ def _train_models_for_study(
         safe_target = target_channel.replace('/', '_').replace(' ', '_')
         study_out_dir = options.output_dir / study_name
         onnx_path = study_out_dir / f'{safe_target}.onnx'
-        pkl_path = study_out_dir / f'{safe_target}.pkl'
         meta_path = study_out_dir / f'{safe_target}.meta.json'
 
-        export_to_onnx(best_model, X_identity.shape[1], onnx_path,
-                       double_precision=double_precision)
+        export_to_onnx(best_model, X_identity.shape[1], onnx_path, double_precision=double_precision)
 
         n_validate = min(500, X_test.shape[0])
-        validate_onnx(onnx_path, best_model, X_test[:n_validate],
-                      double_precision=double_precision)
+        validate_onnx(onnx_path, best_model, X_test[:n_validate], double_precision=double_precision)
 
         # Keep the sklearn pickle too: per-cell std is computed in Python, not from ONNX.
         study_out_dir.mkdir(parents=True, exist_ok=True)

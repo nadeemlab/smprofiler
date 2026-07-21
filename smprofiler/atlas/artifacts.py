@@ -10,6 +10,8 @@ from typing import cast
 
 import numpy as np
 from numpy.typing import NDArray
+from sklearn import GaussianProcessRegressor
+from sklearn import BayesianRidge
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import DoubleTensorType
 from skl2onnx.common.data_types import FloatTensorType
@@ -32,7 +34,9 @@ def export_to_onnx(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tensor_type = DoubleTensorType if double_precision else FloatTensorType
     initial_type = [('X', tensor_type([None, number_features]))]
-    onnx_model = cast(ModelProto, convert_sklearn(model, initial_types=initial_type))
+    # For the below, see: https://onnx.ai/sklearn-onnx/auto_examples/plot_gpr.html#return-std-true
+    options = {BayesianRidge: {'return_std': True}, GaussianProcessRegressor: {'return_std': True}}
+    onnx_model = cast(ModelProto, convert_sklearn(model, initial_types=initial_type, options=options))
     with open(output_path, 'wb') as f:
         f.write(onnx_model.SerializeToString())
     size_kb = output_path.stat().st_size / 1024

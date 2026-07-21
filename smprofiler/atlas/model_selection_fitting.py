@@ -6,8 +6,6 @@ import time
 from numpy.typing import NDArray
 from sklearn.linear_model import BayesianRidge
 from sklearn.model_selection import cross_val_score
-from sklearn.preprocessing import Normalizer
-from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from tqdm import tqdm
 
@@ -33,7 +31,7 @@ def train_and_select_best(
     performances: list[tuple[float, float]] = []
     for name, model_architecture in tqdm(candidates, desc='  CV candidates', leave=False, bar_format=bar_format):
         mean_r2, std_r2, elapsed = _score_architecture_on_data(model_architecture, X_train, y_train, cv_folds)
-        logger.info('    %-28s R²=%+.4f ± %.4f  [%s]%s', name, mean_r2, std_r2, elapsed)
+        logger.info('    %-28s R²=%+.4f ± %.4f  [%s]', name, mean_r2, std_r2, elapsed)
         performances.append((mean_r2, std_r2))
     def key(item: tuple[tuple[str, Pipeline], tuple[float, float]]):
         return item[1][0]
@@ -59,8 +57,6 @@ def build_model_candidates() -> list[tuple[str, Pipeline]]:
         (
             'bayesian_ridge',
             Pipeline([
-                ('normalizer', Normalizer(norm='l1')),
-                ('scaler', StandardScaler()),
                 ('bayesian_ridge', BayesianRidge()),
             ]),
         ),

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class AtlasModelMetadata(BaseModel):
-    """Description of one trained atlas-reference model (without the ONNX itself). """
+    """Description of one trained atlas-reference model (without the ONNX model itself)."""
     id: int
     study: str | None
     target_channel: str
@@ -22,3 +22,4 @@ class AtlasModelMetadata(BaseModel):
     training_time_seconds: float | None
     size_bytes: int | None
     created: datetime
+
