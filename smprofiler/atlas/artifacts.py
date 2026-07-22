@@ -49,10 +49,13 @@ def validate_onnx(
     sklearn_model,
     X_sample: NDArray,
     double_precision: bool = False,
-) -> bool:
+) -> tuple[bool, bool]:
     """
     Run the ONNX model and compare output to sklearn's predictions.
-    Returns True if outputs match within tolerance.
+
+    Returns two flags (tuple of booleans) indicating respectively
+    sufficient concordance between the ordinary predictions, and between 
+    the predicted standard deviations.
     """
     options = SessionOptions()
     ERROR_LEVEL = 3
@@ -65,20 +68,17 @@ def validate_onnx(
     a2 = sklearn_mean.flatten()
     difference = np.sum(np.abs(a1 - a2)) / np_norm(a2)
     cutoff = 2e-2
-    if difference > cutoff:
-        print([onnx_mean, sklearn_mean])
-        print(np.abs(a1 - a2))
+    ordinary_prediction_concordance = difference < cutoff
+    if not ordinary_prediction_concordance:
         logger.error('ONNX validation, vs. sklearn: difference norm ratio = %.6f (tolerated up to %E)', difference, cutoff)
-        return False
     a1 = onnx_std.flatten()
     a2 = sklearn_std.flatten()
     difference = np.sum(np.abs(a1 - a2)) / np_norm(a2)
-    if difference > 0.1:
-        print([onnx_std, sklearn_std])
-        print(np.abs(a1 - a2))
+    std_concordance = difference < 0.1
+    if not std_concordance:
         logger.warning('ONNX validation, vs sklearn: standard deviation prediction difference: %.6f', difference)
     logger.info('ONNX validation passed (max abs diff = %.2e)', difference)
-    return True
+    return (ordinary_prediction_concordance, std_concordance)
 
 
 def write_metadata_to_file(

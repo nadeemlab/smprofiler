@@ -117,11 +117,13 @@ def _execute_plan(plan: tuple[TrainingScenarioStudy, ...], options: TrainingOpti
     random_number_generator = default_rng(42)
     run_start = time.monotonic()
     model_counter = 0
+    number_validated = 0
+    number_validated_std = 0
     summary_rows: list[dict] = []
     model_records: list[dict] = []
     total_models = sum(len(p.channels.functional) for p in plan)
     for study_index, scenario in enumerate(plan, 1):
-        number_new_models = _train_models_for_study(
+        number_new_models, validated, validated_std = _train_models_for_study(
             scenario,
             options,
             total_models,
@@ -133,9 +135,11 @@ def _execute_plan(plan: tuple[TrainingScenarioStudy, ...], options: TrainingOpti
             model_counter,
         )
         model_counter += number_new_models
+        number_validated += validated
+        number_validated_std += validated_std
 
     _store_models_in_db(options.database_config_file, model_records)
-    _report_execution_summary(options, run_start, model_counter, summary_rows)
+    _report_execution_summary(options, run_start, model_counter, number_validated, number_validated_std, summary_rows)
 
 def _report_plan_options(plan: tuple[TrainingScenarioStudy, ...], options: TrainingOptions) -> None:
     total_models = sum(len(p.channels.functional) for p in plan)
@@ -150,9 +154,11 @@ def _report_plan_options(plan: tuple[TrainingScenarioStudy, ...], options: Train
         logger.info('Using full atlas (no cell limit)')
     logger.info('Cross-validation folds: %d', options.cv_folds)
 
-def _report_execution_summary(options: TrainingOptions, run_start, number_models: int, summary_rows: list[dict]):
+def _report_execution_summary(options: TrainingOptions, run_start, number_models: int, number_validated: int, number_validated_std: int, summary_rows: list[dict]):
     total_elapsed = format_elapsed(time.monotonic() - run_start)
     section(f'Training complete — {number_models} models in {total_elapsed}')
+    print(f'Number of ONNX models validated against sklearn original, prediction: {number_validated}')
+    print(f'Number of ONNX models validated against sklearn original, standard deviation prediction: {number_validated_std}')
     if summary_rows:
         header = (f'  {"Study":<24}  {"Target":<16}  {"Model":<24}  {"Std method":<22}'
                   f'  {"cv_R²":>8}  {"test_R²":>8}  {"test_MAE":>10}  {"KB":>6}')
@@ -289,7 +295,7 @@ def _train_models_for_study(
     model_records: list[dict],
     plan_step: int,
     number_trained: int,
-) -> int:
+) -> tuple[int, int, int]:
     study_name = scenario.study_handle
     id_in_atlas = list(c.atlas_specific for c in scenario.channels.identity)
     fn_in_atlas = list(c.atlas_specific for c in scenario.channels.functional)
@@ -335,6 +341,8 @@ def _train_models_for_study(
         _, (atlas_channel, _) = index_channel
         return atlas_channel in fn_in_atlas
     targets = tuple(filter(_is_functional_column, enumerate(zip(atlas_channels_for_training, smprofiler_channels))))
+    ordinary_concordances = 0
+    std_concordances = 0
     for counter, (column_index, (atlas_channel, smprofiler_channel)) in enumerate(targets, 1):
         model_counter += 1
         subsection(
@@ -342,7 +350,7 @@ def _train_models_for_study(
             f'study="{study_name}"  target="{atlas_channel}"  '
             f'({counter}/{len(targets)} in study)'
         )
-        _train_model_one_marker(
+        ordinary, std = _train_model_one_marker(
             column_index,
             smprofiler_channel,
             final_channel_names,
@@ -354,7 +362,9 @@ def _train_models_for_study(
             summary_rows,
             model_records,
         )
-    return model_counter
+        ordinary_concordances += 1 if ordinary else 0
+        std_concordances += 1 if std else 0
+    return model_counter, ordinary_concordances, std_concordances
 
 def _train_model_one_marker(
     column_index: int,
@@ -367,14 +377,14 @@ def _train_model_one_marker(
     scenario: TrainingScenarioStudy,
     summary_rows: list[dict],
     model_records: list[dict],
-) -> None:
+) -> tuple[bool, bool]:
     target_channel = smprofiler_channel
     target_col = column_index
     y = X_unscaled[:, target_col] / sums
 
     if y.std() < 1e-6:
         logger.warning("Skipping: target '%s' has near-zero variance", target_channel)
-        return
+        return False, False
 
     logger.info('  Features : %d identity markers, %s cells (after S>0 filter)', X_identity.shape[1], f'{X_identity.shape[0]:,}')
     logger.info('  Target   : "%s" (norm; range %.4f – %.4f, mean %.4f)', target_channel, float(y.min()), float(y.max()), float(y.mean()))
@@ -389,7 +399,7 @@ def _train_model_one_marker(
         X_train, y_train, cv_folds=options.cv_folds
     )
 
-    y_pred_mean, y_pred_std = best_model.predict(X_test, return_std=True)
+    y_pred_mean, _ = best_model.predict(X_test, return_std=True)
     test_r2 = float(r2_score(y_test, y_pred_mean))
     test_mae = float(mean_absolute_error(y_test, y_pred_mean))
     residuals = y_test - y_pred_mean
@@ -412,8 +422,8 @@ def _train_model_one_marker(
 
     export_to_onnx(best_model, X_identity.shape[1], onnx_path, double_precision=double_precision)
 
-    n_validate = min(10, X_test.shape[0])
-    validate_onnx(onnx_path, best_model, X_test[:n_validate], double_precision=double_precision)
+    n_validate = min(100, X_test.shape[0])
+    ordinary, std = validate_onnx(onnx_path, best_model, X_test[:n_validate], double_precision=double_precision)
 
     write_metadata_to_file(
         meta_path,
@@ -462,4 +472,5 @@ def _train_model_one_marker(
             'training_time_seconds': train_seconds,
             'onnx_bytes': onnx_path.read_bytes(),
         })
+    return ordinary, std
 
