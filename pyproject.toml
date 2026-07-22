@@ -45,6 +45,7 @@ repository = "https://github.com/nadeemlab/smprofiler"
 [project.optional-dependencies]
 all = [
     "adiscstudies",
+    "anndata",
     "attrs",
     "bokeh",
     "boto3",
@@ -62,8 +63,11 @@ all = [
     "networkx",
     "numcodecs==0.15.1",
     "numpy",
+    "onnx",
+    "onnxruntime",
     "pandas",
     "psycopg",
+    "pyarrow",
     "pydantic",
     "PyJWT",
     "pymupdf",
@@ -74,6 +78,7 @@ all = [
     "setuptools>=82",
     "scipy",
     "scikit-learn",
+    "skl2onnx",
     "squidpy", "zarr",
     "sqlalchemy",
     "tables",
