@@ -6,16 +6,16 @@ normal dataset. A cell is **atlas-relative positive** for that marker when its
 measured intensity exceeds the model's expectation.
 
 Models are small [ONNX](https://onnx.ai) regressors, one per `(study, target_channel)`, stored in the
-`atlas_model` database table (with metadata and versions). This page documents how to
+`atlas_model` database table with metadata and versions. This page documents how to
 **use** them; for how they are trained see [`smprofiler.atlas`](/smprofiler/atlas).
 
 Every model:
 - Takes in
     1. an input matrix of shape `(number_cells, number_identity_markers)`, with columns
-  in the order of the model's `input_channels`, and
+       in the order of the model's `input_channels`, and
     2. the functional marker column vector of size `number_cells`.
-- Expects inputs **sum-normalized** by each cell's identity-marker row sum (the helpers
-  below do this for you).
+- Expects inputs (both identity and functional markers) normalized by the given cell's 
+  identity-marker row sum (the helpers below do this for you).
 - Returns the standard deviate of the functional marker values relative to expectation.
 
 ## API
@@ -27,15 +27,13 @@ curl "https://smprofiler.io/api/atlas-models/?study=LUAD%20progression"
 curl "https://smprofiler.io/api/atlas-models/?study=LUAD%20progression&target_channel=FOXP3"
 ```
 
-Each item is [`AtlasModelMetadata`](/smprofiler/db/exchange_data_formats/atlas_models.py).
+Each item is in format [`AtlasModelMetadata`](/smprofiler/db/exchange_data_formats/atlas_models.py).
 
 Download the ONNX model itself for the latest model (or a specific `model_id`):
 
 ```sh
 curl -OJ "https://smprofiler.io/api/atlas-model/?study=LUAD%20progression&target_channel=FOXP3"
 ```
-
-The body is the ONNX model file.
 
 ## Python
 
