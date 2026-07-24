@@ -12,11 +12,21 @@ architecture:
 
 - Gaussian Process: skl2onnx's ``return_std`` converter is exact (matches sklearn
   to ~1e-8 in float64), so we use it directly.
-- BayesianRidge: skl2onnx's ``return_std`` converter is systematically wrong for a
-  ``StandardScaler → BayesianRidge`` pipeline — off by 1–2% on well-conditioned
-  data and 20%+ when ill-conditioned — so we ignore it and append the exact
-  formula ``std = sqrt(xc·Σ·xc + 1/alpha_)`` as ONNX nodes instead
-  (:func:`_append_bayesian_ridge_std`), which reproduces sklearn bit-for-bit.
+- BayesianRidge: skl2onnx's ``return_std`` converter is systematically wrong — it
+  emits ``MatMul(X, sigma_) → ReduceSum`` and drops the element-wise ``* X`` from
+  sklearn's ``(X @ sigma_ * X).sum(1)``, so it computes a linear form, not the
+  quadratic ``xᵀΣx``. The shared ``1/alpha_`` noise term hides it (off by ~1–2%
+  behind a ``StandardScaler`` where ``|X| ~ 1``, but 20%+ / an order of magnitude on
+  large-magnitude features). We ignore it and append the exact formula
+  ``std = sqrt(xc·Σ·xc + 1/alpha_)`` as ONNX nodes instead
+  (:func:`_append_bayesian_ridge_std`), which reproduces sklearn bit-for-bit. See
+  ``docs/skl2onnx_bayesian_ridge_std_bug.md`` for the pinpointed cause and repro.
+- RandomForest / ExtraTrees: skl2onnx emits a single ``TreeEnsembleRegressor`` that
+  outputs only the mean. We re-emit the trees with one target per tree to recover the
+  per-tree predictions, then compute their (calibrated) spread as the std
+  (:func:`_append_tree_ensemble_std`); the mean output is left untouched. The
+  calibration constant is fitted at training time (see
+  :func:`smprofiler.atlas.models._tree_std_calibration`).
 
 Gaussian Process predictions involve kernel-matrix inversion and only reproduce
 in double precision (float32 is off by a few percent), so GP models are exported
@@ -34,9 +44,10 @@ import json
 from pathlib import Path
 
 import numpy as np
-from onnx import ModelProto, TensorProto, helper, numpy_helper
+from onnx import AttributeProto, ModelProto, TensorProto, helper, numpy_helper
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import DoubleTensorType, FloatTensorType
+from sklearn.ensemble import ExtraTreesRegressor, RandomForestRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.linear_model import BayesianRidge
 from onnxruntime import InferenceSession, SessionOptions
@@ -131,6 +142,87 @@ def _append_bayesian_ridge_std(onnx_model: ModelProto, model, double_precision: 
     graph.output.append(helper.make_tensor_value_info(p + "std", onnx_dtype, [None]))
 
 
+def _attr_to_py(attr):
+    """Decode an ONNX ``AttributeProto`` to a plain Python value for node re-emission."""
+    return {
+        AttributeProto.INTS: lambda: list(attr.ints),
+        AttributeProto.FLOATS: lambda: list(attr.floats),
+        AttributeProto.STRINGS: lambda: [s.decode() for s in attr.strings],
+        AttributeProto.INT: lambda: attr.i,
+        AttributeProto.FLOAT: lambda: attr.f,
+        AttributeProto.STRING: lambda: attr.s.decode(),
+    }[attr.type]()
+
+
+def _append_tree_ensemble_std(onnx_model: ModelProto, model, calibration: float,
+                              double_precision: bool) -> None:
+    """Give a random-forest / extra-trees graph a (mean, std) pair of outputs.
+
+    skl2onnx converts the forest to a single ``TreeEnsembleRegressor`` that outputs
+    only the mean. We replace it with one target per tree so the op returns the
+    per-tree predictions instead of collapsing them, then compute **both** the mean
+    and the calibrated spread from that one node in-graph::
+
+        mean = mean_k(pred_k)
+        std  = γ · sqrt( mean_k(pred_k²) − mean_k(pred_k)² )
+
+    Reusing the single tree node (rather than keeping skl2onnx's mean node and adding
+    a second copy of the trees) keeps the graph ~1× the vanilla size. The mean is
+    written back to the original output tensor, so downstream ``target_offset`` baking
+    and the two-output contract are unchanged. ``model`` is the fitted estimator or
+    pipeline whose final step is the forest.
+    """
+    estimator = model.steps[-1][1] if hasattr(model, "steps") else model
+    n_trees = len(estimator.estimators_)
+    np_dtype = np.float64 if double_precision else np.float32
+    onnx_dtype = TensorProto.DOUBLE if double_precision else TensorProto.FLOAT
+
+    graph = onnx_model.graph
+    ter = next(n for n in graph.node if n.op_type == "TreeEnsembleRegressor")
+    ter_input = ter.input[0]
+    mean_name = graph.output[0].name  # e.g. "variable" — keep as the mean output
+    attrs = {a.name: _attr_to_py(a) for a in ter.attribute}
+    # One target per tree; skl2onnx pre-divides leaf weights by n_trees (its single
+    # SUM target == the mean), so multiply back to recover raw per-tree predictions.
+    attrs["target_ids"] = list(attrs["target_treeids"])
+    attrs["target_weights"] = [w * n_trees for w in attrs["target_weights"]]
+    attrs["n_targets"] = n_trees
+    attrs["aggregate_function"] = "SUM"
+    graph.node.remove(ter)  # the only tree node and nothing else consumes it
+
+    p = "tstd_"  # node/initializer name prefix, kept clear of skl2onnx's own names
+
+    def _const(name, arr):
+        graph.initializer.append(numpy_helper.from_array(arr, name=p + name))
+        return p + name
+
+    inv_n = _const("invn", np.array([1.0 / n_trees], dtype=np_dtype))
+    axis = p + "axis"
+    graph.initializer.append(numpy_helper.from_array(np.array([1], dtype=np.int64), name=axis))
+    graph.node.extend([
+        helper.make_node("TreeEnsembleRegressor", [ter_input], [p + "pertree"],
+                         domain="ai.onnx.ml", name=p + "ter", **attrs),
+        # mean output (keepdims -> [N,1], matching skl2onnx's original mean shape)
+        helper.make_node("ReduceSum", [p + "pertree", axis], [p + "summ"], keepdims=1),
+        helper.make_node("Mul", [p + "summ", inv_n], [mean_name]),
+        # std path (1-D, like the BayesianRidge/GP std output); its internal mean is
+        # kept separate from mean_name so the target_offset baked into mean_name later
+        # does not leak into the (shift-invariant) variance.
+        helper.make_node("ReduceSum", [p + "pertree", axis], [p + "sum0"], keepdims=0),
+        helper.make_node("Mul", [p + "sum0", inv_n], [p + "mean0"]),
+        helper.make_node("Mul", [p + "pertree", p + "pertree"], [p + "sq"]),
+        helper.make_node("ReduceSum", [p + "sq", axis], [p + "sum2"], keepdims=0),
+        helper.make_node("Mul", [p + "sum2", inv_n], [p + "meansq"]),
+        helper.make_node("Mul", [p + "mean0", p + "mean0"], [p + "mean2"]),
+        helper.make_node("Sub", [p + "meansq", p + "mean2"], [p + "var"]),
+        # clamp tiny-negative rounding to 0 (variance is >= 0; std of an agreeing forest is 0)
+        helper.make_node("Max", [p + "var", _const("zero", np.array([0.0], dtype=np_dtype))], [p + "varc"]),
+        helper.make_node("Sqrt", [p + "varc"], [p + "spread"]),
+        helper.make_node("Mul", [p + "spread", _const("gamma", np.array([calibration], dtype=np_dtype))], [p + "std"]),
+    ])
+    graph.output.append(helper.make_tensor_value_info(p + "std", onnx_dtype, [None]))
+
+
 def export_to_onnx(
     model,
     n_features: int,
@@ -139,6 +231,7 @@ def export_to_onnx(
     *,
     return_std: bool = False,
     target_offset: float = 0.0,
+    tree_calibration: float = 1.0,
 ) -> None:
     """Convert a fitted sklearn estimator / pipeline to ONNX and save.
 
@@ -148,10 +241,14 @@ def export_to_onnx(
         output_path: destination ``.onnx`` file.
         double_precision: export a float64-input model (required for GP).
         return_std: also emit a per-sample predictive std as a second ONNX output.
-            Supported for GaussianProcessRegressor (via skl2onnx) and BayesianRidge
-            (via an exact appended subgraph); raises for anything else.
+            Supported for GaussianProcessRegressor (via skl2onnx), BayesianRidge (via
+            an exact appended subgraph), and RandomForest/ExtraTrees (via a per-tree
+            spread subgraph); raises for anything else.
         target_offset: constant added to the mean output inside the graph, to undo
             target mean-centering done before fitting (0.0 = no-op).
+        tree_calibration: γ scaling the tree-ensemble spread into a predictive std
+            (see :func:`smprofiler.atlas.models._tree_std_calibration`); ignored by
+            the non-tree paths. 1.0 = raw spread.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tensor_type = DoubleTensorType if double_precision else FloatTensorType
@@ -169,6 +266,10 @@ def export_to_onnx(
         # append the exact std formula ourselves.
         onnx_model = convert_sklearn(model, initial_types=initial_type)
         _append_bayesian_ridge_std(onnx_model, model, double_precision)
+    elif return_std and isinstance(final_estimator, (RandomForestRegressor, ExtraTreesRegressor)):
+        # skl2onnx emits mean only; append the per-tree spread as a calibrated std.
+        onnx_model = convert_sklearn(model, initial_types=initial_type)
+        _append_tree_ensemble_std(onnx_model, model, tree_calibration, double_precision)
     elif return_std:
         raise ValueError(
             f"return_std is not supported for {type(final_estimator).__name__}; "

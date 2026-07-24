@@ -1,20 +1,26 @@
 """Regression model candidates, cross-validated selection, and prediction.
 
 Only architectures whose predictive standard deviation genuinely depends on the
-input ``x`` **and** can be emitted as a native second ONNX output are considered,
-so the per-cell z-score computed at inference reads its uncertainty straight from
-the ONNX model — no separate Python/pickle path. Concretely:
+input ``x`` **and** can be emitted as a second ONNX output are considered, so the
+per-cell z-score computed at inference reads its uncertainty straight from the ONNX
+model — no separate Python/pickle path. Concretely:
 
 - ``bayesian_ridge`` — Bayesian posterior predictive std,
-- ``gaussian_process`` — GP posterior predictive std.
+- ``gaussian_process`` — GP posterior predictive std,
+- ``random_forest`` / ``extra_trees`` — spread of the per-tree predictions,
+  calibrated to a predictive scale (see below).
 
-Both convert with skl2onnx's ``options={<estimator>: {"return_std": True}}`` to a
-two-output graph (mean, std). Tree ensembles (random forest / extra trees) were
-dropped: their uncertainty is the spread across ``estimators_``, which the ONNX
-``TreeEnsembleRegressor`` op collapses and cannot expose. Purely-mean regressors
-(ridge, elastic net, huber, gradient boosting) are excluded because they offer
-only an input-independent residual std. ``predict_with_std`` raises for any model
-outside this set, keeping the invariant enforced in code.
+BayesianRidge and the GP carry a native posterior std. The tree ensembles expose
+only the *epistemic* spread across ``estimators_``; skl2onnx's
+``TreeEnsembleRegressor`` collapses that to the mean, so
+:mod:`smprofiler.atlas.artifacts` re-emits the trees with one target per tree to
+recover the per-tree predictions and computes their std in-graph. That raw spread
+under-estimates the predictive std (it omits the noise term), so it is scaled by a
+single calibration constant ``γ`` fitted on the holdout
+(:func:`_tree_std_calibration`) and baked into the graph. Boosting / purely-mean
+regressors (ridge, elastic net, huber, gradient boosting) remain excluded: their
+trees are additive, not independent, so there is no meaningful across-tree spread.
+``predict_with_std`` raises for any model outside this set.
 
 The Gaussian Process uses ``normalize_y=False`` because skl2onnx's ``return_std``
 converter crashes on the y-rescaling that ``normalize_y=True`` introduces. To keep
@@ -25,6 +31,7 @@ the exported ONNX graph (see :func:`smprofiler.atlas.artifacts.export_to_onnx`).
 import time
 
 import numpy as np
+from sklearn.ensemble import ExtraTreesRegressor, RandomForestRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel, WhiteKernel
 from sklearn.linear_model import BayesianRidge
@@ -42,11 +49,18 @@ logger = colorized_logger(__name__)
 # many (randomly sampled) cells. Other candidates train on the full set.
 MAX_GP_TRAIN_SAMPLES = 2000
 
-# Models whose predictive std depends on x and exports as a native ONNX output.
+# Models whose predictive std depends on x and is emitted as an ONNX output.
 STD_METHODS = {
     "bayesian_ridge": "bayesian_posterior",
     "gaussian_process": "gaussian_posterior",
+    "random_forest": "tree_ensemble_spread",
+    "extra_trees": "tree_ensemble_spread",
 }
+
+# The subset whose std is the calibrated spread across estimators_ (not a native
+# posterior); their ONNX std is built by re-emitting the per-tree predictions and
+# needs a holdout-fit calibration constant (see _tree_std_calibration).
+TREE_METHODS = {"random_forest", "extra_trees"}
 
 
 def build_model_candidates() -> list[tuple[str, object]]:
@@ -75,6 +89,23 @@ def build_model_candidates() -> list[tuple[str, object]]:
                     normalize_y=False,  # see module docstring: keeps return_std ONNX export working
                     random_state=42,
                 )),
+            ]),
+        ),
+        # The StandardScaler is a no-op for tree splits but keeps the pipeline shape
+        # uniform (predict_with_std reaches the estimator via named_steps). 200 trees
+        # gives a stable across-tree spread for the std estimate.
+        (
+            "random_forest",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("random_forest", RandomForestRegressor(n_estimators=200, random_state=42)),
+            ]),
+        ),
+        (
+            "extra_trees",
+            Pipeline([
+                ("scaler", StandardScaler()),
+                ("extra_trees", ExtraTreesRegressor(n_estimators=200, random_state=42)),
             ]),
         ),
     ]
@@ -145,6 +176,7 @@ def predict_with_std(
     model,
     model_name: str,
     X_norm: np.ndarray,
+    calibration: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Return (y_mean, y_std) for a fitted model evaluated on normalized inputs.
@@ -156,12 +188,24 @@ def predict_with_std(
     docstring); the constant offset is reapplied only in the exported ONNX graph.
 
     Dispatch rules:
-        bayesian_ridge   → posterior predictive std from BayesianRidge.predict()
-        gaussian_process → posterior predictive std from GaussianProcessRegressor
+        bayesian_ridge          → posterior predictive std from BayesianRidge.predict()
+        gaussian_process        → posterior predictive std from GaussianProcessRegressor
+        random_forest/extra_trees → ``calibration`` × spread of the per-tree predictions
+
+    Args:
+        calibration: scale applied to the tree-ensemble spread (γ from
+            :func:`_tree_std_calibration`); ignored by the posterior models, which
+            already return a calibrated std. Defaults to 1.0 (raw spread).
 
     Raises:
         ValueError: for any model whose std would not depend on the input.
     """
+    if model_name in TREE_METHODS:
+        X_scaled = model.named_steps["scaler"].transform(X_norm)
+        inner = model.named_steps[model_name]
+        per_tree = np.column_stack([tree.predict(X_scaled) for tree in inner.estimators_])
+        return per_tree.mean(axis=1), calibration * per_tree.std(axis=1)
+
     if model_name in STD_METHODS:
         X_scaled = model.named_steps["scaler"].transform(X_norm)
         inner = model.named_steps[model_name]
@@ -172,3 +216,23 @@ def predict_with_std(
         f"Model '{model_name}' has no input-dependent predictive std; only "
         f"{sorted(STD_METHODS)} are supported."
     )
+
+
+def _tree_std_calibration(residuals: np.ndarray, spread: np.ndarray) -> float:
+    """Global scale γ that turns the across-tree spread into a predictive std.
+
+    The raw spread across trees is epistemic-only and under-estimates the predictive
+    error. Returns ``γ = RMS(residual / spread)`` over the holdout, so the calibrated
+    z-score ``residual / (γ·spread)`` has ~unit variance. The ratio is winsorized at
+    the 1st/99th percentile to bound the effect of near-zero spreads; γ falls back to
+    1.0 when no positive spread is available (a degenerate all-trees-agree fit).
+    """
+    residuals = np.asarray(residuals, dtype=np.float64)
+    spread = np.asarray(spread, dtype=np.float64)
+    positive = spread > 0
+    if not positive.any():
+        return 1.0
+    ratio = residuals[positive] / spread[positive]
+    lo, hi = np.percentile(ratio, [1, 99])
+    ratio = np.clip(ratio, lo, hi)
+    return float(np.sqrt(np.mean(ratio ** 2)))

@@ -24,10 +24,11 @@ from smprofiler.atlas.study_channels import discover_study_channels
 from smprofiler.atlas.atlas_data import load_atlas_gene_names
 from smprofiler.atlas.atlas_data import load_atlas_subset
 from smprofiler.atlas.atlas_data import load_channel_mapping
-from smprofiler.atlas.models import STD_METHODS
+from smprofiler.atlas.models import STD_METHODS, TREE_METHODS
 from smprofiler.atlas.models import build_model_candidates
 from smprofiler.atlas.models import predict_with_std
 from smprofiler.atlas.models import train_and_select_best
+from smprofiler.atlas.models import _tree_std_calibration
 from smprofiler.atlas.artifacts import export_to_onnx, validate_onnx, write_metadata
 
 logger = colorized_logger(__name__)
@@ -281,6 +282,17 @@ def run(
             residuals = y_test_c - y_pred_mean
             global_std = float(residuals.std())
             std_method = STD_METHODS[best_name]
+
+            # Tree ensembles expose only the epistemic across-tree spread; calibrate it
+            # to a predictive std with a single holdout-fit scale γ (baked into the
+            # ONNX graph), so the z-score reads as ~unit variance. Non-tree models
+            # already return a calibrated posterior std, so γ stays 1.0.
+            tree_calibration = 1.0
+            if best_name in TREE_METHODS:
+                tree_calibration = _tree_std_calibration(residuals, y_pred_std)
+                y_pred_std = y_pred_std * tree_calibration
+                logger.info("  Tree std calibration γ = %.3f", tree_calibration)
+
             # GaussianProcess only reproduces in double precision; others use float32.
             double_precision = best_name == "gaussian_process"
             onnx_input_dtype = "float64" if double_precision else "float32"
@@ -302,7 +314,8 @@ def run(
             # centering offset back into the mean output.
             export_to_onnx(best_model, X_identity_norm.shape[1], onnx_path,
                            double_precision=double_precision,
-                           return_std=True, target_offset=y_offset)
+                           return_std=True, target_offset=y_offset,
+                           tree_calibration=tree_calibration)
 
             n_validate = min(500, X_test.shape[0])
             validate_onnx(onnx_path, best_model, X_test[:n_validate],
