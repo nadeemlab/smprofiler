@@ -292,9 +292,10 @@ class CellManifestsParser(SourceToADIParser):
         columns = MultiIndex.from_tuples([(modifier, symbol) for symbol in ordered_symbols])
         index = list(range(len(rows)))
         df = DataFrame(rows, columns=columns, index=index)
-        scale = 1.0 / scale_denominator
-        for c in columns:
-            df[c] = scale * df[c]
+        if modifier == 'quantity':
+            scale = 1.0 / scale_denominator
+            for c in columns:
+                df[c] = scale * df[c]
         return df
 
     def _get_cell_manifests(self, file_manifest_file):
