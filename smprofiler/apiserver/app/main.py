@@ -48,6 +48,9 @@ from smprofiler.db.exchange_data_formats.metrics import (
     AnalysisSummaryAvailable,
 )
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
+from smprofiler.db.exchange_data_formats.atlas_models import AtlasModelMetadata
+from smprofiler.db.accessors.atlas_models import list_atlas_models as _list_atlas_models
+from smprofiler.db.accessors.atlas_models import get_atlas_model as _get_atlas_model_bytes
 from smprofiler.db.querying import query
 from smprofiler.db.publish_promote import create_collection_whitelist
 from smprofiler.apiserver.app.validation import (
@@ -921,6 +924,79 @@ def get_findings(
         )
         rows = tuple(cursor.fetchall())
     return list(map(lambda row: Finding(id=-1, **{key: row[i + 1] for i, key in enumerate(finding_fields)}), rows))
+
+
+@app.get("/atlas-models/")
+async def get_atlas_models(
+    study: Annotated[str, Query(max_length=512)],
+    target_channel: Annotated[str | None, Query(max_length=512)] = None,
+) -> list[AtlasModelMetadata]:
+    """
+    List the trained atlas-reference models for a study, newest version first.
+
+    Each entry describes one model: the functional channel it predicts, the
+    identity `input_channels` it consumes (in input order), its architecture and
+    evaluation metrics, and the `onnx_input_dtype` inference must feed. Download a
+    model's bytes from `/atlas-model/`. Optionally filter to one `target_channel`.
+    """
+    with DBCursor() as cursor:
+        rows = _list_atlas_models(cursor, study=study, target_channel=target_channel)
+    return [AtlasModelMetadata(**row) for row in rows]
+
+
+@app.get("/atlas-model/")
+async def get_atlas_model(
+    study: Annotated[str, Query(max_length=512)],
+    target_channel: Annotated[str, Query(max_length=512)],
+    model_id: Annotated[int | None, Query()] = None,
+):
+    """
+    Download one trained atlas-reference model as raw ONNX bytes.
+
+    Returns the latest model for (`study`, `target_channel`), or the specific
+    version identified by `model_id`. The body is the ONNX model
+    (`application/octet-stream`); response headers carry what is needed to run it:
+
+    - `X-Model-Id`: the stored model id
+    - `X-Onnx-Input-Dtype`: `float32` or `float64` — the dtype of the model's
+      single input tensor `X`
+    - `X-Input-Channels`: comma-separated identity channels, in input order
+    - `X-Architecture-Type`, `X-Std-Method`
+
+    Run it with onnxruntime (Python or onnxruntime-web); usage examples are in
+    [docs/atlas_models.md](https://github.com/nadeemlab/SMProfiler/blob/main/docs/atlas_models.md).
+    """
+    with DBCursor() as cursor:
+        candidates = _list_atlas_models(cursor, study=study, target_channel=target_channel)
+        if not candidates:
+            raise HTTPException(
+                status_code=404,
+                detail=f'No atlas model for study="{study}", target_channel="{target_channel}".',
+            )
+        if model_id is None:
+            metadata = candidates[0]
+        else:
+            metadata = next((row for row in candidates if row["id"] == model_id), None)
+            if metadata is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f'Atlas model id={model_id} not found for '
+                           f'study="{study}", target_channel="{target_channel}".',
+                )
+        onnx_bytes = _get_atlas_model_bytes(cursor, metadata["id"])
+    if onnx_bytes is None:
+        raise HTTPException(status_code=404, detail='Model bytes not found.')
+    return Response(
+        onnx_bytes,
+        media_type="application/octet-stream",
+        headers={
+            "X-Model-Id": str(metadata["id"]),
+            "X-Onnx-Input-Dtype": metadata["onnx_input_dtype"],
+            "X-Input-Channels": ",".join(metadata["input_channels"]),
+            "X-Architecture-Type": metadata["architecture_type"],
+            "X-Std-Method": metadata["std_method"],
+        },
+    )
 
 
 @app.get("/channel-annotations/")

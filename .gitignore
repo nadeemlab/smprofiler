@@ -66,3 +66,6 @@ venv/
 **/buildcache.sqlite3
 analysis_replication/.smprofiler_db.config
 analysis_replication/dbconfig_location.txt
+
+
+scripts/models/
