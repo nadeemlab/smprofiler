@@ -1,0 +1,15 @@
+services:
+  testing-database:
+    image: nadeemlab/smprofiler-db-preloaded-1
+    container_name: smprofiler-db---testing-only-atlas
+    ports:
+      - target: 5432
+        protocol: tcp
+    networks:
+      - isolated_temporary_test
+    environment:
+      POSTGRES_PASSWORD: postgres
+
+networks:
+  isolated_temporary_test:
+    driver: bridge

@@ -12,7 +12,7 @@ from smprofiler import submodule_names
 
 
 def get_argument_free_commands():
-    return ['tail-logs', 'dump-schema', 'start', 'interactive-uploader', 'load-testing', 'review-submissions', 'cache-subsample']
+    return ['tail-logs', 'dump-schema', 'start', 'interactive-uploader', 'load-testing', 'review-submissions', 'cache-subsample', 'train-atlas-models']
 
 def get_commands(submodule_name):
     _files = files(f'smprofiler.{submodule_name}')

@@ -37,6 +37,7 @@ build/graphs/log_of_build.log
 build/db/log_of_build.log
 build/ondemand/log_of_build.log
 build/workflow/log_of_build.log
+build/atlas/log_of_build.log
 test/apiserver/db*.db
 check-dockerfiles-consistency
 data-loaded-image-1smallnointensity
@@ -66,3 +67,10 @@ venv/
 **/buildcache.sqlite3
 analysis_replication/.smprofiler_db.config
 analysis_replication/dbconfig_location.txt
+
+
+scripts/models/
+
+# Atlas model training
+/models/
+.temporary_http_response_cache.sqlite.db

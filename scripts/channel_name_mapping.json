@@ -1,0 +1,14 @@
+{
+  "_comment": "Extra atlas var_name → SPT canonical channel name mappings. These supplement the aliases in channel_annotations.json for cases where the atlas uses a different gene symbol than the SPT channel name.",
+  "MS4A1": "CD20",
+  "PECAM1": "CD31",
+  "PDCD1": "PD1",
+  "CD274": "PDL1",
+  "CD247": "CD3",
+  "HLA-DRA": "HLA-DR",
+  "S100B": "S100B",
+  "MKI67": "MKI67",
+  "TOX": "TOX",
+  "GZMB": "GZMB",
+  "VIM": "VIM"
+}
