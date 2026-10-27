@@ -53,7 +53,7 @@ are a first approximation and should be revisited after a full-data run.
 trained with 3 different architectures against the numpy/sklearn reference.
 
 The unit tests in `test/atlas/unit_tests/test_atlas_inference.py` assert numeric
-concordance between the sklearn model and the ONNX model. 
+concordance between the sklearn model and the ONNX model.
 
 ## Where the code lives
 

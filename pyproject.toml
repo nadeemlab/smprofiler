@@ -238,6 +238,9 @@ packages = [
 "smprofiler.atlas.scripts" = [
     "train_atlas_models.py",
 ]
+"smprofiler.atlas.assets" = [
+    "channel_name_mapping.json",
+]
 "smprofiler.ondemand.scripts" = [
     "read_expression_dump_file.py",
     "start.py",
