@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-"""Command line entry point for atlas-reference model training.
+"""
+Command line entry point for atlas-reference model training.
 
 Example:
     smprofiler atlas train-atlas-models \\

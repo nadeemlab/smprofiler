@@ -2,10 +2,11 @@
 
 Provides the identity/functional channel classification and alias resolution
 used to reconcile marker names between SMProfiler studies and the atlas. This
-is essentially manually maintained.
+is essentially manually maintained, because study-specific names are used for
+consistency with upstream data sources.
 
-The smprofiler API (:func:`load_channel_annotations_from_api`) is intended to
-be the canonical source for this information. Loading from the local pre-API
+The smprofiler API (`load_channel_annotations_from_api`) is intended to
+be the canonical source for this information. Loading from the local *pre-API*
 source files is deprecated, to ensure this information is always formatted in
 just one way.
 
