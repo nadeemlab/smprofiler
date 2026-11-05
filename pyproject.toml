@@ -70,7 +70,7 @@ all = [
     "pyarrow",
     "pydantic",
     "PyJWT",
-    "pymupdf",
+    "pymupdf==1.28.2",
     "pyshp",
     "pytz",
     "requests",
@@ -101,7 +101,7 @@ apiserver = [
     "psycopg",
     "pydantic",
     "PyJWT",
-    "pymupdf",
+    "pymupdf==1.28.2",
     "pytz",
     "requests",
     "scipy",
@@ -198,6 +198,9 @@ packages = [
 [tool.setuptools.package-data]
 "smprofiler" = ["py.typed"]
 "smprofiler.entry_point" = ["smprofiler-completion.sh.jinja"]
+"smprofiler.atlas.assets" = [
+    "channel_proxies.json",
+]
 "smprofiler.workflow.scripts" = [
     "aggregate_core_results.py",
     "core_job.py",
