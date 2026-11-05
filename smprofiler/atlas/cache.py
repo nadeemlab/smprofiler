@@ -2,6 +2,7 @@
 Lightweight HTTP response cache, for convenience.
 """
 from sqlite3 import Connection
+from sqlite3 import OperationalError
 
 
 class StandaloneSQLiteHTTPCache:
@@ -21,7 +22,10 @@ class StandaloneSQLiteHTTPCache:
     def retrieve_response(cls, url: str) -> bytes | None:
         with Connection(cls.cache_filename) as connection:
             cursor = connection.cursor()
-            cursor.execute('SELECT response FROM cache WHERE url=?', (url,))
+            try:
+                cursor.execute('SELECT response FROM cache WHERE url=?', (url,))
+            except OperationalError:
+                return None
             rows = tuple(cursor.fetchall())
         if len(rows) == 0:
             return None

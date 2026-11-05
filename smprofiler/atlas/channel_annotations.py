@@ -25,7 +25,7 @@ logger = colorized_logger(__name__)
 def load_channel_annotations_from_files(
     annotations: Path | StringIO,
     aliases: Path | StringIO,
-) -> tuple[set, dict[str, str]]:
+) -> tuple[set[str], list[str], dict[str, str]]:
     """
     Parse ``/channel-annotations/`` and ``/channel-aliases/`` responses.
 
@@ -51,13 +51,19 @@ def load_channel_annotations_from_files(
         'Channel annotations: %d identity, %d aliases',
         len(identity_channels), len(aliases_data),
     )
-    return identity_channels, aliases_data
+
+    functional = []
+    for group_name, group in groups.items():
+        if group_name != 'identity':
+            functional.extend(group['channels'])
+
+    return identity_channels, functional, aliases_data
 
 
 def load_channel_annotations_from_api(
     base_url: str,
     timeout: int = 30,
-    ) -> tuple[set, dict[str, str]]:
+) -> tuple[set[str], list[str], dict[str, str]]:
     """
     Fetch channel annotations from the smprofiler API, ``/channel-annotations/``
     and ``/channel-aliases/``.

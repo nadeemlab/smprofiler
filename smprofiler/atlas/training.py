@@ -261,7 +261,7 @@ def _form_plan_training_scenarios(
             'a local file is deprecated. Set annotations_api_url.'
         )
     try:
-        identity_channels, aliases = load_channel_annotations_from_api(annotations_api_url)
+        identity_channels, _, aliases = load_channel_annotations_from_api(annotations_api_url)
     except Exception as exc:
         raise RuntimeError(
             f'Failed to load channel annotations from API {annotations_api_url}: {exc}'
