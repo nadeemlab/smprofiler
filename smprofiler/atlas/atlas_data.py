@@ -106,4 +106,4 @@ def report_parquet_attributes(path: Path, smprofiler_to_atlas: dict[str, str]) -
         logger.error('Atlas does not actually contain: %s', missing)
     else:
         logger.info('All manually-mapped-to atlas gene names are actually in atlas.')
- 
+

@@ -1,16 +1,13 @@
 from pathlib import Path
 from io import BytesIO
-from json import loads as json_loads
-from importlib.resources import as_file
-from importlib.resources import files as importlib_files
 
 from pandas import DataFrame
 from pyarrow import Table as pyarrow_Table
 from pyarrow.parquet import ParquetFile
 from pyarrow.parquet import ParquetWriter
 
-from smprofiler.atlas.channel_annotations import load_channel_annotations_from_api
 from smprofiler.atlas.training import DEFAULT_ANNOTATIONS_API_URL
+from smprofiler.atlas.application_databaes_feature_names import ApplicationDatabaseFeatureNames
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 from channel_info_logging import AtlasChannelInfoLogging
@@ -19,42 +16,9 @@ from atlas_file_retrieval import AtlasFileRetrieval
 
 logger = colorized_logger(__name__)
 
-def _retrieve_from_library(subpackage: str, filename: str, binary: bool = False) -> str | bytes:
-    filepath = importlib_files('.'.join(('smprofiler.atlas', subpackage))).joinpath(filename)
-    with as_file(filepath) as path:
-        if not binary:
-            with open(path, 'rt', encoding='utf-8') as file:
-                contents = file.read()
-        else:
-            with open(path, 'rb') as file:
-                contents = file.read()
-    return contents
-
 
 DEFAULT_ATLAS_SOURCE = CellAtlasSource.ALLEN_IMMUNE_HEALTH
 DEFAULT_ATLAS_SMALL = 'cell_atlas_small.parquet'
-
-
-class ApplicationDatabaseFeatureNames:
-    """
-    Provides access to SMProfiler database channel metadata.
-    """
-    annotations_api_url: str
-
-    def __init__(self, annotations_api_url: str):
-        self.annotations_api_url = annotations_api_url
-
-    def get_smprofiler_channels_and_aliases(self) -> tuple[list[str], list[str], dict[str, str]]:
-        """
-        Returns:
-            * The list of identity channels (from the SMProfiler database datasets)
-            * The list of functional channels
-            * The mapping of special-case aliases from SMProfiler specific study
-              channel names to normalized pan-database versions.
-        """
-        identity_set, functional, _ = load_channel_annotations_from_api(self.annotations_api_url)
-        aliases = json_loads(_retrieve_from_library('assets', 'channel_proxies.json'))
-        return sorted(list(identity_set)), functional, aliases
 
 
 class ExtractRelevantCellAtlas:
@@ -81,7 +45,7 @@ class ExtractRelevantCellAtlas:
     ) -> tuple[ParquetFile, DataFrame]:
         """
         Returns:
-            * The extracted/subselected cell atlas dataframe.
+            * The extracted/subselected cell atlas as a ParquetFile table.
             * The "SMProfiler channel name" to "Atlas gene name" mapping dataframe.
 
         If `write_tables` is `True`, the return values are also written to file.
@@ -90,23 +54,23 @@ class ExtractRelevantCellAtlas:
         if write_tables:
             smprofiler_channels_to_atlas_df.to_csv('smprofiler_channels_to_atlas.tsv', sep='\t', index=False)
         atlas_names = list(smprofiler_channels_to_atlas_df['Atlas gene name'].drop_duplicates())
-        writer1 = None
-        writer2 = None
+        atlas_extraction = self._get_atlas_extraction_parquet(atlas_names)
+        if write_tables:
+            writer = ParquetWriter(output_cell_atlas_filename)
+            writer.write(atlas_extraction)
+        return atlas_extraction, smprofiler_channels_to_atlas_df
+
+    def _get_atlas_extraction_parquet(self, atlas_names: list[str]) -> ParquetFile:
+        writer = None
         in_memory = BytesIO()
         for df in self.atlas_file_retrieval.form_source_atlas_portions(atlas_names):
             table = pyarrow_Table.from_pandas(df, preserve_index=False)
-            if write_tables:
-                if writer1 is None:
-                    writer1 = ParquetWriter(output_cell_atlas_filename, table.schema)
-                writer1.write_table(table)
-            if writer2 is None:
-                writer2 = ParquetWriter(in_memory, table.schema)
-            writer2.write_table(table)
-        if writer1 is not None:
-            writer1.close()
-        if writer2 is not None:
-            writer2.close()
-        return ParquetFile(in_memory), smprofiler_channels_to_atlas_df
+            if writer is None:
+                writer = ParquetWriter(in_memory, table.schema)
+            writer.write_table(table)
+        if writer is not None:
+            writer.close()
+        return ParquetFile(in_memory)
 
     def _get_smprofiler_channels_to_atlas_dataframe(self) -> DataFrame:
         smprofiler_channels_to_atlas, identity, functional, original_available = self._map_smprofiler_channels_to_atlas()

@@ -79,11 +79,11 @@ def run(
     database_config_file: Path | None = None,
 ) -> None:
     """
-    Train atlas-reference regression models.
+    Train atlas-reference models.
 
     Args:
-        parquet_atlas_path: path to the aggregated atlas expression table
-            (file cell_atlas_small.parquet) is cells × atlas genes.
+        parquet_atlas_path: path to the aggregated atlas expression table, default file
+            name cell_atlas_small.parquet. It is cells by atlas genes.
         channel_mapping_path: path to the manual SMProfiler-channel → atlas-gene mapping
             (smprofiler_channels_to_atlas.tsv).
         datasets_dir: root directory containing per-study dataset folders.
