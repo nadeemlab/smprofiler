@@ -19,8 +19,6 @@ from os.path import (
 )
 from stat import S_IEXEC
 from configparser import ConfigParser
-from importlib.resources import as_file
-from importlib.resources import files
 from attr import define
 from boto3 import client as boto3_client
 from botocore.exceptions import ClientError
@@ -34,7 +32,6 @@ except ModuleNotFoundError as e:
     from smprofiler.standalone_utilities.module_load_error import \
         SuggestExtrasException
     SuggestExtrasException(e, 'workflow')
-from jinja2 import Environment, BaseLoader  # pylint: disable=ungrouped-imports
 
 from smprofiler.workflow.common.cli_arguments import add_argument  # pylint: disable=ungrouped-imports
 from smprofiler import get_workflow
@@ -42,6 +39,7 @@ from smprofiler import get_workflow_names
 from smprofiler.workflow.common.\
     file_identifier_schema import get_input_filename_by_identifier
 from smprofiler.workflow.common.workflow_module_exporting import WorkflowModules
+from smprofiler.standalone_utilities import retrieve_from_library
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger('smprofiler db configure')
@@ -49,20 +47,8 @@ logger = colorized_logger('smprofiler db configure')
 NF_CONFIG_FILE = 'nextflow.config'
 
 
-def _retrieve_from_library(subpackage: str, filename: str, binary: bool=False) -> str | bytes:
-    filepath = files('.'.join(('smprofiler.workflow', subpackage))).joinpath(filename)
-    with as_file(filepath) as path:
-        if not binary:
-            with open(path, 'rt', encoding='utf-8') as file:
-                contents = file.read()
-        else:
-            with open(path, 'rb') as file:
-                contents = file.read()
-    return contents
-
-
 def _write_config_file(variables: dict[str, str]) -> None:
-    contents = _retrieve_from_library('assets', NF_CONFIG_FILE + '.jinja')
+    contents = retrieve_from_library(NF_CONFIG_FILE + '.jinja', 'workflow')
     template = jinja_environment.from_string(contents)
     file_to_write = template.render(**variables)
     file_to_write = re.sub(r'\n\n+', '\n', file_to_write)
@@ -80,7 +66,7 @@ def _consider_remove_nones(f: str, options: dict) -> str:
 def _write_pipeline_script(workflow: WorkflowModules, options: dict) -> None:
     main_seen: bool = False
     for subpackage, filename, is_main in workflow.assets_needed:
-        pipeline_file = cast(str, _retrieve_from_library(subpackage, filename))
+        pipeline_file = cast(str, retrieve_from_library(filename, workflow, subpackage=subpackage))
         pipeline_file = _consider_remove_nones(pipeline_file, options)
         if is_main:
             if main_seen:
@@ -188,7 +174,7 @@ def _exists_s3_or_local(path_or_uri: str) -> bool:
 
 
 def _process_filename_inputs(options: dict[str, str | bool]) -> None:
-    if not 'input_path' in options:
+    if 'input_path' not in options:
         return
     input_path = cast(str, options['input_path'])
     del options['input_path']
@@ -218,7 +204,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         file_manifest_filename=local_file_manifest,
     )
     options['samples'] = False
-    if not samples_file is None:
+    if samples_file is not None:
         samples_file_abs = join(input_path, samples_file)
         if _exists_s3_or_local(samples_file_abs):
             options['samples_file'] = samples_file_abs
@@ -229,7 +215,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         file_manifest_filename=local_file_manifest,
     )
     options['subjects'] = False
-    if not subjects_file is None:
+    if subjects_file is not None:
         subjects_file_abs = join(input_path, subjects_file)
         if _exists_s3_or_local(subjects_file_abs):
             options['subjects_file'] = subjects_file_abs
@@ -239,7 +225,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         input_file_identifier='Study file',
         file_manifest_filename=local_file_manifest,
     )
-    if not study_file is None:
+    if study_file is not None:
         study_file_abs = join(input_path, study_file)
         if not _exists_s3_or_local(study_file_abs):
             raise FileNotFoundError(f'Did not find study file ({study_file}).')
@@ -250,7 +236,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         input_file_identifier='Diagnosis file',
         file_manifest_filename=local_file_manifest,
     )
-    if not diagnosis_file is None:
+    if diagnosis_file is not None:
         diagnosis_file_abs = join(input_path, diagnosis_file)
         if not _exists_s3_or_local(diagnosis_file_abs):
             raise FileNotFoundError(f'Did not find diagnosis file ({diagnosis_file}).')
@@ -261,7 +247,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         input_file_identifier='Interventions file',
         file_manifest_filename=local_file_manifest,
     )
-    if not interventions_file is None:
+    if interventions_file is not None:
         interventions_file_abs = join(input_path, interventions_file)
         if not _exists_s3_or_local(interventions_file_abs):
             raise FileNotFoundError(f'Did not find interventions file ({interventions_file}).')
@@ -272,7 +258,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         input_file_identifier='Channels file',
         file_manifest_filename=local_file_manifest,
     )
-    if not channels_file is None:
+    if channels_file is not None:
         channels_file_abs = join(input_path, channels_file)
         if not _exists_s3_or_local(channels_file_abs):
             raise FileNotFoundError(f'Did not find channels file ({channels_file}).')
@@ -283,7 +269,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         input_file_identifier='Phenotypes file',
         file_manifest_filename=local_file_manifest,
     )
-    if not phenotypes_file is None:
+    if phenotypes_file is not None:
         phenotypes_file_abs = join(input_path, phenotypes_file)
         if not _exists_s3_or_local(phenotypes_file_abs):
             raise FileNotFoundError(f'Did not find phenotypes file ({phenotypes_file}).')
@@ -294,7 +280,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         input_file_identifier='Permanent condition diagnosis file',
         file_manifest_filename=local_file_manifest,
     )
-    if not permanent_condition_diagnosis_file is None:
+    if permanent_condition_diagnosis_file is not None:
         permanent_condition_diagnosis_file_abs = join(input_path, permanent_condition_diagnosis_file)
         if not _exists_s3_or_local(permanent_condition_diagnosis_file_abs):
             raise FileNotFoundError(f'Did not find permanent condition diagnosis file ({permanent_condition_diagnosis_file}).')
@@ -305,7 +291,7 @@ def _process_filename_inputs(options: dict[str, str | bool]) -> None:
         input_file_identifier='Condition lack file',
         file_manifest_filename=local_file_manifest,
     )
-    if not condition_lack_file is None:
+    if condition_lack_file is not None:
         condition_lack_file_abs = join(input_path, condition_lack_file)
         if not _exists_s3_or_local(condition_lack_file_abs):
             raise FileNotFoundError(f'Did not find permanent condition diagnosis file ({condition_lack_file}).')
@@ -446,3 +432,4 @@ if __name__ == '__main__':
     _write_config_file(config_variables)
     _write_pipeline_script(workflow_configuration, config_variables)
     _record_configuration_command(config_variables, args.config_file)
+
