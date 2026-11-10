@@ -21,6 +21,7 @@ class StandaloneSQLiteHTTPCache:
     def retrieve_response(cls, url: str) -> bytes | None:
         with Connection(cls.cache_filename) as connection:
             cursor = connection.cursor()
+            cursor.execute('CREATE TABLE IF NOT EXISTS cache(url VARCHAR, response BYTES)')
             cursor.execute('SELECT response FROM cache WHERE url=?', (url,))
             rows = tuple(cursor.fetchall())
         if len(rows) == 0:
