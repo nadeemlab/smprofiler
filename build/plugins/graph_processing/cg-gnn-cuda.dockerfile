@@ -20,7 +20,6 @@ RUN pip install scipy==1.15.1
 RUN pip install dgl -f https://data.dgl.ai/wheels/cu118/repo.html
 RUN pip install dglgo -f https://data.dgl.ai/wheels-test/repo.html
 ENV DGLBACKEND=pytorch
-RUN pip install cg-gnn==0.3.2
 
 # Make the files you need in this directory available everywhere in the container
 ADD . /app
