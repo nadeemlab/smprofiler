@@ -27,7 +27,6 @@ from smprofiler.atlas.training import TrainingStudy
 
 logger = colorized_logger(__name__)
 
-ATLAS_VERSION = CellAtlasSource.ALLEN_IMMUNE_HEALTH.value
 _SUMMARY_WIDTH = 70
 
 class TrainingOrchestrator:

@@ -1,13 +1,14 @@
 from typing import cast
+import time
 
 from numpy.random import Generator as RandomNumberGenerator
 from numpy import arange as np_arange
 from numpy import newaxis as np_newaxis
 from numpy.typing import NDArray
-
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
 
+from smprofiler.atlas.types import CellAtlasSource
 from smprofiler.atlas.reporting import format_elapsed
 from smprofiler.atlas.reporting import section
 from smprofiler.atlas.reporting import subsection
@@ -24,6 +25,9 @@ from smprofiler.atlas.artifacts import export_to_onnx, validate_onnx, write_meta
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
+
+
+ATLAS_VERSION = CellAtlasSource.ALLEN_IMMUNE_HEALTH.value
 
 class TrainingStudy:
     options: TrainingOptions
@@ -44,10 +48,10 @@ class TrainingStudy:
         number_trained: int,
     ) -> tuple[int, int, int]:
         study_name = scenario.study_handle
-        id_in_atlas = list(c.atlas_specific for c in scenario.channels.identity)
-        fn_in_atlas = list(c.atlas_specific for c in scenario.channels.functional)
-        final_channel_names = list(c.study_specific for c in scenario.channels.identity)
-        final_target_channel_names = list(c.study_specific for c in scenario.channels.functional)
+        id_in_atlas = list(c.atlas_specific_name for c in scenario.get_channels('identity'))
+        fn_in_atlas = list(c.atlas_specific_name for c in scenario.get_channels('functional'))
+        final_channel_names = list(c.study_specific_name for c in scenario.get_channels('identity'))
+        final_target_channel_names = list(c.study_specific_name for c in scenario.get_channels('functional'))
 
         section(
             f'[{plan_step}/{total_studies}] Study: {study_name}  '
