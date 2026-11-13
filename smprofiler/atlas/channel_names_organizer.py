@@ -99,7 +99,7 @@ class ChannelNamesOrganizer:
         study_specific_names = self._study_specific_names(study)
         smprofiler_names_normalizer = QueryHandler.get_channel_aliases(self.cursor).aliases
         manual_mapping_atlas_names = json_loads(
-            retrieve_from_library('manual_mapping_atlas_names.json', 'db')
+            retrieve_from_library('manual_mapping_atlas_names.json', 'atlas')
         )[self.atlas_source.value]
         virtual_channels = self._get_virtual_channels(study)
 
