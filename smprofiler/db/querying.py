@@ -164,8 +164,8 @@ class QueryHandler:
         )
         return ChannelAnnotations(channelGroups={
             name: ChannelGroupAnnotation(
-                channels = sorted(list(set(group['channel_specific']))),
-                color = color,
+                channels=sorted(list(set(group['channel_specific']))),
+                color=color,
             )
             for (name, color), group in groups.groupby(['name', 'color'])
         })

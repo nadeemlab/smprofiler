@@ -1,5 +1,4 @@
 import re
-from enum import Enum
 from pathlib import Path
 from typing import Iterable
 
@@ -7,13 +6,10 @@ import anndata as ad
 from pandas import DataFrame
 from tqdm import tqdm
 
+from smprofiler.db.exchange_data_formats.atlas_models import CellAtlasSource
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
-
-
-class CellAtlasSource(Enum):
-    ALLEN_IMMUNE_HEALTH = 'Allen Immune Health 2025'
 
 
 class AtlasFileRetrieval:
@@ -26,23 +22,6 @@ class AtlasFileRetrieval:
     def __init__(self, atlas_source: CellAtlasSource, atlas_files_directory: Path):
         self.atlas_source = atlas_source
         self.atlas_files_directory = atlas_files_directory
-
-    def get_all_channels_from_atlas_files(self) -> list[str]:
-        """
-        Loads channel names from all atlas files to verify that they
-        agree, then returns the channel names from one such file.
-        """
-        files = self._get_atlas_files()
-        names_by_file = {}
-        for file in files:
-            names_from_file = self._load_atlas_file_variable_names(file)
-            logger.info(f'Retrieving feature names from {file}... {len(names_from_file)} features/genes')
-            names_by_file[file] = tuple(names_from_file)
-        first_file, first_names = tuple(names_by_file.items())[0]
-        for file, names in names_by_file.items():
-            if tuple(names) != tuple(first_names):
-                raise ValueError(f'Feature names differ between: {first_file} and {file}')
-        return first_names
 
     def form_source_atlas_portions(self, atlas_feature_names: list[str]):
         """

@@ -39,7 +39,7 @@ from smprofiler import get_workflow_names
 from smprofiler.workflow.common.\
     file_identifier_schema import get_input_filename_by_identifier
 from smprofiler.workflow.common.workflow_module_exporting import WorkflowModules
-from smprofiler.standalone_utilities import retrieve_from_library
+from smprofiler.standalone_utilities.asset_loading import retrieve_from_library
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger('smprofiler db configure')

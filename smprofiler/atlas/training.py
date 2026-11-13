@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.request import Request
 from urllib.request import urlopen
 from urllib.parse import quote_plus
+from os.path import exists
 
 from attrs import define
 from numpy.random import default_rng
@@ -44,6 +45,9 @@ from smprofiler.atlas.model_selection_fitting import predict_with_std
 from smprofiler.atlas.model_selection_fitting import train_and_select_best
 from smprofiler.atlas.model_selection_fitting import _tree_std_calibration
 from smprofiler.atlas.artifacts import export_to_onnx, validate_onnx, write_metadata_to_file
+from smprofiler.atlas.extract_relevant_atlas import ExtractRelevantCellAtlas
+from smprofiler.atlas.extract_relevant_atlas import DEFAULT_ATLAS_SMALL
+
 
 logger = colorized_logger(__name__)
 
@@ -66,7 +70,6 @@ class TrainingOptions:
     parquet_atlas_path: Path
 
 def run(
-    parquet_atlas_path: Path,
     channel_mapping_path: Path,
     datasets_dir: Path,
     output_dir: Path,
@@ -82,8 +85,6 @@ def run(
     Train atlas-reference models.
 
     Args:
-        parquet_atlas_path: path to the aggregated atlas expression table, default file
-            name cell_atlas_small.parquet. It is cells by atlas genes.
         channel_mapping_path: path to the manual SMProfiler-channel → atlas-gene mapping
             (smprofiler_channels_to_atlas.tsv).
         datasets_dir: root directory containing per-study dataset folders.
@@ -102,6 +103,8 @@ def run(
         RuntimeError if annotations cannot be loaded from the API, or if no
             studies with usable channel data are found.
     """
+    _consider_extract_from_atlas()
+    parquet_atlas_path = DEFAULT_ATLAS_SMALL
     _check_files_exist(parquet_atlas_path, channel_mapping_path)
     plan = _form_plan_training_scenarios(
         parquet_atlas_path,
@@ -115,6 +118,13 @@ def run(
         return
     options = TrainingOptions(output_dir, max_cells, cv_folds, database_config_file, parquet_atlas_path)
     _execute_plan(plan, options)
+
+def _consider_extract_from_atlas():
+    e = ExtractRelevantCellAtlas()
+    if not exists(DEFAULT_ATLAS_SMALL):
+        e.extract(write_tables=True, output_cell_atlas_filename=DEFAULT_ATLAS_SMALL)
+    else:
+        logger.info('File already exists, not extracting again: %s', DEFAULT_ATLAS_SMALL)
 
 def _execute_plan(plan: tuple[TrainingScenarioStudy, ...], options: TrainingOptions) -> None:
     _report_plan_options(plan, options)
