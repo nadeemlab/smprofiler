@@ -4,7 +4,22 @@ from typing import Literal
 
 from attrs import define
 
-from smprofiler.db.exchange_data_formats.atlas_models import InherenceAtlasAnnotatedChannel
+
+@define
+class InherenceAtlasAnnotatedChannel:
+    """
+    'Inherence' refers to whether a marker represents an inherent
+    feature of a given cell, i.e. it is a cell identity marker,
+    or on the contrary it indicates a functional, mutable state.
+
+    A marker/channel represented with this object is regarded
+    in relation to a specific *atlas* in which it may (approximately) appear
+    as an available gene, and a specific *study* in which it
+    has been measured.
+    """
+    study_specific_name: str
+    atlas_specific_name: str
+    inherence: Literal['identity', 'functional']
 
 
 @define
@@ -29,19 +44,4 @@ class CellAtlasSource(Enum):
     ALLEN_IMMUNE_HEALTH = 'Allen Immune Health 2025'
 
 
-@define
-class InherenceAtlasAnnotatedChannel:
-    """
-    'Inherence' refers to whether a marker represents an inherent
-    feature of a given cell, i.e. it is a cell identity marker,
-    or on the contrary it indicates a functional, mutable state.
-
-    A marker/channel represented with this object is regarded
-    in relation to a specific *atlas* in which it may (approximately) appear
-    as an available gene, and a specific *study* in which it
-    has been measured.
-    """
-    study_specific_name: str
-    atlas_specific_name: str
-    inherence: Literal['identity', 'functional']
 
