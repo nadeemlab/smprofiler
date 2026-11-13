@@ -74,3 +74,4 @@ scripts/models/
 # Atlas model training
 /models/
 .temporary_http_response_cache.sqlite.db
+cell_atlas_small.parquet
