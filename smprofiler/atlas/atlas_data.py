@@ -92,7 +92,7 @@ def load_atlas_subset(
     )
     return X
 
-def report_parquet_attributes(path: Path, smprofiler_to_atlas: dict[str, str]) -> None:
+def report_parquet_attributes(path: Path) -> None:
     size_mb = path.stat().st_size / (1024 ** 2)
     schema = pq.read_schema(path)
     names = list(schema.names)
@@ -101,9 +101,4 @@ def report_parquet_attributes(path: Path, smprofiler_to_atlas: dict[str, str]) -
         'Atlas parquet (%.1f MB): %s cells × %d genes — %s',
         size_mb, f'{n_rows:,}', len(names), path,
     )
-    missing = set(smprofiler_to_atlas.values()).difference(names)
-    if len(missing) > 0:
-        logger.error('Atlas does not actually contain: %s', missing)
-    else:
-        logger.info('All manually-mapped-to atlas gene names are actually in atlas.')
 

@@ -4,7 +4,7 @@ Command line entry point for atlas-reference model training.
 Example:
     smprofiler atlas train-atlas-models \\
         --database-config-file database_config_file \\
-        --output-dir models \\
+        --output-directory models \\
         [--max-cells 500000] [--study luad_progression] [--dry-run]
 """
 import argparse
@@ -34,7 +34,7 @@ def parse_args() -> argparse.Namespace:
         help="Name of the source atlas",
     )
     parser.add_argument(
-        "--output-dir",
+        "--output-directory",
         default="models",
         help="Output directory for ONNX models and metadata",
     )
@@ -61,6 +61,11 @@ def parse_args() -> argparse.Namespace:
         help="Print the training plan without actually training any models",
     )
     parser.add_argument(
+        "--save-to-database",
+        action="store_true",
+        help="Save models to the database in addition to local files.",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Enable DEBUG logging",
@@ -70,7 +75,7 @@ def parse_args() -> argparse.Namespace:
 
 def main(args: argparse.Namespace) -> None:
     try:
-        from smprofiler.atlas import training
+        from smprofiler.atlas.training_orchestrator import TrainingOrchestrator
         from smprofiler.atlas.reporting import set_atlas_log_level
         from smprofiler.atlas.reporting import suppress_third_party_logging
     except ModuleNotFoundError as exception:
@@ -81,14 +86,17 @@ def main(args: argparse.Namespace) -> None:
     set_atlas_log_level(args.verbose)
 
     try:
-        training.run(
+        t = TrainingOrchestrator(
             Path(args.database_config_file),
-            Path(args.output_dir),
+            args.atlas_source,
+            Path(args.output_directory),
             max_cells=args.max_cells,
             study=args.study,
             cv_folds=args.cv_folds,
             dry_run=args.dry_run,
+            save_to_database=args.save_to_database,
         )
+        t.run()
     except (FileNotFoundError, RuntimeError) as exception:
         logger.error('%s', exception)
         sys.exit(1)

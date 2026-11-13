@@ -13,7 +13,6 @@ from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)
 
-# Metadata columns returned by list_atlas_models (everything except the ONNX bytes).
 _METADATA_COLUMNS = (
     'id', 'study', 'target_channel', 'input_channels', 'architecture_type',
     'std_method', 'onnx_input_dtype', 'onnx_has_std', 'atlas_version', 'cv_r2', 'test_r2',
