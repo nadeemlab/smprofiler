@@ -1,11 +1,9 @@
-"""Access to the aggregated atlas artifacts.
+"""Access to the aggregated atlas artifact.
 
-Reads the two files produced by the atlas aggregation step (in smprofiler-data):
+Reads the files produced by the atlas aggregation step (in smprofiler-data):
 
 - ``cell_atlas_small.parquet`` - a cell × gene expression table restricted to
   the atlas genes relevant to SMProfiler channels.
-- ``smprofiler_channels_to_atlas.tsv`` - the manual mapping from SMProfiler channel
-  names to atlas gene names.
 """
 import time
 from pathlib import Path

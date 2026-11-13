@@ -111,14 +111,14 @@ class TrainingOrchestrator:
             model_counter += number_new_models
             number_validated += validated
             number_validated_std += validated_std
-        self._store_models_in_db(self.options.database_config_file, model_records)
+        self._store_models_in_db(model_records)
         self._report_execution_summary(run_start, model_counter, number_validated, number_validated_std, summary_rows)
 
     def _store_models_in_db(self, model_records: list[dict] | None) -> None:
         if (not self.save_to_database) or model_records is None or len(model_records) == 0:
             logger.info('Not storing models in database.')
             return
-        store_models_in_db(self.database_config_file, model_records)
+        store_models_in_db(self.options.database_config_file, model_records)
 
     def _report_execution_summary(self, run_start, number_models: int, number_validated: int, number_validated_std: int, summary_rows: list[dict]):
         total_elapsed = format_elapsed(time.monotonic() - run_start)
