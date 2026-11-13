@@ -11,8 +11,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from smprofiler.atlas.types import CellAtlasSource
 from smprofiler.standalone_utilities.module_load_error import SuggestExtrasException
-from smprofiler.db.exchange_data_formats.atlas_models import CellAtlasSource
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger('train-atlas-models')

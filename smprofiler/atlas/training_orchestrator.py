@@ -18,7 +18,7 @@ from smprofiler.atlas.reporting import format_elapsed, section
 from smprofiler.db.accessors.atlas_models import store_models_in_db
 from smprofiler.atlas.extract_relevant_atlas import ExtractRelevantCellAtlas
 from smprofiler.atlas.extract_relevant_atlas import DEFAULT_ATLAS_SMALL
-from smprofiler.db.exchange_data_formats.atlas_models import CellAtlasSource
+from smprofiler.atlas.types import CellAtlasSource
 from smprofiler.atlas.types import TrainingScenarioStudy
 from smprofiler.atlas.types import TrainingOptions
 from smprofiler.atlas.training_planning import TrainingPlanner
@@ -77,7 +77,7 @@ class TrainingOrchestrator:
         self._consider_extract_from_atlas()
 
     def _consider_extract_from_atlas(self) -> None:
-        e = ExtractRelevantCellAtlas(database_config_file=self.database_config_file, extraction_path=DEFAULT_ATLAS_SMALL)
+        e = ExtractRelevantCellAtlas(database_config_file=self.database_config_file, extraction_path=Path(DEFAULT_ATLAS_SMALL))
         if not exists(DEFAULT_ATLAS_SMALL):
             e.extract(write_table=True)
         else:
@@ -90,7 +90,6 @@ class TrainingOrchestrator:
 
     def _execution(self) -> None:
         self.planner.report_plan_options(self.plan)
-
         random_number_generator = default_rng(42)
         run_start = time.monotonic()
         model_counter = 0
@@ -113,7 +112,6 @@ class TrainingOrchestrator:
             model_counter += number_new_models
             number_validated += validated
             number_validated_std += validated_std
-
         self._store_models_in_db(self.options.database_config_file, model_records)
         self._report_execution_summary(run_start, model_counter, number_validated, number_validated_std, summary_rows)
 

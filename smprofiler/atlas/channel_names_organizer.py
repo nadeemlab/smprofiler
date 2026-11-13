@@ -14,7 +14,7 @@ from typing import Literal
 from psycopg import sql as psycopg_sql
 from psycopg import Cursor as PsycopgCursor
 
-from smprofiler.db.exchange_data_formats.atlas_models import CellAtlasSource
+from smprofiler.atlas.types import CellAtlasSource
 from smprofiler.db.exchange_data_formats.atlas_models import InherenceAtlasAnnotatedChannel
 from smprofiler.standalone_utilities.asset_loading import retrieve_from_library
 from smprofiler.db.querying import QueryHandler

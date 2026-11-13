@@ -12,7 +12,6 @@ from pathlib import Path
 
 import numpy as np
 from numpy.typing import NDArray
-from pandas import read_csv
 import pyarrow.parquet as pq
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
@@ -20,23 +19,6 @@ from smprofiler.atlas.reporting import format_elapsed
 
 logger = colorized_logger(__name__)
 
-
-def load_channel_mapping(mapping_path: Path) -> dict[str, str]:
-    """
-    The manual SMProfiler-channel to atlas-gene mapping.
-
-    The source TSV has columns ``SMProfiler channel name`` and ``Atlas gene name``.
-    Several SMProfiler channels may map to the same atlas gene (e.g. CD45, CD45RA and
-    CD45RO all map to PTPRC), so the returned dict is many-to-one.
-
-    Returns:
-        dict mapping smprofiler_channel_name to atlas_gene_name.
-    """
-    df = read_csv(mapping_path, sep='\t')
-    columns = ('SMProfiler channel name', 'Atlas gene name')
-    if tuple(df.columns) != columns:
-        raise ValueError(f'Wrong columns: {columns}')
-    return dict(df.itertuples(index=False))
 
 def load_atlas_subset(
     parquet_path: Path,

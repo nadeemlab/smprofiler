@@ -1,7 +1,6 @@
 from pathlib import Path
 from io import BytesIO
 from os.path import exists
-from typing import Any
 
 from pyarrow import Table as pyarrow_Table
 from pyarrow.parquet import ParquetFile
@@ -10,8 +9,9 @@ from pyarrow.parquet import ParquetWriter
 from smprofiler.atlas.channel_names_organizer import ChannelNamesOrganizer
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
-from smprofiler.atlas.atlas_file_retrieval import CellAtlasSource
+from smprofiler.atlas.types import CellAtlasSource
 from smprofiler.atlas.atlas_file_retrieval import AtlasFileRetrieval
+from smprofiler.atlas.atlas_data import report_parquet_attributes
 
 logger = colorized_logger(__name__)
 

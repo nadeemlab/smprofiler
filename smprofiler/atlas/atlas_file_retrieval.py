@@ -6,7 +6,7 @@ import anndata as ad
 from pandas import DataFrame
 from tqdm import tqdm
 
-from smprofiler.db.exchange_data_formats.atlas_models import CellAtlasSource
+from smprofiler.atlas.types import CellAtlasSource
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
 logger = colorized_logger(__name__)

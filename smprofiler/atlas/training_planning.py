@@ -3,7 +3,7 @@ from pathlib import Path
 from smprofiler.atlas.types import TrainingOptions
 from smprofiler.atlas.types import TrainingScenarioStudy
 from smprofiler.atlas.channel_names_organizer import ChannelNamesOrganizer
-from smprofiler.db.exchange_data_formats.atlas_models import CellAtlasSource
+from smprofiler.atlas.types import CellAtlasSource
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 from smprofiler.atlas.reporting import section
 from smprofiler.atlas.reporting import subsection
