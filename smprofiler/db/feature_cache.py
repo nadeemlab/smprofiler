@@ -16,7 +16,7 @@ from sqlalchemy import Connection as SQLAlchemyConnection
 from smprofiler.db.database_connection import DBConnection
 from smprofiler.db.database_connection import DBCursor
 from smprofiler.db.credentials import retrieve_credentials_from_file
-from smprofiler.db.credentials import MissingKeysError 
+from smprofiler.db.credentials import MissingKeysError
 from smprofiler.db.credentials import get_credentials_from_environment
 from smprofiler.db.describe_features import get_handle
 from smprofiler.standalone_utilities.chainable_destructable_resource import ChainableDestructableResource

@@ -2,7 +2,7 @@
 
 import re
 
-from pandas import read_sql  # type: ignore
+from pandas import DataFrame
 
 from smprofiler.db.database_connection import QueryCursor
 from smprofiler.db.exchange_data_formats.study import (
@@ -154,14 +154,14 @@ class QueryHandler:
 
     @classmethod
     def get_channel_annotations(cls, cursor) -> ChannelAnnotations:
-        groups = read_sql(
-            '''
-            SELECT name, color, channel_specific
-            FROM channel_in_group cg
-            JOIN channel_group g ON g.name=cg._group;
-            ''',
-            cursor.connection,
-        )
+        query = '''
+        SELECT name, color, channel_specific
+        FROM channel_in_group cg
+        JOIN channel_group g ON g.name=cg._group;
+        '''
+        cursor.execute(query)
+        rows = tuple(cursor.fetchall())
+        groups = DataFrame(rows, columns=['name', 'color', 'channel_specific'])
         return ChannelAnnotations(channelGroups={
             name: ChannelGroupAnnotation(
                 channels=sorted(list(set(group['channel_specific']))),
