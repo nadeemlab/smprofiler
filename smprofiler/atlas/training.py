@@ -69,7 +69,7 @@ class TrainingStudy:
             self.options.parquet_atlas_path,
             atlas_channels_for_training,
             max_cells=self.options.max_cells,
-            rng=self.random_number_generator,
+            rng=self.rng,
         )
         X_identity_unscaled = X_unfiltered_unscaled[:, [i for i, name in enumerate(atlas_channels_for_training) if name in id_in_atlas]]
 
