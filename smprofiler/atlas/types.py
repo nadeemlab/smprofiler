@@ -2,7 +2,14 @@ from pathlib import Path
 from enum import Enum
 from typing import Literal
 
+from numpy.typing import NDArray
+from sklearn.pipeline import Pipeline
+
 from attrs import define
+
+
+class CellAtlasSource(Enum):
+    ALLEN_IMMUNE_HEALTH = 'Allen Immune Health 2025'
 
 
 @define
@@ -30,6 +37,15 @@ class TrainingScenarioStudy:
     def get_channels(self, group: str) -> tuple[InherenceAtlasAnnotatedChannel, ...]:
         return tuple(filter(lambda c: c.inherence == group, self.channels))
 
+    def get_channels_study_specific_strs(self, group: str) -> tuple[InherenceAtlasAnnotatedChannel, ...]:
+        return tuple(map(
+            lambda c: c.study_specific_name,
+            filter(lambda c: c.inherence == group, self.channels),
+        ))
+
+
+TrainingPlan = tuple[TrainingScenarioStudy, ...]
+
 
 @define
 class TrainingOptions:
@@ -40,8 +56,41 @@ class TrainingOptions:
     parquet_atlas_path: Path
 
 
-class CellAtlasSource(Enum):
-    ALLEN_IMMUNE_HEALTH = 'Allen Immune Health 2025'
+@define
+class TrainingProgress:
+    model_counter: int
+    number_validated: int
+    number_validated_std: int
+    summary_rows: list[dict]
+    model_records: list[dict]
 
 
+@define
+class Splits:
+    test_indices: NDArray
+    x_train: NDArray
+    x_test: NDArray
+    y_train: NDArray
+    y_test: NDArray
+    target_channel: str
+
+
+@define
+class SelectedModel:
+    model: Pipeline
+    name: str
+    cv_r2: float
+    cv_r2_std: float
+    training_time_formatted: str
+    training_time_seconds: float
+    test_r2: float
+    test_mae: float
+    global_std: float
+
+
+STD_METHODS = {
+    'bayesian_ridge': 'bayesian_posterior',
+    'random_forest': 'tree_ensemble_spread',
+    'extra_trees': 'tree_ensemble_spread',
+}
 

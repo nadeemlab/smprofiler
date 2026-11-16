@@ -42,6 +42,10 @@ class AtlasFileRetrieval:
         return files
 
     def _filter_out_full_file(self, files: Iterable[Path]) -> list[Path]:
+        """
+        A guard against accidental usage of the "..._full" source file in
+        the case of one specific atlas.
+        """
         files = list(files)
         for file in files:
             if re.search('full', str(file)):

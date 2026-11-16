@@ -1,32 +1,5 @@
-"""Model artifact production: ONNX export, ONNX validation, and metadata.
-
-Converts a fitted estimator to ONNX (via skl2onnx), appends the per-sample
-standard deviation and the z-score computation as ONNX nodes, verifies the
-exported graph reproduces the sklearn reference within tolerance, and writes the
-per-model JSON metadata.
-
-Exported graph contract (all tensors float32):
-
-- inputs: ``X`` of shape ``(n_cells, n_identity)``, raw identity-marker
-  intensities in ``input_channels`` order; ``measured`` of shape ``(n_cells,)``,
-  raw intensity of the target functional marker.
-- outputs: ``z`` (primary), ``mean``, ``std``, each of shape ``(n_cells,)``.
-  ``mean`` and ``std`` are on the raw intensity scale. Cells whose identity row
-  sums to zero have no atlas reference and yield ``NaN`` in all three.
-
-The identity-sum normalization used at training time is performed inside the
-graph, so callers pass raw values and treat the model as a black box.
-
-How the std reaches the graph depends on the architecture:
-
-- BayesianRidge: skl2onnx's ``return_std`` converter drops the element-wise
-  ``* X`` from sklearn's ``(X @ sigma_ * X).sum(1)`` and is therefore wrong (see
-  ``docs/skl2onnx_bayesian_ridge_std_bug.md``). The exact formula is appended as
-  nodes instead (:func:`_append_bayesian_ridge_std`).
-- RandomForest / ExtraTrees: skl2onnx emits one ``TreeEnsembleRegressor`` that
-  outputs only the mean. It is re-emitted with one target per tree, and the mean
-  and calibrated spread are computed from the per-tree predictions
-  (:func:`_append_tree_ensemble_std`).
+"""
+ONNX model artifact export, validation, and metadata.
 """
 import json
 from pathlib import Path
@@ -42,25 +15,24 @@ from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import BayesianRidge
 from onnxruntime import InferenceSession
-from onnxruntime import SessionOptions  # type: ignore  # conditionally imported due to c binding under the hood
+from onnxruntime import SessionOptions
 
 from smprofiler.standalone_utilities.log_formats import colorized_logger
-from smprofiler.atlas.model_selection_fitting import predict_with_std
+from smprofiler.atlas.model_selection_fitting import ModelSelectionFitting
 
 logger = colorized_logger(__name__)
 
 ONNX_INPUT_NAMES = ('X', 'measured')
 ONNX_OUTPUT_NAMES = ('z', 'mean', 'std')
 
-# Opset pins: ReduceSum/Unsqueeze with axes as an input need the default domain at
-# 13 or later; ai.onnx.ml 3 keeps TreeEnsembleRegressor (not the newer TreeEnsemble).
+# ONNX operation set versions required or at least targeted.
 _TARGET_OPSET = {'': 17, 'ai.onnx.ml': 3}
 
 _MEAN_RELATIVE_L1_TOLERANCE = 1e-3
-_STD_RTOL = 1e-2
-_STD_ATOL = 1e-6
-_Z_RTOL = 1e-2
-_Z_ATOL = 1e-3
+_STD_RELATIVE_TOLERANCE = 1e-2
+_STD_ABSOLUTE_TOLERANCE = 1e-6
+_Z_RELATIVE_TOLERANCE = 1e-2
+_Z_ABSOLUTE_TOLERANCE = 1e-3
 _SIZE_WARNING_BYTES = 5_000_000
 
 
@@ -74,11 +46,13 @@ def export_to_onnx(
     tree_calibration: float = 1.0,
 ) -> None:
     """
-    Convert a fitted candidate pipeline to ONNX with the (X, measured) -> (z, mean, std)
-    contract described in the module docstring, and save it.
+    Convert a fitted candidate scikit-learn pipeline to ONNX with the
+    signature
+        (identity vector, measured functional)
+            -> (z score, mean, standard deviation)
 
-    `tree_calibration` is the γ factor for the tree ensembles' spread (see
-    `model_selection_fitting._tree_std_calibration`); ignored for BayesianRidge.
+    `tree_calibration` is for adjusting the tree ensembles' variance,
+    if applicable. (see `model_selection_fitting._tree_std_calibration`)
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tensor_type = DoubleTensorType if double_precision else FloatTensorType
@@ -91,7 +65,7 @@ def export_to_onnx(
     elif isinstance(estimator, (RandomForestRegressor, ExtraTreesRegressor)):
         _append_tree_ensemble_std(onnx_model, model, tree_calibration, double_precision)
     else:
-        raise ValueError(f'No ONNX std path for model "{model_name}" ({type(estimator).__name__}).')
+        raise ValueError(f'No ONNX standard deviation prediction capability for model "{model_name}" ({type(estimator).__name__}).')
     _prepend_row_sum_normalization_and_z(onnx_model, double_precision)
     _deduplicate_opset_imports(onnx_model)
     checker.check_model(onnx_model)
@@ -298,7 +272,7 @@ def reference_outputs(
     model_name: str,
     X_raw: NDArray,
     measured_raw: NDArray,
-    tree_calibration: float = 1.0,
+    tree_calibration: float | None = None,
 ) -> tuple[NDArray, NDArray, NDArray]:
     """
     The numpy/sklearn reference for the ONNX contract: (z, mean, std) from raw inputs.
@@ -310,7 +284,9 @@ def reference_outputs(
     valid = row_sums > 0
     safe_sums = np.where(valid, row_sums, 1.0)
     X_normalized = X_raw / safe_sums[:, np.newaxis]
-    mean_normalized, std_normalized = predict_with_std(sklearn_model, model_name, X_normalized, tree_calibration)
+    mean_normalized, std_normalized = ModelSelectionFitting.predict_with_std(
+        sklearn_model, model_name, X_normalized, tree_calibration,
+    )
     with np.errstate(divide='ignore', invalid='ignore'):
         z = (measured_raw / safe_sums - mean_normalized) / std_normalized
     mean = mean_normalized * safe_sums
@@ -350,11 +326,11 @@ def validate_onnx(
     if not mean_concordance:
         logger.error('ONNX validation, mean vs. sklearn: relative L1 difference = %.6f (tolerated up to %E)', mean_difference, _MEAN_RELATIVE_L1_TOLERANCE)
 
-    std_concordance = bool(np.allclose(onnx_std, std, rtol=_STD_RTOL, atol=_STD_ATOL, equal_nan=True))
+    std_concordance = bool(np.allclose(onnx_std, std, rtol=_STD_RELATIVE_TOLERANCE, atol=_STD_ABSOLUTE_TOLERANCE, equal_nan=True))
     if not std_concordance:
         logger.warning('ONNX validation, std vs. sklearn: max abs difference = %.6f', float(np.nanmax(np.abs(onnx_std - std))))
 
-    z_concordance = bool(np.allclose(onnx_z, z, rtol=_Z_RTOL, atol=_Z_ATOL, equal_nan=True))
+    z_concordance = bool(np.allclose(onnx_z, z, rtol=_Z_RELATIVE_TOLERANCE, atol=_Z_ABSOLUTE_TOLERANCE, equal_nan=True))
     if not z_concordance:
         logger.error('ONNX validation, z vs. sklearn: max abs difference = %.6f', float(np.nanmax(np.abs(onnx_z - z))))
 
@@ -382,7 +358,7 @@ def write_metadata_to_file(
     global_std: float = float('nan'),
     onnx_input_dtype: str = 'float32',
     onnx_has_std: bool = True,
-    tree_calibration: float = 1.0,
+    tree_calibration: float | None = None,
 ) -> None:
     meta = {
         'study': study,
@@ -403,7 +379,7 @@ def write_metadata_to_file(
         'onnx_has_std': onnx_has_std,
         'onnx_inputs': list(ONNX_INPUT_NAMES),
         'onnx_outputs': list(ONNX_OUTPUT_NAMES),
-        'tree_calibration': round(float(tree_calibration), 8),
+        'tree_calibration': None if tree_calibration is None else round(float(tree_calibration), 8),
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w') as f:

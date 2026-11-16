@@ -4,11 +4,9 @@ Command line entry point for atlas-reference model training.
 Example:
     smprofiler atlas train-atlas-models \\
         --database-config-file database_config_file \\
-        --output-directory models \\
         [--max-cells 500000] [--study luad_progression] [--dry-run]
 """
 import argparse
-import sys
 from pathlib import Path
 
 from smprofiler.atlas.types import CellAtlasSource
@@ -26,7 +24,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--database-config-file",
-        help="Database credentials file, see template in the repository."
+        help="Database credentials file, see template in the repository"
     )
     parser.add_argument(
         "--atlas-source",
@@ -63,7 +61,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--save-to-database",
         action="store_true",
-        help="Save models to the database in addition to local files.",
+        help="Save models to the database in addition to local files",
     )
     parser.add_argument(
         "--verbose",
@@ -85,21 +83,17 @@ def main(args: argparse.Namespace) -> None:
     suppress_third_party_logging()
     set_atlas_log_level(args.verbose)
 
-    try:
-        t = TrainingOrchestrator(
-            Path(args.database_config_file),
-            args.atlas_source,
-            Path(args.output_directory),
-            max_cells=args.max_cells,
-            study=args.study,
-            cv_folds=args.cv_folds,
-            dry_run=args.dry_run,
-            save_to_database=args.save_to_database,
-        )
-        t.run()
-    except (FileNotFoundError, RuntimeError) as exception:
-        logger.error('%s', exception)
-        sys.exit(1)
+    t = TrainingOrchestrator(
+        Path(args.database_config_file),
+        args.atlas_source,
+        Path(args.output_directory),
+        max_cells=args.max_cells,
+        study=args.study,
+        cv_folds=args.cv_folds,
+        dry_run=args.dry_run,
+        save_to_database=args.save_to_database,
+    )
+    t.run()
 
 
 if __name__ == "__main__":
