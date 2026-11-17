@@ -14,7 +14,7 @@ from os.path import exists
 
 from numpy.random import default_rng
 
-from smprofiler.db.accessors.atlas_models import store_models_in_db
+from smprofiler.db.accessors.atlas_models import StoredAtlasModels
 from smprofiler.atlas.reporting import report_execution_summary
 from smprofiler.atlas.extract_relevant_atlas import ExtractRelevantCellAtlas
 from smprofiler.atlas.extract_relevant_atlas import DEFAULT_ATLAS_SMALL
@@ -111,6 +111,6 @@ class TrainingOrchestrator:
         if (not self.save_to_database) or model_records is None or len(model_records) == 0:
             logger.info('Not storing models in database.')
             return
-        store_models_in_db(self.options.database_config_file, model_records)
+        StoredAtlasModels.store_models_in_db(self.options.database_config_file, model_records)
 
 
