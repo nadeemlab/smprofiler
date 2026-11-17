@@ -26,8 +26,8 @@ from smprofiler.atlas.types import STD_METHODS
 from smprofiler.atlas.extract_relevant_atlas import LoadFromExtraction
 from smprofiler.atlas.model_selection_fitting import TREE_METHODS
 from smprofiler.atlas.model_selection_fitting import ModelSelectionFitting
-from smprofiler.atlas.artifacts import export_to_onnx
-from smprofiler.atlas.artifacts import validate_onnx
+from smprofiler.atlas.artifacts import SklearnToONNX
+from smprofiler.atlas.artifacts import SklearnToONNXValidation
 from smprofiler.atlas.artifacts import write_metadata_to_file
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 
@@ -205,7 +205,7 @@ class TrainingStudy:
     def _validate_onnx(self) -> tuple[bool, bool]:
         n_validate = min(500, len(self._splits.test_indices))
         validation_indices = self._splits.test_indices[:n_validate]
-        ordinary, std = validate_onnx(
+        ordinary, std = SklearnToONNXValidation.validate_onnx(
             self._get_onnx_model_path(),
             self._selected.model,
             self._selected.name,
@@ -226,7 +226,7 @@ class TrainingStudy:
         return tree_calibration
 
     def _export(self) -> None:
-        export_to_onnx(
+        SklearnToONNX.export_to_onnx(
             self._selected.model,
             self._selected.name,
             self.feature_matrices.reference_cell_data_identity_normalized.shape[1],

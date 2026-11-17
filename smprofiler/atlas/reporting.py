@@ -63,7 +63,7 @@ def report_execution_summary(run_start, options: TrainingOptions, progress: Trai
     print(f'Number of ONNX models validated against sklearn original, standard deviation prediction: {progress.number_validated_std}')
 
     def _shorten(string: str, to: int = 23) -> str:
-        return string[0:min(len(string))]
+        return string[0:min(len(string), to)]
 
     if progress.summary_rows:
         header = (f'  {"Study":<24}  {"Target":<16}  {"Model":<24}  {"Std method":<22}'
