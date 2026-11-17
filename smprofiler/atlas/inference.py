@@ -1,4 +1,5 @@
-"""Run a trained atlas-reference model to determine per-cell "atlas-relative" z-scores.
+"""
+Run a trained atlas-reference model to determine per-cell "atlas-relative" z-scores.
 
 The ONNX models take raw identity-marker intensities `X` (columns in the model's
 `input_channels` order) and the raw measured intensity of the target functional

@@ -40,6 +40,7 @@ class StoredAtlasModels:
 
     @classmethod
     def _store_atlas_model(
+        cls,
         cursor: PsycopgCursor,
         *,
         study: str,
