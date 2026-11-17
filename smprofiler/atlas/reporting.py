@@ -72,10 +72,10 @@ def report_execution_summary(run_start, options: TrainingOptions, progress: Trai
         print('  ' + '-' * (_SUMMARY_WIDTH - 2), flush=True)
         for row in progress.summary_rows:
             print(
-                f'  {_shorten(row["study"]):<24}  {row["target"]:<16}  {row["model"]:<24}'
+                f'  {_shorten(row["study"]):<24}  {row["target_channel"]:<16}  {row["architecture_type"]:<24}'
                 f'  {row["std_method"]:<22}'
                 f'  {row["cv_r2"]:>8.4f}  {row["test_r2"]:>8.4f}'
-                f'  {row["test_MAE"]:>10.4f}  {row["onnx_kb"]:>6}',
+                f'  {row["test_mae"]:>10.4f}  {row["onnx_kb"]:>6}',
                 flush=True,
             )
     print(f'\nModels saved to: {options.output_directory.resolve()}', flush=True)

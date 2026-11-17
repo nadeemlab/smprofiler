@@ -150,12 +150,13 @@ class TrainingStudy:
         return reference_cell_data, reference_cell_data_identity, row_sums
 
     def _normalized_feature_matrix(self, reference_cell_data_identity: NDArray, row_sums: NDArray) -> NDArray:
-        reference_cell_data_identity_normalized = reference_cell_data_identity / row_sums[np_newaxis]
+        reference_cell_data_identity_normalized = reference_cell_data_identity / row_sums[:, np_newaxis]
         logger.info(
             'Features : %d identity markers, %s cells (after sum>0 filter)',
             reference_cell_data_identity_normalized.shape[1],
-            f'{reference_cell_data_identity_normalized:,}',
+            f'{reference_cell_data_identity_normalized.shape[0]}',
         )
+        return reference_cell_data_identity_normalized
 
     def _form_splits(self, target_column: int, target_channel: str) -> bool:
         y = self.feature_matrices.reference_cell_data[:, target_column] / self.feature_matrices.row_sums
@@ -261,7 +262,7 @@ class TrainingStudy:
                 'onnx_bytes': self._get_onnx_model_path().read_bytes(),
                 'training_time_seconds': self._selected.training_time_seconds,
             })
-        summary_keys = ['study', 'target', 'architecture_type', 'std_method', 'cv_r2', 'test_r2', 'test_mae']
+        summary_keys = ['study', 'target_channel', 'architecture_type', 'std_method', 'cv_r2', 'test_r2', 'test_mae']
         self.progress.summary_rows.append(
             {k: metadata[k] for k in summary_keys} | {
                 'onnx_kb': self._get_onnx_model_path().stat().st_size // 1024,

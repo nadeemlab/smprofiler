@@ -23,7 +23,7 @@ from smprofiler.atlas.types import TrainingScenarioStudy
 from smprofiler.atlas.types import TrainingOptions
 from smprofiler.atlas.types import TrainingProgress
 from smprofiler.atlas.training_planning import TrainingPlanner
-from smprofiler.atlas.training import TrainingStudy
+from smprofiler.atlas.training_study import TrainingStudy
 from smprofiler.atlas.reporting import report_plan_options
 from smprofiler.standalone_utilities.log_formats import colorized_logger
 

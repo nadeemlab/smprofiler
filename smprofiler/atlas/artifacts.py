@@ -345,7 +345,7 @@ def write_metadata_to_file(
     study: str,
     target_channel: str,
     input_channels: list[str],
-    model_type: str,
+    architecture_type: str,
     cv_r2: float,
     cv_r2_std: float,
     test_r2: float,
@@ -364,7 +364,7 @@ def write_metadata_to_file(
         'study': study,
         'target_channel': target_channel,
         'input_channels': input_channels,
-        'model_type': model_type,
+        'architecture_type': architecture_type,
         'cv_r2': round(cv_r2, 6),
         'cv_r2_std': round(cv_r2_std, 6),
         'test_r2': round(test_r2, 6),
@@ -385,3 +385,4 @@ def write_metadata_to_file(
     with open(output_path, 'w') as f:
         json.dump(meta, f, indent=2)
     logger.info('Metadata saved: %s', output_path)
+
