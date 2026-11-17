@@ -14,6 +14,7 @@ CREATE TABLE atlas_model (
     onnx_has_std BOOLEAN NOT NULL DEFAULT true,
     atlas_version VARCHAR,
     cv_r2 DOUBLE PRECISION,
+    cv_r2_std DOUBLE PRECISION,
     test_r2 DOUBLE PRECISION,
     test_mae DOUBLE PRECISION,
     n_train INTEGER,

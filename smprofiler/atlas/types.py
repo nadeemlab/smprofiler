@@ -73,6 +73,7 @@ class Splits:
     y_train: NDArray
     y_test: NDArray
     target_channel: str
+    target_column: int
 
 
 @define

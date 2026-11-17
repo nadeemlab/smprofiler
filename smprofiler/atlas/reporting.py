@@ -61,6 +61,10 @@ def report_execution_summary(run_start, options: TrainingOptions, progress: Trai
     section(f'Training complete - {progress.model_counter} models in {total_elapsed}')
     print(f'Number of ONNX models validated against sklearn original, prediction: {progress.number_validated}')
     print(f'Number of ONNX models validated against sklearn original, standard deviation prediction: {progress.number_validated_std}')
+
+    def _shorten(string: str, to: int = 23) -> str:
+        return string[0:min(len(string))]
+
     if progress.summary_rows:
         header = (f'  {"Study":<24}  {"Target":<16}  {"Model":<24}  {"Std method":<22}'
                   f'  {"cv_R²":>8}  {"test_R²":>8}  {"test_MAE":>10}  {"KB":>6}')
@@ -68,9 +72,9 @@ def report_execution_summary(run_start, options: TrainingOptions, progress: Trai
         print('  ' + '-' * (_SUMMARY_WIDTH - 2), flush=True)
         for row in progress.summary_rows:
             print(
-                f'  {row["study"]:<24}  {row["target"]:<16}  {row["model"]:<24}'
+                f'  {_shorten(row["study"]):<24}  {row["target"]:<16}  {row["model"]:<24}'
                 f'  {row["std_method"]:<22}'
-                f'  {row["cv_R²"]:>8.4f}  {row["test_R²"]:>8.4f}'
+                f'  {row["cv_r2"]:>8.4f}  {row["test_r2"]:>8.4f}'
                 f'  {row["test_MAE"]:>10.4f}  {row["onnx_kb"]:>6}',
                 flush=True,
             )

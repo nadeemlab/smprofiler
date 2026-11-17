@@ -39,10 +39,10 @@ ATLAS_VERSION = CellAtlasSource.ALLEN_IMMUNE_HEALTH.value
 
 @define
 class FeatureMatrices:
-    x_identity_raw: NDArray
-    x_identity: NDArray
-    x_unscaled: NDArray
-    x_valid_row_sums: NDArray
+    reference_cell_data: NDArray
+    reference_cell_data_identity: NDArray
+    reference_cell_data_identity_normalized: NDArray
+    row_sums: NDArray
 
 
 class TrainingStudy:
@@ -92,70 +92,96 @@ class TrainingStudy:
                 f'study="{study_name}"  target="{channel.atlas_specific_name}"  '
                 f'({index + 1}/{len(targets)} in study)'
             )
-            self._train_model_one_marker(index, channel.study_specific_name)
+            if not self._train_model_one_marker(index, channel.study_specific_name):
+                continue
             ordinary, std = self._validate_onnx()
             ordinary_concordances += 1 if ordinary else 0
             std_concordances += 1 if std else 0
+            self._cleanup_training_state()
         self.progress.model_counter += model_counter
         self.progress.number_validated += ordinary_concordances
         self.progress.number_validated_std += std_concordances
 
-    def _train_model_one_marker(self, target_column: int, target_channel: str) -> None:
-        self._form_splits(target_column, target_channel)
+    def _train_model_one_marker(self, target_column: int, target_channel: str) -> bool:
+        if not self._form_splits(target_column, target_channel):
+            logger.warning('Something went wrong forming cross validation split.')
+            return False
         self._train_and_select_best()
         self._export()
+        return True
 
     def _form_training_feature_matrices(self) -> None:
+        _reference_cell_data, _reference_cell_data_identity = self._load_from_extraction()
+        (
+            reference_cell_data,
+            reference_cell_data_identity,
+            row_sums,
+        ) = self._restrict_to_nontrivial(_reference_cell_data, _reference_cell_data_identity)
+        reference_cell_data_identity_normalized = self._normalized_feature_matrix(reference_cell_data_identity, row_sums)
+        self.feature_matrices = FeatureMatrices(
+            reference_cell_data,
+            reference_cell_data_identity,
+            reference_cell_data_identity_normalized,
+            row_sums,
+        )
+
+    def _load_from_extraction(self) -> tuple[NDArray, NDArray]:
         atlas_channels_for_training = list(map(lambda c: c.atlas_specific_name, self.scenario.channels))
         identity_only = list(map(lambda c: c.atlas_specific_name, self.scenario.get_channels('identity')))
-        x_unfiltered_unscaled = LoadFromExtraction.load(
+        _reference_cell_data = LoadFromExtraction.load(
             self.options.parquet_atlas_path,
             atlas_channels_for_training,
             max_cells=self.options.max_cells,
             rng=self.rng,
         )
-        x_identity_unscaled = x_unfiltered_unscaled[:, [i for i, name in enumerate(atlas_channels_for_training) if name in identity_only]]
+        identity_indices = [i for i, name in enumerate(atlas_channels_for_training) if name in identity_only]
+        _reference_cell_data_identity = _reference_cell_data[:, identity_indices]
+        return _reference_cell_data, _reference_cell_data_identity
 
-        row_sums_all = x_identity_unscaled.sum(axis=1)
-        valid_mask = row_sums_all > 1e-8
-        n_zero_sum = int((~valid_mask).sum())
-        if n_zero_sum:
-            logger.info('  Removed %d cells with zero identity-channel sum', n_zero_sum)
-        x_identity_raw = x_identity_unscaled[valid_mask]
-        x_identity = x_identity_raw / row_sums_all[valid_mask, np_newaxis]
-        x_unscaled = x_unfiltered_unscaled[valid_mask]
+    def _restrict_to_nontrivial(self, _reference_cell_data, _reference_cell_data_identity) -> tuple[NDArray, NDArray, NDArray]:
+        _row_sums = _reference_cell_data_identity.sum(axis=1)
+        valid_mask = _row_sums > 1e-8
+        number_zero_sum = int((~valid_mask).sum())
+        if number_zero_sum:
+            logger.info('Removed %d cells with zero identity-channel sum', number_zero_sum)
+        reference_cell_data = _reference_cell_data[valid_mask]
+        reference_cell_data_identity = _reference_cell_data_identity[valid_mask]
+        row_sums = _row_sums[valid_mask]
+        return reference_cell_data, reference_cell_data_identity, row_sums
 
-        self.feature_matrices = FeatureMatrices(
-            x_identity_raw,
-            x_identity,
-            x_unscaled,
-            row_sums_all[valid_mask],
-        )
-
+    def _normalized_feature_matrix(self, reference_cell_data_identity: NDArray, row_sums: NDArray) -> NDArray:
+        reference_cell_data_identity_normalized = reference_cell_data_identity / row_sums[np_newaxis]
         logger.info(
-            '  Normalized: %s cells retained  (%.2f%% of loaded)',
-            f'{self.feature_matrices.x_identity.shape[0]:,}',
-            100.0 * self.feature_matrices.x_identity.shape[0] / x_unfiltered_unscaled.shape[0],
+            'Features : %d identity markers, %s cells (after sum>0 filter)',
+            reference_cell_data_identity_normalized.shape[1],
+            f'{reference_cell_data_identity_normalized:,}',
         )
 
-    def _form_splits(self, target_column: int, target_channel: str) -> None:
-        y = self.feature_matrices.x_unscaled[:, target_column] / self.feature_matrices.x_valid_row_sums
+    def _form_splits(self, target_column: int, target_channel: str) -> bool:
+        y = self.feature_matrices.reference_cell_data[:, target_column] / self.feature_matrices.row_sums
 
         if y.std() < 1e-6:
             logger.warning("Skipping: target '%s' has near-zero variance", target_channel)
-            return False, False
+            self._cleanup_training_state()
+            return False
 
-        logger.info('  Features : %d identity markers, %s cells (after S>0 filter)', self.feature_matrices.x_identity.shape[1], f'{self.feature_matrices.x_identity.shape[0]:,}')
-        logger.info('  Target   : "%s" (norm; range %.4f - %.4f, mean %.4f)', target_channel, float(y.min()), float(y.max()), float(y.mean()))
+        logger.info(
+            '  Target   : "%s" (norm; range %.4f - %.4f, mean %.4f)',
+            target_channel,
+            float(y.min()),
+            float(y.max()),
+            float(y.mean()),
+        )
 
         train_indices, test_indices = cast(tuple[NDArray, NDArray], train_test_split(
             np_arange(len(y)), test_size=0.2, random_state=42
         ))
-        x = self.feature_matrices.x_identity
+        x = self.feature_matrices.reference_cell_data_identity_normalized
         x_train, x_test = x[train_indices], x[test_indices]
         y_train, y_test = y[train_indices], y[test_indices]
         logger.info('  Split    : %s train / %s test', f'{len(x_train):,}', f'{len(x_test):,}')
-        self._splits = Splits(test_indices, x_train, x_test, y_train, y_test, target_channel)
+        self._splits = Splits(test_indices, x_train, x_test, y_train, y_test, target_channel, target_column)
+        return True
 
     def _train_and_select_best(self) -> str:
         t_train_start = time.monotonic()
@@ -175,15 +201,15 @@ class TrainingStudy:
         self._tree_calibration = self._get_tree_calibration()
         report_model_stats(self._selected)
 
-    def _validate(self) -> tuple[bool, bool]:
+    def _validate_onnx(self) -> tuple[bool, bool]:
         n_validate = min(500, len(self._splits.test_indices))
         validation_indices = self._splits.test_indices[:n_validate]
         ordinary, std = validate_onnx(
             self._get_onnx_model_path(),
             self._selected.model,
             self._selected.name,
-            self.feature_matrices.x_identity_raw[validation_indices],
-            self.feature_matrices.x_unscaled[validation_indices, self._splits.target_column],
+            self.feature_matrices.reference_cell_data_identity[validation_indices],
+            self.feature_matrices.reference_cell_data[validation_indices, self._splits.target_column],
             double_precision=False,
             tree_calibration=self._tree_calibration,
         )
@@ -202,62 +228,50 @@ class TrainingStudy:
         export_to_onnx(
             self._selected.model,
             self._selected.name,
-            self.feature_matrices.x_identity.shape[1],
+            self.feature_matrices.reference_cell_data_identity_normalized.shape[1],
             self._get_onnx_model_path(),
             double_precision=False,
             tree_calibration=self._tree_calibration,
         )
-
+        metadata = {
+            'study': self.scenario.study_handle,
+            'target_channel': self._splits.target_channel,
+            'input_channels': self.scenario.get_channels_study_specific_strs('identity'),
+            'architecture_type': self._selected.name,
+            'cv_r2': self._selected.cv_r2,
+            'cv_r2_std': self._selected.cv_r2_std,
+            'test_r2': self._selected.test_r2,
+            'test_mae': self._selected.test_mae,
+            'n_train': len(self._splits.x_train),
+            'n_test': len(self._splits.x_test),
+            'atlas_version': ATLAS_VERSION,
+            'std_method': STD_METHODS[self._selected.name],
+            'onnx_input_dtype': 'float32',
+            'onnx_has_std': True,
+        }
         write_metadata_to_file(
             self._get_onnx_metadata_path(),
-            study=self.scenario.study_handle,
-            target_channel=self._splits.target_channel,
-            input_channels=self.scenario.get_channels_study_specific_strs('identity'),
-            model_type=self._selected.name,
-            cv_r2=self._selected.cv_r2,
-            cv_r2_std=self._selected.cv_r2_std,
-            test_r2=self._selected.test_r2,
-            test_mae=self._selected.test_mae,
-            n_train=len(self._splits.x_train),
-            n_test=len(self._splits.x_test),
-            atlas_version=ATLAS_VERSION,
+            **metadata,
             sum_normalized=True,
-            std_method=STD_METHODS[self._selected.name],
             global_std=self._selected.global_std,
-            onnx_input_dtype='float32',
-            onnx_has_std=True,
             tree_calibration=self._tree_calibration,
         )
-
-        self.progress.summary_rows.append({
-            'study': self.scenario.study_handle,
-            'target': self._splits.target_channel,
-            'model': self._selected.name,
-            'std_method': STD_METHODS[self._selected.name],
-            'cv_R²': self._selected.cv_r2,
-            'test_R²': self._selected.test_r2,
-            'test_MAE': self._selected.test_mae,
-            'onnx_kb': self._get_onnx_model_path().stat().st_size // 1024,
-        })
-
         if self.options.database_config_file is not None:
-            self.progress.model_records.append({
-                'study': self.scenario.study_handle,
-                'target_channel': self._splits.target_channel,
-                'input_channels': self.scenario.get_channels_study_specific_strs('identity'),
-                'architecture_type': self._seleced.name,
-                'std_method': STD_METHODS[self._selected.name],
-                'onnx_input_dtype': 'float32',
-                'onnx_has_std': True,
-                'atlas_version': ATLAS_VERSION,
-                'cv_r2': self._selected.cv_r2,
-                'test_r2': self._selected.test_r2,
-                'test_mae': self._selected.test_mae,
-                'n_train': len(self._splits.x_train),
-                'n_test': len(self._splits.x_test),
-                'training_time_seconds': self._selected.train_seconds,
+            self.progress.model_records.append(metadata | {
                 'onnx_bytes': self._get_onnx_model_path().read_bytes(),
+                'training_time_seconds': self._selected.training_time_seconds,
             })
+        summary_keys = ['study', 'target', 'architecture_type', 'std_method', 'cv_r2', 'test_r2', 'test_mae']
+        self.progress.summary_rows.append(
+            {k: metadata[k] for k in summary_keys} | {
+                'onnx_kb': self._get_onnx_model_path().stat().st_size // 1024,
+            }
+        )
+
+    def _cleanup_training_state(self) -> None:
+        self._splits = None
+        self._selected = None
+        self._tree_calibration = None
 
     def _get_onnx_model_path(self) -> Path:
         return self._get_onnx_file_path('model')

@@ -15,14 +15,14 @@ logger = colorized_logger(__name__)
 
 _METADATA_COLUMNS = (
     'id', 'study', 'target_channel', 'input_channels', 'architecture_type',
-    'std_method', 'onnx_input_dtype', 'onnx_has_std', 'atlas_version', 'cv_r2', 'test_r2',
+    'std_method', 'onnx_input_dtype', 'onnx_has_std', 'atlas_version', 'cv_r2', 'cv_r2_std', 'test_r2',
     'test_mae', 'n_train', 'n_test', 'training_time_seconds', 'size_bytes', 'created',
 )
 
 _INSERT = """
 INSERT INTO atlas_model (
     study, target_channel, input_channels, architecture_type, std_method,
-    onnx_input_dtype, onnx_has_std, atlas_version, cv_r2, test_r2, test_mae, n_train, n_test,
+    onnx_input_dtype, onnx_has_std, atlas_version, cv_r2, cv_r2_std, test_r2, test_mae, n_train, n_test,
     training_time_seconds, size_bytes, onnx_model
 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id ;
@@ -48,6 +48,7 @@ def store_atlas_model(
     onnx_has_std: bool = True,
     atlas_version: str | None = None,
     cv_r2: float | None = None,
+    cv_r2_std: float | None = None,
     test_r2: float | None = None,
     test_mae: float | None = None,
     n_train: int | None = None,
@@ -58,7 +59,7 @@ def store_atlas_model(
     size_bytes = len(onnx_bytes)
     cursor.execute(_INSERT, (
         study, target_channel, list(input_channels), architecture_type, std_method,
-        onnx_input_dtype, onnx_has_std, atlas_version, cv_r2, test_r2, test_mae, n_train, n_test,
+        onnx_input_dtype, onnx_has_std, atlas_version, cv_r2, cv_r2_std, test_r2, test_mae, n_train, n_test,
         training_time_seconds, size_bytes, onnx_bytes,
     ))
     model_id = cast(TupleRow, cursor.fetchone())[0]
