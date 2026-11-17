@@ -80,26 +80,9 @@ class SklearnToONNX:
             logger.warning('ONNX model is %.1f MB; consider tighter tree bounds.', size_bytes / 1e6)
 
     @classmethod
-    def _deduplicate_opset_imports(cls, onnx_model: ModelProto) -> None:
-        """skl2onnx can list the default domain twice when given a dict target opset."""
-        seen: dict[str, int] = {}
-        for entry in onnx_model.opset_import:
-            seen[entry.domain] = max(entry.version, seen.get(entry.domain, 0))
-        del onnx_model.opset_import[:]
-        for domain, version in seen.items():
-            onnx_model.opset_import.append(helper.make_opsetid(domain, version))
-
-    @classmethod
     def _append_bayesian_ridge_std(cls, onnx_model: ModelProto, model, double_precision: bool) -> None:
         """
-        Append the exact per-sample std as a second graph output to a BayesianRidge graph:
-
-            xc  = (X - X_offset_) / X_scale_      # BayesianRidge input-centering
-            std = sqrt( sum(xc @ sigma_ * xc, axis=1) + 1/alpha_ )
-
-        Any preceding transform steps in the pipeline are assumed absent (see
-        `model_selection_fitting.build_model_candidates`); a StandardScaler, if ever
-        reintroduced, is folded into the affine `xc = X * A - B`.
+        Append the correct standard deviation as a second graph output to a BayesianRidge graph.
         """
         if hasattr(model, 'steps'):
             scaler = model.steps[0][1] if len(model.steps) > 1 else None
@@ -138,18 +121,6 @@ class SklearnToONNX:
         graph.output.append(helper.make_tensor_value_info(p + 'std', onnx_dtype, [None]))
 
     @classmethod
-    def _attr_to_py(cls, attr):
-        """Decode an ONNX `AttributeProto` to a plain Python value."""
-        return {
-            AttributeProto.INTS: lambda: list(attr.ints),
-            AttributeProto.FLOATS: lambda: list(attr.floats),
-            AttributeProto.STRINGS: lambda: [s.decode() for s in attr.strings],
-            AttributeProto.INT: lambda: attr.i,
-            AttributeProto.FLOAT: lambda: attr.f,
-            AttributeProto.STRING: lambda: attr.s.decode(),
-        }[attr.type]()
-
-    @classmethod
     def _append_tree_ensemble_std(
         cls,
         onnx_model: ModelProto,
@@ -159,13 +130,8 @@ class SklearnToONNX:
     ) -> None:
         """
         Replace the single-target `TreeEnsembleRegressor` by one with one target per tree,
-        and compute from the per-tree predictions both the mean (written back to the
-        original mean output) and a second output
-
-            std = γ · sqrt( mean_k(pred_k²) − mean_k(pred_k)² )
-
-        where γ is `calibration`. Reusing the one tree node keeps the graph about the
-        size of the vanilla export.
+        and compute from the per-tree predictions both the mean and a second output representing
+        variance.
         """
         estimator = model.steps[-1][1] if hasattr(model, 'steps') else model
         number_trees = len(estimator.estimators_)
@@ -213,12 +179,14 @@ class SklearnToONNX:
     @classmethod
     def _prepend_row_sum_normalization_and_z(cls, onnx_model: ModelProto, double_precision: bool) -> None:
         """
-        Turn a (X_normalized) -> (mean_normalized, std_normalized) graph into the
-        (X, measured) -> (z, mean, std) contract of the module docstring.
+        Row sum normalization is prepended to the ONNX model graph, and
+        final z-score computation is appended.
 
-        The existing nodes are rewired to read the in-graph normalized identity matrix
-        `z_Xn = X / rowsum(X)`. Rows with zero identity sum are divided by 1 instead (so
-        the estimator sees finite input) and masked to NaN in all outputs.
+        The new signature is
+            (X, measured) -> (z, mean, std) format.
+
+        The old signature is
+            (X_normalized) -> (mean_normalized, std_normalized)
         """
         np_dtype = np.float64 if double_precision else np.float32
         onnx_dtype = TensorProto.DOUBLE if double_precision else TensorProto.FLOAT
@@ -268,6 +236,29 @@ class SklearnToONNX:
         graph.input.append(helper.make_tensor_value_info('measured', onnx_dtype, [None]))
         del graph.output[:]
         graph.output.extend(helper.make_tensor_value_info(name, onnx_dtype, [None]) for name in ONNX_OUTPUT_NAMES)
+
+    @classmethod
+    def _attr_to_py(cls, attr):
+        """Decode an ONNX `AttributeProto` to a plain Python value."""
+        return {
+            AttributeProto.INTS: lambda: list(attr.ints),
+            AttributeProto.FLOATS: lambda: list(attr.floats),
+            AttributeProto.STRINGS: lambda: [s.decode() for s in attr.strings],
+            AttributeProto.INT: lambda: attr.i,
+            AttributeProto.FLOAT: lambda: attr.f,
+            AttributeProto.STRING: lambda: attr.s.decode(),
+        }[attr.type]()
+
+    @classmethod
+    def _deduplicate_opset_imports(cls, onnx_model: ModelProto) -> None:
+        """skl2onnx can list the default domain twice when given a dict target opset."""
+        seen: dict[str, int] = {}
+        for entry in onnx_model.opset_import:
+            seen[entry.domain] = max(entry.version, seen.get(entry.domain, 0))
+        del onnx_model.opset_import[:]
+        for domain, version in seen.items():
+            onnx_model.opset_import.append(helper.make_opsetid(domain, version))
+
 
 class SklearnToONNXValidation:
     @classmethod

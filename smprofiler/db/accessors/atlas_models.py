@@ -24,7 +24,7 @@ INSERT INTO atlas_model (
     study, target_channel, input_channels, architecture_type, std_method,
     onnx_input_dtype, onnx_has_std, atlas_version, cv_r2, cv_r2_std, test_r2, test_mae, n_train, n_test,
     training_time_seconds, size_bytes, onnx_model
-) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id ;
 """
 
