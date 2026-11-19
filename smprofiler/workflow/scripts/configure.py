@@ -66,7 +66,7 @@ def _consider_remove_nones(f: str, options: dict) -> str:
 def _write_pipeline_script(workflow: WorkflowModules, options: dict) -> None:
     main_seen: bool = False
     for subpackage, filename, is_main in workflow.assets_needed:
-        pipeline_file = cast(str, retrieve_from_library(filename, workflow, subpackage=subpackage))
+        pipeline_file = cast(str, retrieve_from_library(filename, 'workflow', subpackage=subpackage))
         pipeline_file = _consider_remove_nones(pipeline_file, options)
         if is_main:
             if main_seen:
@@ -84,7 +84,6 @@ def _write_pipeline_script(workflow: WorkflowModules, options: dict) -> None:
             file.write(pipeline_file)
     if not main_seen:
         raise ValueError('Workflow must have a main Nextflow file.')
-
 
 def _record_configuration_command(variables: dict[str, str], configuration_file: str) -> None:
     tokens = ['smprofiler workflow configure']
