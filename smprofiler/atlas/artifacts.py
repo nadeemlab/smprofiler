@@ -292,7 +292,7 @@ class SklearnToONNXValidation:
         dtype = np.float64 if double_precision else np.float32
         feeds = {'X': np.asarray(X_raw, dtype=dtype), 'measured': np.asarray(measured_raw, dtype=dtype)}
         onnx_z, onnx_mean, onnx_std = (np.asarray(o, dtype=np.float64).reshape(-1) for o in session.run(list(ONNX_OUTPUT_NAMES), feeds))
-        z, mean, std = cls._sklearn_outputs(sklearn_model, model_name, X_raw, measured_raw, tree_calibration)
+        z, mean, std = cls.sklearn_outputs(sklearn_model, model_name, X_raw, measured_raw, tree_calibration)
         mean_difference = float(np.sum(np.abs(onnx_mean - mean)) / max(np.sum(np.abs(mean)), np.finfo(float).tiny))
         mean_concordance = mean_difference < _MEAN_RELATIVE_L1_TOLERANCE
         if not mean_concordance:
@@ -312,7 +312,7 @@ class SklearnToONNXValidation:
         return (ordinary_prediction_concordance, std_concordance)
 
     @classmethod
-    def _sklearn_outputs(
+    def sklearn_outputs(
         cls,
         sklearn_model,
         model_name: str,
