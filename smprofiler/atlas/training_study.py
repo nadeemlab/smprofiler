@@ -159,6 +159,7 @@ class TrainingStudy:
         return reference_cell_data_identity_normalized
 
     def _form_splits(self, target_column: int, target_channel: str) -> bool:
+        x = self.feature_matrices.reference_cell_data_identity_normalized
         y = self.feature_matrices.reference_cell_data[:, target_column] / self.feature_matrices.row_sums
 
         if y.std() < 1e-6:
@@ -177,7 +178,6 @@ class TrainingStudy:
         train_indices, test_indices = cast(tuple[NDArray, NDArray], train_test_split(
             np_arange(len(y)), test_size=0.2, random_state=42
         ))
-        x = self.feature_matrices.reference_cell_data_identity_normalized
         x_train, x_test = x[train_indices], x[test_indices]
         y_train, y_test = y[train_indices], y[test_indices]
         logger.info('  Split    : %s train / %s test', f'{len(x_train):,}', f'{len(x_test):,}')
