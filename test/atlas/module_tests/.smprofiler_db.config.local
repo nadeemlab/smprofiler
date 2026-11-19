@@ -1,0 +1,5 @@
+[database-credentials]
+endpoint = localhost
+database = default_study_lookup
+user = postgres
+password = postgres
