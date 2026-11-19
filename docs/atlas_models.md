@@ -84,13 +84,13 @@ positive = model.atlas_relative_positive(identity, measured_foxp3, threshold=2.0
 For a whole slide, batch the cells into one `(n_cells, n_identity)` matrix rather than
 looping per cell.
 
-## Exposure
+## Use of the models
 The models are intended to be used by the SMProfiler exploratory data analysis application,
 and they can be used in any framework or environment that support the usage of ONNX models.
 
 Each model makes the most sense in the context of the study from which came the training data.
 In a context similar to a given study, e.g. breast or lung cancer, the model can be used
-directly (outside SMProfiler) for the specific purpose of **quickly determining reference-adjusted
+directly (outside SMProfiler) for the specific purpose of **quickly determining reference-relative
 expression levels for functional markers** without requiring any sort of lookup against
 the original atlas data.
 
