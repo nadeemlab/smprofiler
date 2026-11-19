@@ -1,5 +1,5 @@
 [database-credentials]
-endpoint = localhost
+endpoint = smprofiler-db---testing-only-atlas
 database = default_study_lookup
 user = postgres
 password = postgres

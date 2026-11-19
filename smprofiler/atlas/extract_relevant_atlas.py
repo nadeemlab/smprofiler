@@ -40,7 +40,7 @@ class ExtractRelevantCellAtlas:
         extraction_path: Path = Path(DEFAULT_ATLAS_SMALL)
     ):
         if not exists(atlas_files_directory):
-            raise ValueError('Directory %s for atlas files does not exist.', atlas_files_directory)
+            logger.warning('Directory %s for atlas files does not exist.', atlas_files_directory)
         self.atlas_file_retrieval = AtlasFileRetrieval(atlas_source, atlas_files_directory)
         self.database_config_file = database_config_file
         self.extraction_path = extraction_path
