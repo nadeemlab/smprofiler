@@ -1,4 +1,35 @@
 # Atlas model training
+## Usage
+
+```sh
+smprofiler atlas train-atlas-models \
+ --database-config-file=.smprofiler_db.config \
+ --save-to-database
+```
+
+## Pipeline
+The `atlas/` module contains:
+
+- [`AtlasFileRetrieval`](/smprofiler/atlas/atlas_file_retrieval.py). Access specific source cell-atlas files.
+- [`ExtractRelevantCellAtlas`](/smprofiler/atlas/extract_relevant_atlas.py). Extract needed information from the cell-atlas.
+- [`LoadFromExtraction`](/smprofiler/atlas/extract_relevant_atlas.py). Access to the extraction.
+- [`ChannelNamesOrganizer`](/smprofiler/atlas/channel_names_organizer.py). Read SMProfiler channel metadata and prepare it for training purposes.
+- [`TrainingOrchestrator`](/smprofiler/atlas/training_orchestrator.py). High-level orchestration of the model training process.
+- [`TrainingPlanner`](/smprofiler/atlas/training_planning.py). Form a list of scenarios, one for each model to be trained.
+- [`TrainingStudy`](/smprofiler/atlas/training_study). Do training for the markers for one study.
+- [`ModelSelectionFitting`](/smprofiler/atlas/model_selection_fitting.py). Actual model fitting, across various architectures.
+- [`SklearnToONNX`](/smprofiler/atlas/artifacts.py). Model export to interoperable ONNX format.
+- [`SklearnToONNXValidation`](/smprofiler/atlas/artifacts.py). Check concordance with scikit-learn models originally trained.
+- [`AtlasReferenceModel`](/smprofiler/atlas/inference.py). Example usage of inference for the ONNX models using the `onnxruntime` Python package.
+
+- Definitions of types used for interoperability between modules:
+  * [`CellAtlasSource`](/smprofiler/atlas/types.py)
+  * [`InherenceAtlasAnnotatedChannel`](/smprofiler/atlas/types.py)
+  * [`TrainingScenarioStudy`](/smprofiler/atlas/types.py)
+  * [`TrainingOptions`](/smprofiler/atlas/types.py)
+  * [`TrainingProgress`](/smprofiler/atlas/types.py)
+  * [`Splits`](/smprofiler/atlas/types.py)
+  * [`SelectedModel`](/smprofiler/atlas/types.py)
 
 ## What the model outputs
 For our atlas-reference models, we deliberately limit ourselves to candidate architectures
@@ -6,12 +37,10 @@ whose uncertainty varies non-trivially with input. From raw identity intensities
 measured functional intensity `measured`, every exported graph computes:
 
 ```
-S        = rowsum(X)
-mean_n   = model(X / S)
-std_n    = predictive std at X / S
-z        = ((measured / S) − mean_n) / std_n
-mean     = mean_n * S
-std      = std_n * S
+S      = rowsum(X)
+mean   = model(X / S)
+std    = predictive std at X / S
+z      = ((measured / S) − mean) / std
 ```
 
 ## Supported architectures
@@ -26,7 +55,7 @@ The current implementation uses the `scikit-learn` framework. The architectures 
 Specifically excluded are:
 
 - Gaussian process regression. It supports a posterior standard deviation, but `O(N^3)` training
-  cannot use a meaningful fraction of the `N` ~ 2 million-cell atlas.
+  time cannot use a meaningful fraction of the `N` ~ 2 million-cell atlas.
 - Boosting and purely-mean regressors (ridge, elastic net, huber, gradient boosting,
   XGBoost). The standard deviation is either a single residual scale or, for additive boosting,
   has no meaningful across-tree spread.
@@ -54,13 +83,4 @@ trained with 3 different architectures against the numpy/sklearn reference.
 
 The unit tests in `test/atlas/unit_tests/test_atlas_inference.py` assert numeric
 concordance between the sklearn model and the ONNX model.
-
-## Where the code lives
-
-- [`smprofiler/atlas/model_selection_fitting.py`](smprofiler/atlas/model_selection_fitting.py): candidates, CV selection, tree calibration.
-- [`smprofiler/atlas/artifacts.py`](smprofiler/atlas/artifacts.py): export to ONNX, the appended subgraphs, the in-graph normalization and z-score, ONNX validation.
-- [`smprofiler/atlas/inference.py`](smprofiler/atlas/inference.py): prediction and thresholding.
-- [`smprofiler/atlas/training.py`](smprofiler/atlas/training.py): End-to-end run.
-- [`smprofiler/db/accessors/atlas_models.py`](smprofiler/db/accessors/atlas_models.py): API access to models.
-- [`smprofiler/apiserver/app/main.py`](smprofiler/apiserver/app/main.py): API access to models.
 

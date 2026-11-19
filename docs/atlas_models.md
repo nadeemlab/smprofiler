@@ -32,7 +32,7 @@ on the channels available for one specific study at a time:
 | `std`      | output | `(n_cells,)`               | predictive standard deviation, raw scale |
 
 Identity-sum normalization is used inside the model to ensure that the overall scale of the
-training data is at least coarsely matched against given inputs at runtime. Callers pass raw values and
+training data is at least coarsely matchable against given inputs at runtime. Callers pass raw values and
 treat the model as a black box. `NaN` values are assigned to cells whose identity intensities sum to zero.
 
 ## API
@@ -58,11 +58,14 @@ The body is the ONNX model, and response headers describe how to run it.
 
 ```python
 import numpy as np
-from smprofiler.atlas.inference import load_model, predict_z_score, atlas_relative_positive
+from smprofiler.atlas.inference import AtlasReferenceModel
 
 # onnx_bytes: Model trained on channels for given study and functional marker,
 # e.g. response.content from GET /atlas-model/, or Path(...).read_bytes()
-session = load_model(onnx_bytes)
+model = AtlasReferenceModel(onnx_bytes)
+
+# If onnxruntime.InferenceSession is needed, access at
+#     session = model.session
 
 # Columns in the input_channels order for the given study, 2 cells and 3 markers:
 raw_identity_markers = np.array([
@@ -70,17 +73,12 @@ raw_identity_markers = np.array([
     [ 1.0, 9.0, 4.0, 0.2],   # cell 2
 ])
 
-# The measured target-channel intensity for the functional marker (FOXP3 in thise case)
+# The measured target-channel intensity for the functional marker (FOXP3 in this case)
 # which is incorporated into the model
 measured_foxp3 = np.array([2.4, 0.1])
 
-z = predict_z_score(session, identity, measured_foxp3)
-positive = atlas_relative_positive(session, identity, measured_foxp3, threshold=2.0)
-
-# Expected intensity and predictive standard deviation on the raw scale:
-from smprofiler.atlas.inference import predict_expected_intensity, predict_expected_std
-expected = predict_expected_intensity(session, identity)
-spread = predict_expected_std(session, identity)
+z = model.normalize_functional_marker(identity, measured_foxp3)
+positive = model.atlas_relative_positive(identity, measured_foxp3, threshold=2.0)
 ```
 
 For a whole slide, batch the cells into one `(n_cells, n_identity)` matrix rather than
@@ -89,6 +87,12 @@ looping per cell.
 ## Exposure
 The models are intended to be used by the SMProfiler exploratory data analysis application,
 and they can be used in any framework or environment that support the usage of ONNX models.
+
+Each model makes the most sense in the context of the study from which came the training data.
+In a context similar to a given study, e.g. breast or lung cancer, the model can be used
+directly (outside SMProfiler) for the specific purpose of **quickly determining reference-adjusted
+expression levels for functional markers** without requiring any sort of lookup against
+the original atlas data.
 
 ## References
 [^1]: Gong Q, Sharma M, Kuan EL, Glass MC, Chander A, Singh M, et al. Longitudinal Multi-omic Immune Profiling Reveals Age-Related Immune Cell Dynamics in Healthy Adults. Nature. 2025. ([paper](https://doi.org/10.1038/s41586-025-09686-5)) ([data](https://apps.allenimmunology.org/aifi/resources/imm-health-atlas/))
