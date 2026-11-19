@@ -12,6 +12,9 @@ smprofiler db upload-sync-small --database-config-file=build/db/.smprofiler_db.c
 smprofiler db count-cells --database-config-file=build/db/.smprofiler_db.config.local
 
 smprofiler db status --database-config-file build/db/.smprofiler_db.config.local > table_counts.txt
+
+smprofiler db sync-annotations --database-config-file=build/db/.smprofiler_db.config.local test/atlas/channel_annotations.json
+
 diff build/build_scripts/expected_table_counts.txt table_counts.txt
 status=$?
 [ $status -eq 0 ] && echo "Import created correct number of records." || (cat table_counts.txt && echo "Import failed.")

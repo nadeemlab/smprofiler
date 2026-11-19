@@ -170,6 +170,7 @@ packages = [
     "smprofiler.apiserver.request_scheduling",
     "smprofiler.apiserver.scripts",
     "smprofiler.atlas",
+    "smprofiler.atlas.assets",
     "smprofiler.atlas.scripts",
     "smprofiler.graphs",
     "smprofiler.graphs.scripts",
