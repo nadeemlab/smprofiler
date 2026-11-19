@@ -28,7 +28,7 @@ class _FakeCursor:
 def test_store_atlas_model_builds_insert_and_returns_id():
     cursor = _FakeCursor(one=(42,))
     onnx_bytes = b"onnx-model-bytes"
-    model_id = StoredAtlasModels.store_atlas_model(
+    model_id = StoredAtlasModels._store_atlas_model(
         cursor,
         study="luad",
         target_channel="FOXP3",
