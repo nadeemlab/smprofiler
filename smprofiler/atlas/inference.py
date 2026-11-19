@@ -21,7 +21,7 @@ class AtlasReferenceModel:
     def __init__(self, onnx_model: bytes | str):
         self.session = self._load_model(onnx_model)
 
-    def load_model(self, onnx_model: bytes | str) -> InferenceSession:
+    def _load_model(self, onnx_model: bytes | str) -> InferenceSession:
         """Return an onnxruntime session for a model given as ONNX bytes or a file path."""
         options = SessionOptions()
         ERROR_LEVEL = 3

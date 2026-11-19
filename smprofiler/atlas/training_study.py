@@ -106,7 +106,7 @@ class TrainingStudy:
         if not self._form_splits(target_column, target_channel):
             logger.warning('Something went wrong forming cross validation split.')
             return False
-        self._train_and_select_best()
+        self._train_and_select_best_model()
         self._export()
         return True
 
@@ -184,7 +184,7 @@ class TrainingStudy:
         self._splits = Splits(test_indices, x_train, x_test, y_train, y_test, target_channel, target_column)
         return True
 
-    def _train_and_select_best(self) -> str:
+    def _train_and_select_best_model(self) -> str:
         t_train_start = time.monotonic()
         best_name, best_model, cv_r2, cv_r2_std = ModelSelectionFitting.train_and_select_best(
             self._splits.x_train, self._splits.y_train, cv_folds=self.options.cv_folds

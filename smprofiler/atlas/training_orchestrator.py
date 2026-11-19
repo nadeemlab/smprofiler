@@ -86,8 +86,8 @@ class TrainingOrchestrator:
         e.review_atlas_file()
 
     def _planning(self) -> None:
-        self.planner = TrainingPlanner(self.options)
-        self.planner.form_plan(self.database_config_file, self.study, self.atlas_source)
+        self.planner = TrainingPlanner(self.options, self.database_config_file, self.atlas_source)
+        self.planner.form_plan(self.study)
         self.plan = self.planner.plan
 
     def _execution(self) -> None:
