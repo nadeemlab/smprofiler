@@ -59,11 +59,8 @@ def test_train_atlas_models_on_tiny_subset():
             patch.object(StandaloneSQLiteHTTPCache, 'cache_filename', str(Path(tmp) / 'cache.sqlite')):
         output_dir = Path(tmp) / 'models'
         training.run(
-            FIXTURE / 'cell_atlas_small.parquet',
-            FIXTURE / 'smprofiler_channels_to_atlas.tsv',
-            FIXTURE / 'datasets',
+            '.smprofiler_db.config.container',
             output_dir,
-            annotations_api_url='https://fixture.local/api',  # stubbed; never fetched
             cv_folds=3,
         )
 
