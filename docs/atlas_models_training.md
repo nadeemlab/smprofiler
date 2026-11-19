@@ -10,26 +10,28 @@ smprofiler atlas train-atlas-models \
 ## Pipeline
 The `atlas/` module contains:
 
-- [`AtlasFileRetrieval`](/smprofiler/atlas/atlas_file_retrieval.py). Access specific source cell-atlas files.
-- [`ExtractRelevantCellAtlas`](/smprofiler/atlas/extract_relevant_atlas.py). Extract needed information from the cell-atlas.
-- [`LoadFromExtraction`](/smprofiler/atlas/extract_relevant_atlas.py). Access to the extraction.
-- [`ChannelNamesOrganizer`](/smprofiler/atlas/channel_names_organizer.py). Read SMProfiler channel metadata and prepare it for training purposes.
-- [`TrainingOrchestrator`](/smprofiler/atlas/training_orchestrator.py). High-level orchestration of the model training process.
-- [`TrainingPlanner`](/smprofiler/atlas/training_planning.py). Form a list of scenarios, one for each model to be trained.
-- [`TrainingStudy`](/smprofiler/atlas/training_study). Do training for the markers for one study.
-- [`ModelSelectionFitting`](/smprofiler/atlas/model_selection_fitting.py). Actual model fitting, across various architectures.
-- [`SklearnToONNX`](/smprofiler/atlas/artifacts.py). Model export to interoperable ONNX format.
-- [`SklearnToONNXValidation`](/smprofiler/atlas/artifacts.py). Check concordance with scikit-learn models originally trained.
-- [`AtlasReferenceModel`](/smprofiler/atlas/inference.py). Example usage of inference for the ONNX models using the `onnxruntime` Python package.
+|   |   |
+|---|---|
+| [`AtlasFileRetrieval`](/smprofiler/atlas/atlas_file_retrieval.py) | Access specific source cell-atlas files. |
+| [`ExtractRelevantCellAtlas`](/smprofiler/atlas/extract_relevant_atlas.py) | Extract needed information from the cell-atlas. |
+| [`LoadFromExtraction`](/smprofiler/atlas/extract_relevant_atlas.py) | Access to the extraction. |
+| [`ChannelNamesOrganizer`](/smprofiler/atlas/channel_names_organizer.py) | Read SMProfiler channel metadata and prepare it for training purposes. |
+| [`TrainingOrchestrator`](/smprofiler/atlas/training_orchestrator.py) | High-level orchestration of the model training process. |
+| [`TrainingPlanner`](/smprofiler/atlas/training_planning.py) | Form a list of scenarios, one for each model to be trained. |
+| [`TrainingStudy`](/smprofiler/atlas/training_study.py) | Do training for the markers for one study. |
+| [`ModelSelectionFitting`](/smprofiler/atlas/model_selection_fitting.py) | Actual model fitting, across various architectures. |
+| [`SklearnToONNX`](/smprofiler/atlas/artifacts.py) | Model export to interoperable ONNX format. |
+| [`SklearnToONNXValidation`](/smprofiler/atlas/artifacts.py) | Check concordance with scikit-learn models originally trained. |
+| [`AtlasReferenceModel`](/smprofiler/atlas/inference.py) | Example usage of inference for the ONNX models using the `onnxruntime` Python package. |
 
-- Definitions of types used for interoperability between modules:
-  * [`CellAtlasSource`](/smprofiler/atlas/types.py)
-  * [`InherenceAtlasAnnotatedChannel`](/smprofiler/atlas/types.py)
-  * [`TrainingScenarioStudy`](/smprofiler/atlas/types.py)
-  * [`TrainingOptions`](/smprofiler/atlas/types.py)
-  * [`TrainingProgress`](/smprofiler/atlas/types.py)
-  * [`Splits`](/smprofiler/atlas/types.py)
-  * [`SelectedModel`](/smprofiler/atlas/types.py)
+Definitions of types used for interoperability between modules:
+* [`CellAtlasSource`](/smprofiler/atlas/types.py)
+* [`InherenceAtlasAnnotatedChannel`](/smprofiler/atlas/types.py)
+* [`TrainingScenarioStudy`](/smprofiler/atlas/types.py)
+* [`TrainingOptions`](/smprofiler/atlas/types.py)
+* [`TrainingProgress`](/smprofiler/atlas/types.py)
+* [`Splits`](/smprofiler/atlas/types.py)
+* [`SelectedModel`](/smprofiler/atlas/types.py)
 
 ## What the model outputs
 For our atlas-reference models, we deliberately limit ourselves to candidate architectures
