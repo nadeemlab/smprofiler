@@ -19,6 +19,7 @@ class AtlasModelMetadata(BaseModel):
     onnx_has_std: bool
     atlas_version: str | None
     cv_r2: float | None
+    cv_r2_std: float | None
     test_r2: float | None
     test_mae: float | None
     n_train: int | None
@@ -26,4 +27,6 @@ class AtlasModelMetadata(BaseModel):
     training_time_seconds: float | None
     size_bytes: int | None
     created: datetime
+
+
 

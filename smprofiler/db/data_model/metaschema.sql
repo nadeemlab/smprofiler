@@ -3,11 +3,6 @@ CREATE TABLE study_lookup (
     schema_name VARCHAR(512)
 );
 
--- Trained atlas-reference models (one row per trained (study, target_channel) model).
--- No foreign keys: chemical_species lives in each per-study schema (out of reach from
--- this shared metaschema), and a study may be trained before it is loaded into
--- study_lookup, so `study` and the channel names are stored as plain text. Multiple
--- rows per (study, target_channel) with distinct `created` values give model versions.
 CREATE TABLE atlas_model (
     id SERIAL PRIMARY KEY,
     study VARCHAR(512),
@@ -19,6 +14,7 @@ CREATE TABLE atlas_model (
     onnx_has_std BOOLEAN NOT NULL DEFAULT true,
     atlas_version VARCHAR,
     cv_r2 DOUBLE PRECISION,
+    cv_r2_std DOUBLE PRECISION,
     test_r2 DOUBLE PRECISION,
     test_mae DOUBLE PRECISION,
     n_train INTEGER,

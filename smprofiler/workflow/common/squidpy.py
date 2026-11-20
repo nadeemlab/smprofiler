@@ -38,7 +38,6 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import LabelEncoder
 from spatialdata import SpatialData
 
-from squidpy._constants._constants import RipleyStat
 from squidpy._constants._pkg_constants import Key
 from squidpy._utils import NDArrayA
 from squidpy.gr._utils import _assert_categorical_obs, _assert_spatial_basis, _save_data
@@ -106,16 +105,16 @@ def ripley_custom(
 
     for i in np.arange(np.max(cluster_idx) + 1):
         coord_c = coordinates[cluster_idx == i, :]
-        if mode == RipleyStat.F:
+        if mode == 'F':
             random = _ppp(hull, n_simulations=1, n_observations=n_observations, seed=seed)
             tree_c = NearestNeighbors(metric=metric, n_neighbors=n_neigh).fit(coord_c)
             distances, _ = tree_c.kneighbors(random, n_neighbors=n_neigh)
             bins, obs_stats = _f_g_function(distances.squeeze(), support)
-        elif mode == RipleyStat.G:
+        elif mode == 'G':
             tree_c = NearestNeighbors(metric=metric, n_neighbors=n_neigh).fit(coord_c)
             distances, _ = tree_c.kneighbors(coordinates[cluster_idx != i, :], n_neighbors=n_neigh)
             bins, obs_stats = _f_g_function(distances.squeeze(), support)
-        elif mode == RipleyStat.L:
+        elif mode == 'L':
             distances = pdist(coord_c, metric=metric)
             bins, obs_stats = _l_function(distances, support, N, area)
         else:
@@ -127,15 +126,15 @@ def ripley_custom(
 
     for i in range(n_simulations):
         random_i = _ppp(hull, n_simulations=1, n_observations=n_observations, seed=seed)
-        if mode == RipleyStat.F:
+        if mode == 'F':
             tree_i = NearestNeighbors(metric=metric, n_neighbors=n_neigh).fit(random_i)
             distances_i, _ = tree_i.kneighbors(random, n_neighbors=1)
             _, stats_i = _f_g_function(distances_i.squeeze(), support)
-        elif mode == RipleyStat.G:
+        elif mode == 'G':
             tree_i = NearestNeighbors(metric=metric, n_neighbors=n_neigh).fit(random_i)
             distances_i, _ = tree_i.kneighbors(coordinates, n_neighbors=1)
             _, stats_i = _f_g_function(distances_i.squeeze(), support)
-        elif mode == RipleyStat.L:
+        elif mode == 'L':
             distances_i = pdist(random_i, metric=metric)
             _, stats_i = _l_function(distances_i, support, N, area)
         else:

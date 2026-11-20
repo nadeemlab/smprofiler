@@ -49,8 +49,7 @@ from smprofiler.db.exchange_data_formats.metrics import (
 )
 from smprofiler.db.exchange_data_formats.cells import BitMaskFeatureNames
 from smprofiler.db.exchange_data_formats.atlas_models import AtlasModelMetadata
-from smprofiler.db.accessors.atlas_models import list_atlas_models as _list_atlas_models
-from smprofiler.db.accessors.atlas_models import get_atlas_model as _get_atlas_model_bytes
+from smprofiler.db.accessors.atlas_models import StoredAtlasModels
 from smprofiler.db.querying import query
 from smprofiler.db.publish_promote import create_collection_whitelist
 from smprofiler.apiserver.app.validation import (
@@ -936,11 +935,11 @@ async def get_atlas_models(
 
     Each entry describes one model: the functional channel it predicts, the
     identity `input_channels` it consumes (in input order), its architecture and
-    evaluation metrics, and the `onnx_input_dtype` inference must feed. Download a
+    evaluation metrics, and the `onnx_input_dtype` (probably 'float32'). Download a
     model's bytes from `/atlas-model/`. Optionally filter to one `target_channel`.
     """
     with DBCursor() as cursor:
-        rows = _list_atlas_models(cursor, study=study, target_channel=target_channel)
+        rows = StoredAtlasModels.list_atlas_models(cursor, study=study, target_channel=target_channel)
     return [AtlasModelMetadata(**row) for row in rows]
 
 
@@ -954,8 +953,8 @@ async def get_atlas_model(
     Download one trained atlas-reference model as raw ONNX bytes.
 
     Returns the latest model for (`study`, `target_channel`), or the specific
-    version identified by `model_id`. The body is the ONNX model
-    (`application/octet-stream`); response headers carry what is needed to run it:
+    version identified by `model_id`. The body is the ONNX model.
+    Response headers carry what is needed to run it:
 
     - `X-Model-Id`: the stored model id
     - `X-Onnx-Input-Dtype`: `float32` or `float64` — the dtype of the model's
@@ -971,7 +970,7 @@ async def get_atlas_model(
     [docs/atlas_models.md](https://github.com/nadeemlab/SMProfiler/blob/main/docs/atlas_models.md).
     """
     with DBCursor() as cursor:
-        candidates = _list_atlas_models(cursor, study=study, target_channel=target_channel)
+        candidates = StoredAtlasModels.list_atlas_models(cursor, study=study, target_channel=target_channel)
         if not candidates:
             raise HTTPException(
                 status_code=404,
@@ -987,7 +986,7 @@ async def get_atlas_model(
                     detail=f'Atlas model id={model_id} not found for '
                            f'study="{study}", target_channel="{target_channel}".',
                 )
-        onnx_bytes = _get_atlas_model_bytes(cursor, metadata["id"])
+        onnx_bytes = StoredAtlasModels.get_atlas_model_bytes(cursor, metadata["id"])
     if onnx_bytes is None:
         raise HTTPException(status_code=404, detail='Model bytes not found.')
     return Response(
